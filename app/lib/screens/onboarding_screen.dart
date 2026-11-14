@@ -17,8 +17,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final _api = ApiClient();
   int _currentStep = 0;
 
-  final _urlCtrl = TextEditingController(text: "http://100.97.30.113:8000");
-  final _tokenCtrl = TextEditingController(text: "mApIGVEyORqpXbJzPhrhLPk9pRaS_vPOFyxH07nuPV4");
+  final _urlCtrl = TextEditingController(text: "");
+  final _tokenCtrl = TextEditingController(text: "");
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStoredCredentials();
+  }
+
+  Future<void> _loadStoredCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    final url = prefs.getString("server_url") ?? "";
+    final token = prefs.getString("auth_token") ?? "";
+    if (mounted) {
+      if (url.isNotEmpty) _urlCtrl.text = url;
+      if (token.isNotEmpty) _tokenCtrl.text = token;
+    }
+  }
 
   @override
   void dispose() {
@@ -77,7 +93,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text("Candidate: Adharsh Arvinth", style: TextStyle(fontWeight: FontWeight.w500)),
+                                const Text("Candidate Profile & Fact Base", style: TextStyle(fontWeight: FontWeight.w600)),
                                 const SizedBox(height: 4),
                                 const Text("Education: MTech Integrated CSE (Data Science), VIT Vellore (CGPA 7.62)"),
                                 const SizedBox(height: 8),

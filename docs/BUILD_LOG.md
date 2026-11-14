@@ -146,7 +146,7 @@ Automated end-to-end build log for ApplyPilot (FastAPI Backend + Flutter Mobile 
   - Responsive Flutter Web Cockpit mounted on FastAPI backend at `/app/` and `/`.
   - Automated Android SDK environment setup at `D:\Android\Sdk` including Platforms 35/36, Build-Tools 28.0.3/36.0.0, CMake 3.22.1, and NDK 28.2.13676358.
   - Updated `build-apk.bat` for one-click release builds directly linking to `D:\flutter\bin` and `D:\Android\Sdk`.
-  - Direct APK download route exposed over Tailscale: `http://100.97.30.113:8000/output/ApplyPilot.apk`.
+  - Direct APK download route exposed over Tailscale: `http://100.x.y.z:8000/output/ApplyPilot.apk`.
 - **Failures & Fixes**:
   - *Failure 1*: Flutter 3.50+ required `CardThemeData` instead of `CardTheme` in `theme.dart`. *Fix*: Updated to `CardThemeData`.
   - *Failure 2*: `settings.gradle` used deprecated imperative plugin loading. *Fix*: Migrated to modern declarative Gradle `.kts` syntax.

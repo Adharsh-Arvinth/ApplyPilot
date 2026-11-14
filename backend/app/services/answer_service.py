@@ -234,11 +234,11 @@ class AnswerService:
         profile = db.query(Profile).first()
         if not profile:
             profile = Profile(
-                full_name="Adharsh Arvinth",
-                email="adharsharvinth2108@gmail.com",
-                phone="+91 7397161512",
-                linkedin="https://linkedin.com/in/Adharsh-Arvinth",
-                github="https://github.com/Adharsh-Arvinth",
+                full_name="Candidate Profile",
+                email="candidate@applypilot.local",
+                phone="+91 98765 43210",
+                linkedin="https://linkedin.com/in/candidate",
+                github="https://github.com/candidate",
                 education="MTech Integrated CSE (Data Science), VIT Vellore",
                 cgpa="7.62/10",
                 graduation_date="May 2027",

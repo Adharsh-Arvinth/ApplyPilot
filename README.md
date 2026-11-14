@@ -296,24 +296,76 @@ backend/tests/test_safety_audit.py (6 tests) PASSED                             
 The production release artifact is compiled and verified:
 
 - **File**: `output/ApplyPilot.apk`
+- **Architecture**: `arm64-v8a` (Universal Modern Android)
 - **Version**: `1.3.0` (Complete Product Audit, Real ATS Discovery & UI/UX Upgrade)
-- **Size**: `52.03 MB` (54,559,494 bytes)
-- **SHA-256**: `2AFE0DB164D2033C4CAE4EC2658553405EBD5D0489BFE7878D43D280F9E51804`
+- **Size**: `18.18 MB` (19,064,524 bytes) — *Optimized lightweight build, zero GitHub size warnings*
+- **SHA-256**: `6341712640C8B158521EEFA2AD254415E932CCAB3B7D3CEEFBCD9FD186CC3944`
 - **Target SDK**: Android 14 (API 34) / Min SDK: Android 8.0 (API 26)
 - **Flutter Web Build**: Compiled to `app/build/web` and hosted natively at `http://localhost:8000/app/`
 - **Metadata**: Verified in `output/ApplyPilot-release-info.json`
 
 ---
 
+## Complete API Reference
+
+| Endpoint | Method | Security | Description |
+| :--- | :---: | :---: | :--- |
+| `/api/v1/health` | `GET` | Public | System uptime, WAL mode status, queue state |
+| `/api/v1/profile` | `GET` | Bearer | Candidate profile, preferences, target roles, salary floor |
+| `/api/v1/profile` | `PUT` | Bearer | Update candidate preferences, locations, excluded companies |
+| `/api/v1/profile/resume` | `POST` | Bearer | Multipart resume upload with automatic PyPDF fact extraction |
+| `/api/v1/profile/toggle-pause` | `POST` | Bearer | Emergency toggle for all automated pipelines |
+| `/api/v1/profile/toggle-go-live` | `POST` | Bearer | Toggle between Safe Dry-Run and Live Auto-Submit |
+| `/api/v1/jobs` | `GET` | Bearer | Filter jobs by status (`queued`, `maybe`, `applied`, `skipped`, `blocked`), work mode, and score |
+| `/api/v1/jobs/discover` | `POST` | Bearer | Scan live Greenhouse, Lever, and Ashby job boards |
+| `/api/v1/jobs/evaluate` | `POST` | Bearer | Run Stage A eligibility and Stage B 5-factor fit scoring |
+| `/api/v1/jobs/{id}/apply` | `POST` | Bearer | Process specific job form (safe dry-run or live auto-submit) |
+| `/api/v1/jobs/apply-next` | `POST` | Bearer | Pop next eligible job from queue and apply |
+| `/api/v1/answer-bank` | `GET` | Bearer | Search and filter canonical question/answer memories |
+| `/api/v1/answer-bank` | `POST` | Bearer | Add new verified question/answer pair with evidence |
+| `/api/v1/needs-you` | `GET` | Bearer | List unresolved application questions requiring candidate input |
+| `/api/v1/needs-you/{id}/resolve`| `POST` | Bearer | Resolve blocker question, save to Answer Bank, and auto-resume |
+| `/api/v1/automation/status` | `GET` | Bearer | Real-time queue state, pre-flight readiness checks, recovery tips |
+| `/api/v1/automation/pause` | `POST` | Bearer | Safely pause automation with specific reason and details |
+| `/api/v1/automation/resume` | `POST` | Bearer | Resume automation pipeline after verifying pre-flight checks |
+| `/api/v1/analytics` | `GET` | Bearer | Telemetry: conversion funnel, trends, real vs dry-run breakdown |
+| `/api/v1/logs` | `GET` | Bearer | Expandable execution audit trail with level, company, outcome |
+
+---
+
+## Security, Privacy & Anti-Hallucination Architecture
+
+1. **Zero Cloud PII Exposure**: All candidate contact details, resumes, and Answer Bank memories are stored locally in the candidate's private SQLite WAL database. No personal credentials or contact data are transmitted to third-party tracking services.
+2. **Encrypted Private Mesh Networking**: Communication between the Flutter Android cockpit and the Windows PC backend runs exclusively over **Tailscale Mesh VPN** with WireGuard encryption. No ports are forwarded on your router.
+3. **Truth-Grounded Answers Only**: Form filling is strictly bounded by verified candidate records (degrees, published patents, benchmarks, and approved Answer Bank entries). The automation engine is programmatically barred from inventing or improvising credentials.
+4. **Authoritative Safety Gates**:
+   - **Dry-Run by Default**: Forms are filled, validated, and screenshotted in headless Chromium without clicking final submit until the user explicitly toggles Go-Live.
+   - **30-Day Per-Company Cooldown**: Prevents multiple applications to the same employer within a 30-day window.
+   - **Circuit Breaker**: Automatically halts the application queue upon 3 consecutive failures to safeguard candidate reputation.
+   - **Daily Application Cap**: Strict local timezone cutoff (`Asia/Kolkata`) prevents exceeding daily limits.
+
+---
+
 ## Getting Started
 
-### 1. Start Windows Host Backend
+### 1. Configure Environment
+Create a `backend/.env` file with your settings (never committed to Git):
+```ini
+APPLYPILOT_ENV=development
+APPLYPILOT_HOST=0.0.0.0
+APPLYPILOT_PORT=8000
+APPLYPILOT_TOKEN=<generate_secure_random_token>
+APPLYPILOT_ENCRYPTION_KEY=<generate_fernet_key>
+GEMINI_API_KEY=<your_gemini_api_key>
+```
+
+### 2. Start Windows Host Backend
 ```powershell
 python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
 ```
 
-### 2. Connect Mobile App Over Tailscale
-1. Install `output/ApplyPilot.apk` on your Android device.
+### 3. Connect Mobile Cockpit Over Tailscale
+1. Install `output/ApplyPilot.apk` on your Android device (or run `flutter run` in `app/`).
 2. Enter your Windows host Tailscale IP (e.g. `http://100.x.y.z:8000`).
-3. Enter your bearer token: `mApIGVEyORqpXbJzPhrhLPk9pRaS_vPOFyxH07nuPV4`.
-4. Tap **Verify Connection** and start your automated career cockpit!
+3. Enter your bearer token configured in `backend/.env`.
+4. Tap **Verify Connection** and take full control of your career search!

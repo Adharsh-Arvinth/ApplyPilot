@@ -1,4 +1,4 @@
 @echo off
-title Career-Ops Auto-Apply Agent - Adharsh Arvinth
+title ApplyPilot Auto-Apply Agent
 cd /d "%~dp0career-ops"
 call RUN_AUTO_APPLY.bat

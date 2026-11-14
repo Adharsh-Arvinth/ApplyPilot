@@ -137,10 +137,10 @@ class ResumeTailoringService:
             projects_html = block_accident + block_agentic + block_doppler
             changes_applied.append("Balanced core research implementations & patents")
 
-        email_val = profile.email if profile else "adharsharvinth2108@gmail.com"
-        phone_val = profile.phone if profile else "+91 7397161512"
-        linkedin_val = profile.linkedin if profile else "https://linkedin.com/in/Adharsh-Arvinth"
-        github_val = profile.github if profile else "https://github.com/Adharsh-Arvinth"
+        email_val = profile.email if (profile and profile.email) else "candidate@applypilot.local"
+        phone_val = profile.phone if (profile and profile.phone) else "+91 98765 43210"
+        linkedin_val = profile.linkedin if (profile and profile.linkedin) else "https://linkedin.com/in/candidate"
+        github_val = profile.github if (profile and profile.github) else "https://github.com/candidate"
         education_val = profile.education if profile else "Integrated MTech Computer Science and Engineering (Data Science)"
         cgpa_val = profile.cgpa if profile else "7.62/10"
         grad_val = profile.graduation_date if profile else "May 2027"

@@ -13,20 +13,20 @@ class ApiClient {
   factory ApiClient() => _instance;
   ApiClient._internal();
 
-  String _baseUrl = "http://100.97.30.113:8000";
-  String _token = "mApIGVEyORqpXbJzPhrhLPk9pRaS_vPOFyxH07nuPV4";
+  String _baseUrl = "http://100.x.y.z:8000";
+  String _token = "";
 
   String get baseUrl => _baseUrl;
   String get token => _token;
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
-    String defaultUrl = "http://100.97.30.113:8000";
+    String defaultUrl = "http://100.x.y.z:8000";
     if (kIsWeb && Uri.base.origin.startsWith("http")) {
       defaultUrl = Uri.base.origin;
     }
     _baseUrl = prefs.getString("server_url") ?? defaultUrl;
-    _token = prefs.getString("auth_token") ?? "mApIGVEyORqpXbJzPhrhLPk9pRaS_vPOFyxH07nuPV4";
+    _token = prefs.getString("auth_token") ?? "";
   }
 
   Future<void> saveConnectionSettings(String url, String token) async {

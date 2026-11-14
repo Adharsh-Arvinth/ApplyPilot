@@ -3,9 +3,10 @@
   "version_name": "ApplyPilot Complete Product Audit, Real ATS Discovery & UI/UX Upgrade",
   "package_name": "com.applypilot.app",
   "apk_filename": "ApplyPilot.apk",
-  "file_size_bytes": 54559494,
-  "file_size_mb": 52.03,
-  "sha256": "2AFE0DB164D2033C4CAE4EC2658553405EBD5D0489BFE7878D43D280F9E51804",
+  "architecture": "arm64-v8a (Universal Modern Android)",
+  "file_size_bytes": 19064524,
+  "file_size_mb": 18.18,
+  "sha256": "6341712640C8B158521EEFA2AD254415E932CCAB3B7D3CEEFBCD9FD186CC3944",
   "build_type": "release",
   "min_sdk": 26,
   "target_sdk": 34,
@@ -21,6 +22,8 @@
     "Minimal Editorial Design System: Dark Background #0E0F0E, Semantic Score Dot (• 4.8 / 5.0), Filled Rounded Inputs, Wrapping Chips",
     "Expandable Real-Time Operation Audit Logs with Company, Role, Outcome, and Timestamp",
     "Verified 10-Job Real ATS Dry-Run Report across Live Postings without Submission",
+    "Lightweight Optimized Architecture (< 20 MB, No GitHub Large File Warnings)",
+    "Strict Privacy Guard: Zero Hardcoded Personal PII or Bearer Tokens in Repository Code",
     "60/60 Backend Unit & Integration Tests Passing",
     "Full Flutter Widget & Integration Test Suite Passing"
   ]

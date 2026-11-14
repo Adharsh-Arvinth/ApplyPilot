@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     APPLYPILOT_ENV: str = "development"
     APPLYPILOT_HOST: str = "0.0.0.0"
     APPLYPILOT_PORT: int = 8000
-    APPLYPILOT_TOKEN: str = "mApIGVEyORqpXbJzPhrhLPk9pRaS_vPOFyxH07nuPV4"
+    APPLYPILOT_TOKEN: str = "applypilot_dev_token_insecure_replace_in_env"
     APPLYPILOT_ENCRYPTION_KEY: str = "ECvqzWXsliXT4qtOZoppgQGIJcC2HuLTGEB8w2FBbnI="
     CLAUDE_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None

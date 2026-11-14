@@ -12,10 +12,10 @@ logger = logging.getLogger(__name__)
 # Verified candidate ground truth (Strictly bounded truth source - zero fabrication permitted)
 CANDIDATE_FACTS = """
 CANDIDATE PROFILE (VERIFIED TRUTH SOURCE):
-- Full Name: Adharsh Arvinth
-- Email: adharsharvinth2108@gmail.com
-- Phone: +91 7397161512
-- Links: GitHub (github.com/Adharsh-Arvinth), LinkedIn (linkedin.com/in/Adharsh-Arvinth)
+- Full Name: Candidate Profile
+- Email: candidate@applypilot.local
+- Phone: +91 98765 43210
+- Links: GitHub (github.com/candidate), LinkedIn (linkedin.com/in/candidate)
 - Degree: Integrated MTech in Computer Science & Engineering (Specialization: Data Science), Vellore Institute of Technology (VIT Vellore)
 - Graduation: May 2027 | CGPA: 7.62/10
 - Notice Period: Immediate / Negotiable for college schedule | Work Authorization: Indian citizen, no sponsorship required in India

@@ -10,11 +10,11 @@ class Profile(Base):
     __tablename__ = "profiles"
 
     id = Column(Integer, primary_key=True, index=True)
-    full_name = Column(String(128), default="Adharsh Arvinth")
-    email = Column(String(128), default="adharsharvinth2108@gmail.com")
-    phone = Column(String(64), default="+91 7397161512")
-    linkedin = Column(String(256), default="https://linkedin.com/in/Adharsh-Arvinth")
-    github = Column(String(256), default="https://github.com/Adharsh-Arvinth")
+    full_name = Column(String(128), default="Candidate Profile")
+    email = Column(String(128), default="candidate@applypilot.local")
+    phone = Column(String(64), default="+91 98765 43210")
+    linkedin = Column(String(256), default="https://linkedin.com/in/candidate")
+    github = Column(String(256), default="https://github.com/candidate")
     education = Column(String(256), default="MTech Integrated CSE (Data Science), VIT Vellore")
     cgpa = Column(String(32), default="7.62/10")
     graduation_date = Column(String(64), default="May 2027")
