@@ -49,26 +49,38 @@ def migrate_db():
 
         # 1. Migrate profiles
         profile_cols = get_existing_cols("profiles")
-        if "excluded_companies_json" not in profile_cols:
-            conn.execute(text("ALTER TABLE profiles ADD COLUMN excluded_companies_json TEXT DEFAULT '[]';"))
-        if "widget_preferences_json" not in profile_cols:
-            conn.execute(text("ALTER TABLE profiles ADD COLUMN widget_preferences_json TEXT DEFAULT '{}';"))
-        if "daily_target" not in profile_cols:
-            conn.execute(text("ALTER TABLE profiles ADD COLUMN daily_target INTEGER DEFAULT 50;"))
-        if "timezone" not in profile_cols:
-            conn.execute(text("ALTER TABLE profiles ADD COLUMN timezone VARCHAR(64) DEFAULT 'Asia/Kolkata';"))
+        profile_additions = [
+            ("excluded_companies_json", "TEXT DEFAULT '[]'"),
+            ("widget_preferences_json", "TEXT DEFAULT '{}'"),
+            ("daily_target", "INTEGER DEFAULT 50"),
+            ("timezone", "VARCHAR(64) DEFAULT 'Asia/Kolkata'"),
+            ("min_stipend_inr", "INTEGER DEFAULT 25000"),
+            ("allow_unpaid_internships", "BOOLEAN DEFAULT 0"),
+            ("allow_unknown_salary", "BOOLEAN DEFAULT 1"),
+            ("pause_reason", "VARCHAR(128) DEFAULT ''"),
+            ("paused_at", "DATETIME"),
+            ("pause_details", "TEXT DEFAULT ''"),
+        ]
+        for col_name, col_def in profile_additions:
+            if col_name not in profile_cols:
+                conn.execute(text(f"ALTER TABLE profiles ADD COLUMN {col_name} {col_def};"))
         conn.commit()
 
         # 2. Migrate answer_bank
         bank_cols = get_existing_cols("answer_bank")
-        if "source" not in bank_cols:
-            conn.execute(text("ALTER TABLE answer_bank ADD COLUMN source VARCHAR(64) DEFAULT 'candidate_profile';"))
-        if "is_verified" not in bank_cols:
-            conn.execute(text("ALTER TABLE answer_bank ADD COLUMN is_verified BOOLEAN DEFAULT 1;"))
-        if "supporting_evidence" not in bank_cols:
-            conn.execute(text("ALTER TABLE answer_bank ADD COLUMN supporting_evidence TEXT DEFAULT '';"))
-        if "allow_reuse" not in bank_cols:
-            conn.execute(text("ALTER TABLE answer_bank ADD COLUMN allow_reuse BOOLEAN DEFAULT 1;"))
+        bank_additions = [
+            ("source", "VARCHAR(64) DEFAULT 'candidate_profile'"),
+            ("is_verified", "BOOLEAN DEFAULT 1"),
+            ("supporting_evidence", "TEXT DEFAULT ''"),
+            ("allow_reuse", "BOOLEAN DEFAULT 1"),
+            ("canonical_key", "VARCHAR(128) DEFAULT ''"),
+            ("aliases_json", "TEXT DEFAULT '[]'"),
+            ("user_approved", "BOOLEAN DEFAULT 1"),
+            ("application_references_json", "TEXT DEFAULT '[]'"),
+        ]
+        for col_name, col_def in bank_additions:
+            if col_name not in bank_cols:
+                conn.execute(text(f"ALTER TABLE answer_bank ADD COLUMN {col_name} {col_def};"))
         conn.commit()
 
         # 3. Migrate jobs
@@ -95,10 +107,37 @@ def migrate_db():
             ("missing_qualifications_json", "TEXT DEFAULT '[]'"),
             ("company_logo_url", "VARCHAR(512) DEFAULT ''"),
             ("is_saved", "BOOLEAN DEFAULT 0"),
+            ("is_assist_only", "BOOLEAN DEFAULT 0"),
+            ("is_internship", "BOOLEAN DEFAULT 0"),
+            ("stipend_raw", "VARCHAR(128) DEFAULT ''"),
+            ("stipend_numeric", "INTEGER DEFAULT 0"),
+            ("salary_currency", "VARCHAR(16) DEFAULT 'INR'"),
+            ("salary_period", "VARCHAR(16) DEFAULT 'annual'"),
+            ("last_verified_at", "DATETIME"),
+            ("is_expired", "BOOLEAN DEFAULT 0"),
+            ("quality_readiness_score", "FLOAT DEFAULT 100.0"),
+            ("quality_readiness_notes", "TEXT DEFAULT ''"),
+            ("interview_prep_notes", "TEXT DEFAULT ''"),
+            ("company_research_notes", "TEXT DEFAULT ''"),
+            ("blocked_reason", "TEXT DEFAULT ''"),
         ]
         for col_name, col_def in job_additions:
             if col_name not in job_cols:
                 conn.execute(text(f"ALTER TABLE jobs ADD COLUMN {col_name} {col_def};"))
+        conn.commit()
+
+        # 4. Migrate run_logs
+        log_cols = get_existing_cols("run_logs")
+        log_additions = [
+            ("job_id", "INTEGER"),
+            ("company", "VARCHAR(128) DEFAULT ''"),
+            ("role", "VARCHAR(128) DEFAULT ''"),
+            ("outcome", "VARCHAR(32) DEFAULT 'neutral'"),
+            ("details_json", "TEXT DEFAULT '{}'"),
+        ]
+        for col_name, col_def in log_additions:
+            if col_name not in log_cols:
+                conn.execute(text(f"ALTER TABLE run_logs ADD COLUMN {col_name} {col_def};"))
         conn.commit()
 
         # 4. Migrate applications

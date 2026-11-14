@@ -137,29 +137,33 @@ class _AnswerBankScreenState extends State<AnswerBankScreen> {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.s8),
-                // Category Pills
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
+                // Category Pills (Wrapping)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
                     children: _categories.map((cat) {
                       final isSelected = _selectedCategory == cat;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: AppSpacing.s8),
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() => _selectedCategory = cat);
-                            _loadAnswers();
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12, vertical: AppSpacing.s6),
-                            decoration: BoxDecoration(
-                              color: isSelected ? accentGreen : Colors.transparent,
-                              borderRadius: BorderRadius.circular(AppRadii.pill),
-                              border: Border.all(color: isSelected ? accentGreen : AppColors.hairlineBorder),
-                            ),
-                            child: Text(
-                              cat.toUpperCase(),
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isSelected ? AppColors.pureWhite : secondaryTextColor),
+                      return InkWell(
+                        onTap: () {
+                          setState(() => _selectedCategory = cat);
+                          _loadAnswers();
+                        },
+                        borderRadius: BorderRadius.circular(AppRadii.pill),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: isSelected ? accentGreen : Colors.transparent,
+                            borderRadius: BorderRadius.circular(AppRadii.pill),
+                            border: Border.all(color: isSelected ? accentGreen : borderColor),
+                          ),
+                          child: Text(
+                            cat.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: isSelected ? AppColors.pureWhite : secondaryTextColor,
                             ),
                           ),
                         ),

@@ -98,10 +98,57 @@ def seed_candidate_records(db: Session) -> int:
     logger.info(f"Seeded {len(records)} structured candidate records.")
     return len(records)
 
+SYNONYM_MAP = {
+    # Degree & Education
+    "highest degree": "degree",
+    "degree": "degree",
+    "qualification": "degree",
+    "highest qualification": "degree",
+    "education level": "degree",
+    # Institution & University
+    "school": "institution",
+    "institution": "institution",
+    "university": "institution",
+    "college": "institution",
+    "university college": "institution",
+    # Graduation Year
+    "passing year": "graduation year",
+    "graduation year": "graduation year",
+    "year of graduation": "graduation year",
+    "year of passing": "graduation year",
+    "completion year": "graduation year",
+    # Compensation
+    "expected salary": "salary expectation",
+    "salary expectation": "salary expectation",
+    "desired salary": "salary expectation",
+    "compensation expectation": "salary expectation",
+    # Notice & Availability
+    "notice period": "notice period",
+    "availability": "notice period",
+    "joining time": "notice period",
+    "earliest start date": "notice period",
+    # Contact
+    "phone": "phone",
+    "mobile": "phone",
+    "phone number": "phone",
+    "contact number": "phone",
+    # Social links
+    "linkedin": "linkedin",
+    "linkedin profile": "linkedin",
+    "linkedin url": "linkedin",
+    "github": "github",
+    "github profile": "github",
+    "github url": "github",
+    "portfolio": "portfolio",
+    "website": "portfolio",
+    "personal website": "portfolio",
+}
+
 def clean_and_deduplicate_answer_bank(db: Session):
     """
-    De-duplicates redundant education entries and resolves conflicting demographic answers.
-    Normalizes all keys into canonical forms.
+    De-duplicates redundant entries via synonym mapping and canonical facts.
+    Merges usage counts, preserves original question aliases in aliases_json,
+    and resolves conflicting demographic/education entries.
     """
     # 1. Resolve conflicting gender answers to 'Male'
     gender_entries = db.query(AnswerBank).filter(
@@ -112,25 +159,54 @@ def clean_and_deduplicate_answer_bank(db: Session):
         entry.category = "demographics"
         entry.is_verified = True
         entry.supporting_evidence = "Verified Profile Demographics"
+        entry.canonical_key = "gender"
 
-    # 2. De-duplicate degree entries: keep 'degree' and delete 'highest degree'
-    highest_deg = db.query(AnswerBank).filter(AnswerBank.question_key == "highest degree").first()
-    deg = db.query(AnswerBank).filter(AnswerBank.question_key == "degree").first()
-    if highest_deg and deg:
-        deg.usage_count += highest_deg.usage_count
-        db.delete(highest_deg)
+    # 2. Canonical synonym deduplication
+    all_entries = db.query(AnswerBank).all()
+    canonical_lookup = {}
+
+    for entry in all_entries:
+        key = entry.question_key.lower().strip()
+        canonical = SYNONYM_MAP.get(key, key)
+        entry.canonical_key = canonical
+
+        if canonical not in canonical_lookup:
+            canonical_lookup[canonical] = entry
+            # Ensure aliases list contains question_text
+            try:
+                aliases = json.loads(entry.aliases_json or "[]")
+            except Exception:
+                aliases = []
+            if entry.question_text and entry.question_text not in aliases:
+                aliases.append(entry.question_text)
+            entry.aliases_json = json.dumps(aliases)
+        else:
+            # Merge duplicate into canonical row
+            primary = canonical_lookup[canonical]
+            if primary.id != entry.id:
+                primary.usage_count += entry.usage_count
+                try:
+                    p_aliases = json.loads(primary.aliases_json or "[]")
+                except Exception:
+                    p_aliases = []
+                if entry.question_text and entry.question_text not in p_aliases:
+                    p_aliases.append(entry.question_text)
+                if key not in p_aliases:
+                    p_aliases.append(key)
+                primary.aliases_json = json.dumps(p_aliases)
+                if entry.is_verified:
+                    primary.is_verified = True
+                db.delete(entry)
 
     # 3. Clarify university vs school entries
     inst = db.query(AnswerBank).filter(AnswerBank.question_key == "institution").first()
-    sch = db.query(AnswerBank).filter(AnswerBank.question_key == "school").first()
-    if inst and sch:
+    if inst:
         inst.question_text = "University / Institution"
         inst.answer = "Vellore Institute of Technology (VIT Vellore)"
-        sch.question_text = "School / College"
-        sch.answer = "Vellore Institute of Technology"
+        inst.canonical_key = "institution"
 
     db.commit()
-    logger.info("Cleaned and deduplicated Answer Bank.")
+    logger.info("Cleaned and deduplicated Answer Bank with canonical synonym mapping.")
 
 def normalize_question_key(text: str) -> str:
     """
@@ -337,9 +413,16 @@ class AnswerService:
             return None
 
         clean_key = normalize_question_key(label)
+        stripped_key = re.sub(r'^(what is your|what is|please enter your|please provide your|please select your|enter your|provide your|select your|indicate your|choose your)\s+', '', clean_key).strip()
+        canonical = SYNONYM_MAP.get(clean_key, SYNONYM_MAP.get(stripped_key, stripped_key))
 
-        # 1. Exact match on question_key in AnswerBank
-        match = db.query(AnswerBank).filter(AnswerBank.question_key == clean_key).first()
+        # 1. Exact match on question_key, stripped_key, or canonical synonym in AnswerBank
+        match = db.query(AnswerBank).filter(
+            (AnswerBank.question_key == clean_key) |
+            (AnswerBank.question_key == stripped_key) |
+            (AnswerBank.canonical_key == canonical) |
+            (AnswerBank.question_key == canonical)
+        ).first()
         if match:
             if not match.allow_reuse:
                 return None

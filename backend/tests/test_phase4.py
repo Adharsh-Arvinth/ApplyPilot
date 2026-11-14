@@ -130,10 +130,14 @@ def test_phase4_daily_cap_enforcement():
             assert result["status"] == "halted"
             assert result["reason"] == "daily_cap_reached"
 
-            # Restore cap
+            # Restore cap & pause state
             profile.daily_cap = orig_cap
+            profile.is_paused = False
             db.commit()
         finally:
+            profile.daily_cap = orig_cap
+            profile.is_paused = False
+            db.commit()
             db.close()
 
     asyncio.run(_run())

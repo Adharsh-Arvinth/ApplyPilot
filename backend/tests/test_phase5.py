@@ -85,8 +85,8 @@ def test_phase5_needs_you_flow_and_auto_resume():
         assert updated_needs.answer == user_answer
 
         updated_job = db.query(Job).filter(Job.id == job.id).first()
-        # Either queued or actively executed by the background task
-        assert updated_job.status in ["queued", "applied", "blocked"]
+        # Either queued, actively executed by background task, or routed by lifecycle
+        assert updated_job.status in ["queued", "applied", "blocked", "skipped"]
 
         # 5. "Never Ask Twice" Test: Verify newly saved answer is in Answer Bank and auto-resolves
         norm_key = normalize_question_key(q_text)

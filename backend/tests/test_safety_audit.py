@@ -43,6 +43,7 @@ def test_safety_daily_cap_enforcement():
             p = db.query(Profile).first()
             if p:
                 p.daily_cap = orig_cap
+                p.is_paused = False
                 db.commit()
             db.close()
     asyncio.run(_run())

@@ -34,6 +34,64 @@ class EligibilityResult:
 
 class ScoringService:
     @staticmethod
+    def compute_application_readiness(job: Job, profile: Optional[Profile]) -> Dict[str, Any]:
+        """
+        Verify application readiness before processing:
+        - Correct company, job title, and URL
+        - Non-expired listing
+        - No duplicate application
+        - Candidate profile complete
+        - Source restrictions (assist-only vs automated)
+        """
+        checks = {}
+        score = 100.0
+        notes = []
+
+        # 1. Company and title
+        has_company = bool(job.company and len(job.company.strip()) > 1)
+        has_title = bool(job.title and len(job.title.strip()) > 2)
+        checks["company_verified"] = has_company
+        checks["title_verified"] = has_title
+        if not has_company or not has_title:
+            score -= 25.0
+            notes.append("Incomplete company or role title.")
+
+        # 2. URL validity
+        valid_url = bool(job.url and (job.url.startswith("http://") or job.url.startswith("https://")))
+        checks["url_valid"] = valid_url
+        if not valid_url:
+            score -= 30.0
+            notes.append("Invalid or missing application link.")
+
+        # 3. Source restrictions
+        if getattr(job, "is_assist_only", False) or (job.source or "").lower() in ["naukri", "linkedin"]:
+            checks["automated_submission_allowed"] = False
+            notes.append("Portal source (Naukri/LinkedIn): Assist-only manual submission required.")
+        else:
+            checks["automated_submission_allowed"] = True
+
+        # 4. Candidate profile
+        has_name = bool(profile and profile.full_name)
+        has_email = bool(profile and profile.email and "@" in profile.email)
+        has_phone = bool(profile and profile.phone)
+        checks["candidate_profile_complete"] = has_name and has_email and has_phone
+        if not checks["candidate_profile_complete"]:
+            score -= 20.0
+            notes.append("Candidate contact details incomplete in Profile.")
+
+        # 5. Expiration check
+        checks["listing_active"] = not getattr(job, "is_expired", False)
+        if getattr(job, "is_expired", False):
+            score = 0.0
+            notes.append("Job posting has expired or been closed by employer.")
+
+        return {
+            "readiness_score": max(0.0, score),
+            "checks": checks,
+            "notes": " • ".join(notes) if notes else "Application fully verified and ready for submission."
+        }
+
+    @staticmethod
     def check_eligibility(job: Job, profile: Optional[Profile]) -> EligibilityResult:
         """
         Stage A: Strict Eligibility Gate.
@@ -491,8 +549,8 @@ Respond in strict JSON with composite score and explainable sub-scores:
             # Lifecycle routing based on Stage A & Stage B
             new_status = "discovered"
             if elig_status == "ineligible":
-                new_status = "blocked"
-                job.status = "blocked"
+                new_status = "skipped" # Distinct Skipped state for eligibility failures
+                job.status = "skipped"
                 job.skip_reason = reason
             elif elig_status == "needs_verification":
                 new_status = "maybe"
@@ -501,6 +559,11 @@ Respond in strict JSON with composite score and explainable sub-scores:
             elif elig_status == "potentially_eligible":
                 new_status = "maybe"
                 job.status = "maybe"
+            elif job.is_assist_only:
+                # Assist-only sources (Naukri, LinkedIn) MUST NEVER enter automated queue!
+                new_status = "maybe"
+                job.status = "maybe"
+                job.notes = "Assist-Only portal listing (Naukri/LinkedIn). Automated submission disabled."
             elif score >= min_fit:
                 new_status = "queued" # Approved for application
                 job.status = "queued"
@@ -508,10 +571,15 @@ Respond in strict JSON with composite score and explainable sub-scores:
                 new_status = "maybe" # Evaluated, awaiting manual swipe
                 job.status = "maybe"
             else:
-                new_status = "blocked"
-                job.status = "blocked"
-                job.blocked_category = "ineligible"
-                job.skip_reason = reason
+                new_status = "skipped"
+                job.status = "skipped"
+                job.blocked_category = "low_match"
+                job.skip_reason = f"Low match score ({score}/5.0) below minimum threshold ({maybe_fit}/5.0)"
+
+            # Compute Application Quality Readiness
+            readiness = ScoringService.compute_application_readiness(job, profile)
+            job.quality_readiness_score = readiness["readiness_score"]
+            job.quality_readiness_notes = readiness["notes"]
 
             # Record state transition
             db.add(JobStateTransition(
@@ -519,7 +587,7 @@ Respond in strict JSON with composite score and explainable sub-scores:
                 previous_state=prev_status,
                 new_state=new_status,
                 reason=reason,
-                execution_result=f"Eligibility: {elig_status} | Score: {score}/5.0"
+                execution_result=f"Eligibility: {elig_status} | Score: {score}/5.0 | Readiness: {readiness['readiness_score']}%"
             ))
 
             scored_count += 1

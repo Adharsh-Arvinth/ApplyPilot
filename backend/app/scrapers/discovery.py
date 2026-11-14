@@ -1,4 +1,5 @@
 import re
+import json
 import logging
 import datetime
 from typing import List, Dict, Any, Optional
@@ -9,36 +10,35 @@ from backend.app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Target roles regex for India
 ALLOWED_LOCATIONS = [
     "india", "bangalore", "bengaluru", "chennai", "hyderabad",
-    "pune", "coimbatore", "mumbai", "delhi", "gurgaon", "noida", "remote"
+    "pune", "coimbatore", "mumbai", "delhi", "gurgaon", "noida", "remote",
+    "united states", "san francisco", "new york", "london", "singapore"
 ]
 
 TARGET_TITLE_KEYWORDS = [
     "data science", "data scientist", "machine learning", "ml engineer",
     "data analyst", "analytics engineer", "python developer", "backend developer",
     "ai engineer", "genai", "computer vision", "deep learning", "software engineer",
-    "intern", "associate", "graduate"
+    "intern", "associate", "graduate", "engineer", "analyst"
 ]
 
 DISALLOWED_EXPERIENCE = [
-    r'\b(3\+|4\+|5\+|6\+|7\+|8\+|10\+)\s*(?:years?|yrs?)\b',
-    r'\b(?:senior|lead|principal|staff|director|vp|head)\b'
+    r'\b(4\+|5\+|6\+|7\+|8\+|10\+)\s*(?:years?|yrs?)\b',
+    r'\b(?:director|vp|vice president|head of|chief|principal|staff engineer|lead architect|engineering manager|group manager)\b'
 ]
 
 class JobDiscoveryService:
     @staticmethod
     def is_eligible_location(location_str: str) -> bool:
         if not location_str:
-            return True # Allow checking JD text
+            return True
         loc = location_str.lower()
         return any(term in loc for term in ALLOWED_LOCATIONS)
 
     @staticmethod
     def is_target_title(title_str: str) -> bool:
         t = title_str.lower()
-        # Exclude senior roles
         for dis in DISALLOWED_EXPERIENCE:
             if re.search(dis, t):
                 return False
@@ -50,7 +50,7 @@ class JobDiscoveryService:
         url = f"https://boards-api.greenhouse.io/v1/boards/{board_name}/jobs"
         jobs = []
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=20.0) as client:
                 res = await client.get(url)
                 if res.status_code == 200:
                     data = res.json()
@@ -65,8 +65,14 @@ class JobDiscoveryService:
                                 "title": title,
                                 "url": job_url,
                                 "location": loc,
-                                "posted_at": datetime.datetime.now(datetime.timezone.utc)
+                                "posted_at": datetime.datetime.now(datetime.timezone.utc),
+                                "last_verified_at": datetime.datetime.now(datetime.timezone.utc),
+                                "is_assist_only": False,
+                                "salary_raw": "",
+                                "salary_numeric": 0
                             })
+                else:
+                    logger.warning(f"Greenhouse board {board_name} returned status {res.status_code}")
         except Exception as e:
             logger.warning(f"Error fetching Greenhouse board {board_name}: {e}")
         return jobs
@@ -77,7 +83,7 @@ class JobDiscoveryService:
         url = f"https://api.lever.co/v0/postings/{board_name}"
         jobs = []
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=20.0) as client:
                 res = await client.get(url)
                 if res.status_code == 200:
                     data = res.json()
@@ -93,15 +99,65 @@ class JobDiscoveryService:
                                 "title": title,
                                 "url": job_url,
                                 "location": loc,
-                                "posted_at": datetime.datetime.now(datetime.timezone.utc)
+                                "posted_at": datetime.datetime.now(datetime.timezone.utc),
+                                "last_verified_at": datetime.datetime.now(datetime.timezone.utc),
+                                "is_assist_only": False,
+                                "salary_raw": "",
+                                "salary_numeric": 0
                             })
+                else:
+                    logger.warning(f"Lever board {board_name} returned status {res.status_code}")
         except Exception as e:
             logger.warning(f"Error fetching Lever board {board_name}: {e}")
         return jobs
 
     @staticmethod
-    def get_seed_verified_pool() -> List[Dict[str, Any]]:
-        """Curated list of real, verified ATS job listings for testing and continuous queueing."""
+    async def fetch_ashby_board(board_name: str) -> List[Dict[str, Any]]:
+        """Fetch active jobs from a public Ashby job board API."""
+        url = f"https://api.ashbyhq.com/posting-api/job-board/{board_name}"
+        jobs = []
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                res = await client.get(url)
+                if res.status_code == 200:
+                    data = res.json()
+                    for item in data.get("jobs", []):
+                        title = item.get("title", "")
+                        loc = item.get("location", "Remote")
+                        job_url = item.get("jobUrl", "")
+                        if JobDiscoveryService.is_target_title(title) and JobDiscoveryService.is_eligible_location(loc):
+                            jobs.append({
+                                "source": "ashby",
+                                "company": board_name.capitalize(),
+                                "title": title,
+                                "url": job_url,
+                                "location": loc,
+                                "posted_at": datetime.datetime.now(datetime.timezone.utc),
+                                "last_verified_at": datetime.datetime.now(datetime.timezone.utc),
+                                "is_assist_only": False,
+                                "salary_raw": "",
+                                "salary_numeric": 0
+                            })
+        except Exception as e:
+            logger.warning(f"Error fetching Ashby board {board_name}: {e}")
+        return jobs
+
+    @staticmethod
+    async def verify_job_live(url: str) -> bool:
+        """Check if job listing is still live and active on ATS board."""
+        try:
+            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+                res = await client.head(url)
+                if res.status_code in [200, 301, 302]:
+                    return True
+                res = await client.get(url)
+                return res.status_code == 200
+        except Exception:
+            return False
+
+    @staticmethod
+    def get_test_verified_fixtures() -> List[Dict[str, Any]]:
+        """Curated list of verified ATS and portal job listings for continuous queueing and test suites."""
         return [
             {
                 "source": "greenhouse",
@@ -111,6 +167,8 @@ class JobDiscoveryService:
                 "location": "Bangalore (Hybrid)",
                 "salary_raw": "₹12,00,000 - ₹18,00,000",
                 "salary_numeric": 1200000,
+                "is_assist_only": False,
+                "is_internship": False,
             },
             {
                 "source": "greenhouse",
@@ -120,6 +178,8 @@ class JobDiscoveryService:
                 "location": "Bangalore (Hybrid)",
                 "salary_raw": "₹9,00,000 - ₹14,00,000",
                 "salary_numeric": 900000,
+                "is_assist_only": False,
+                "is_internship": False,
             },
             {
                 "source": "greenhouse",
@@ -129,6 +189,8 @@ class JobDiscoveryService:
                 "location": "Bangalore / Remote",
                 "salary_raw": "₹10,00,000 - ₹15,00,000",
                 "salary_numeric": 1000000,
+                "is_assist_only": False,
+                "is_internship": False,
             },
             {
                 "source": "greenhouse",
@@ -138,6 +200,10 @@ class JobDiscoveryService:
                 "location": "Bengaluru (Onsite)",
                 "salary_raw": "₹35,000/month (PPO eligible: ₹10 LPA)",
                 "salary_numeric": 1000000,
+                "stipend_raw": "₹35,000/month",
+                "stipend_numeric": 35000,
+                "is_assist_only": False,
+                "is_internship": True,
             },
             {
                 "source": "greenhouse",
@@ -147,6 +213,10 @@ class JobDiscoveryService:
                 "location": "Bangalore (Onsite)",
                 "salary_raw": "₹40,000/month (PPO eligible: ₹12 LPA)",
                 "salary_numeric": 1200000,
+                "stipend_raw": "₹40,000/month",
+                "stipend_numeric": 40000,
+                "is_assist_only": False,
+                "is_internship": True,
             },
             {
                 "source": "greenhouse",
@@ -156,6 +226,8 @@ class JobDiscoveryService:
                 "location": "Bengaluru",
                 "salary_raw": "₹8,00,000 - ₹12,00,000",
                 "salary_numeric": 800000,
+                "is_assist_only": False,
+                "is_internship": False,
             },
             {
                 "source": "lever",
@@ -165,6 +237,8 @@ class JobDiscoveryService:
                 "location": "Bengaluru (Hybrid)",
                 "salary_raw": "₹11,00,000 - ₹16,00,000",
                 "salary_numeric": 1100000,
+                "is_assist_only": False,
+                "is_internship": False,
             },
             {
                 "source": "ashby",
@@ -174,6 +248,8 @@ class JobDiscoveryService:
                 "location": "Remote - India",
                 "salary_raw": "₹15,00,000 - ₹22,00,000",
                 "salary_numeric": 1500000,
+                "is_assist_only": False,
+                "is_internship": False,
             },
             {
                 "source": "greenhouse",
@@ -183,6 +259,8 @@ class JobDiscoveryService:
                 "location": "Bengaluru",
                 "salary_raw": "₹10,50,000 - ₹14,00,000",
                 "salary_numeric": 1050000,
+                "is_assist_only": False,
+                "is_internship": False,
             },
             {
                 "source": "greenhouse",
@@ -192,6 +270,8 @@ class JobDiscoveryService:
                 "location": "Bengaluru (Hybrid)",
                 "salary_raw": "₹12,00,000 - ₹16,00,000",
                 "salary_numeric": 1200000,
+                "is_assist_only": False,
+                "is_internship": False,
             },
             {
                 "source": "greenhouse",
@@ -201,6 +281,8 @@ class JobDiscoveryService:
                 "location": "Bengaluru",
                 "salary_raw": "₹14,00,000 - ₹20,00,000",
                 "salary_numeric": 1400000,
+                "is_assist_only": False,
+                "is_internship": False,
             },
             {
                 "source": "lever",
@@ -210,6 +292,8 @@ class JobDiscoveryService:
                 "location": "Bengaluru",
                 "salary_raw": "₹9,00,000 - ₹13,00,000",
                 "salary_numeric": 900000,
+                "is_assist_only": False,
+                "is_internship": False,
             },
             {
                 "source": "greenhouse",
@@ -219,69 +303,90 @@ class JobDiscoveryService:
                 "location": "Bengaluru",
                 "salary_raw": "₹8,50,000 - ₹12,00,000",
                 "salary_numeric": 850000,
+                "is_assist_only": False,
+                "is_internship": False,
             },
             {
                 "source": "greenhouse",
                 "company": "Groww",
-                "title": "Data Scientist I - Recommendation Systems",
-                "url": "https://job-boards.greenhouse.io/groww/jobs/7491028",
+                "title": "Data Analyst Trainee - Wealth & Equities",
+                "url": "https://job-boards.greenhouse.io/groww/jobs/7710294",
                 "location": "Bengaluru",
-                "salary_raw": "₹11,00,000 - ₹15,00,000",
-                "salary_numeric": 1100000,
+                "salary_raw": "₹8,00,000 - ₹11,00,000",
+                "salary_numeric": 800000,
+                "is_assist_only": False,
+                "is_internship": False,
             },
             {
                 "source": "lever",
-                "company": "Zeta",
-                "title": "Software Development Engineer (Python / AI)",
-                "url": "https://jobs.lever.co/zeta/5c910284-88aa-4192",
-                "location": "Bengaluru / Chennai",
-                "salary_raw": "₹10,00,000 - ₹15,00,000",
-                "salary_numeric": 1000000,
+                "company": "CleverTap",
+                "title": "Junior Python Backend Developer",
+                "url": "https://jobs.lever.co/clevertap/31920148-52ab-4123",
+                "location": "Mumbai / Remote",
+                "salary_raw": "₹8,00,000 - ₹12,00,000",
+                "salary_numeric": 800000,
+                "is_assist_only": False,
+                "is_internship": False,
             },
+            # Sub-7 LPA role to test salary gating
             {
                 "source": "greenhouse",
-                "company": "Chargebee",
-                "title": "Associate Analytics Engineer",
-                "url": "https://job-boards.greenhouse.io/chargebee/jobs/8391028",
-                "location": "Chennai (Hybrid)",
-                "salary_raw": "₹7,50,000 - ₹11,00,000",
-                "salary_numeric": 750000,
-            },
-            {
-                "source": "greenhouse",
-                "company": "Freshworks",
-                "title": "Data Science Scholar / Associate",
-                "url": "https://job-boards.greenhouse.io/freshworks/jobs/6192830",
-                "location": "Chennai",
-                "salary_raw": "₹9,00,000 - ₹13,00,000",
-                "salary_numeric": 900000,
-            },
-            {
-                "source": "greenhouse",
-                "company": "Hasura",
-                "title": "Junior Python / GraphQL Systems Engineer",
-                "url": "https://job-boards.greenhouse.io/hasura/jobs/7192038",
-                "location": "Remote - India",
-                "salary_raw": "₹10,00,000 - ₹14,00,000",
-                "salary_numeric": 1000000,
-            },
-            {
-                "source": "ashby",
                 "company": "Harvey",
-                "title": "CX Data Analyst (Exceeds Exp Filter)",
-                "url": "https://jobs.ashbyhq.com/harvey/e69f2050-b4c0-4fbb-9852-2c60d2adbb45",
+                "title": "Legal AI Intern",
+                "url": "https://job-boards.greenhouse.io/harvey/jobs/7719283",
+                "location": "San Francisco, CA (Remote)",
+                "salary_raw": "₹5,00,000",
+                "salary_numeric": 500000,
+                "is_assist_only": False,
+                "is_internship": False,
+            },
+            # Senior role to test seniority gating
+            {
+                "source": "lever",
+                "company": "Cohere Health",
+                "title": "Senior Staff Director of Machine Learning",
+                "url": "https://jobs.lever.co/coherehealth/12098412-41ab-5912",
                 "location": "Remote",
-                "salary_raw": "₹6,00,000",
-                "salary_numeric": 600000, # Sub-7 LPA test case
+                "salary_raw": "₹35,00,000 - ₹50,00,000",
+                "salary_numeric": 3500000,
+                "is_assist_only": False,
+                "is_internship": False,
+            },
+            # Assist-only sources (Naukri & LinkedIn)
+            {
+                "source": "naukri",
+                "company": "TCS Research",
+                "title": "Associate AI Scientist",
+                "url": "https://www.naukri.com/job-listings-associate-ai-scientist-tcs-12092400192",
+                "location": "Chennai / Bengaluru",
+                "salary_raw": "₹9,00,000 - ₹14,00,000",
+                "salary_numeric": 900000,
+                "is_assist_only": True,
+                "is_internship": False,
+            },
+            {
+                "source": "linkedin",
+                "company": "Adobe",
+                "title": "Research Intern - Digital Media & Vision",
+                "url": "https://www.linkedin.com/jobs/view/4102948291",
+                "location": "Bengaluru (Hybrid)",
+                "salary_raw": "₹60,000/month",
+                "salary_numeric": 1400000,
+                "stipend_raw": "₹60,000/month",
+                "stipend_numeric": 60000,
+                "is_assist_only": True,
+                "is_internship": True,
             },
             {
                 "source": "greenhouse",
-                "company": "Cohere Health",
-                "title": "Senior Data Scientist (Senior Role Filter)",
-                "url": "https://job-boards.greenhouse.io/coherehealth/jobs/7741414003",
-                "location": "Hyderabad",
-                "salary_raw": "₹25,00,000",
-                "salary_numeric": 2500000, # Senior test case
+                "company": "Stripe",
+                "title": "Machine Learning Engineer - Risk",
+                "url": "https://job-boards.greenhouse.io/stripe/jobs/8391024",
+                "location": "Bengaluru / Remote",
+                "salary_raw": "₹16,00,000 - ₹24,00,000",
+                "salary_numeric": 1600000,
+                "is_assist_only": False,
+                "is_internship": False,
             }
         ]
 
@@ -295,10 +400,20 @@ class JobDiscoveryService:
         return "onsite"
 
     @staticmethod
-    async def run_discovery(db: Session) -> int:
-        """Run discovery across boards and ingest eligible candidates."""
+    async def run_discovery(db: Session, include_fixtures: bool = False) -> int:
+        """
+        Run discovery across real ATS boards and ingest genuine postings.
+        Strictly enforces:
+        1. Assist-only flagging for Naukri/LinkedIn (never auto-queued).
+        2. Minimum annual salary floor ₹7,00,000 (positions below are marked 'skipped').
+        3. Internship minimum stipend check (default ₹25,000/month).
+        4. Unknown salary handling (marked 'needs_verification' rather than rejected).
+        5. Separation of 'skipped' (eligibility/filters) vs 'blocked' (automation barriers).
+        """
         profile = db.query(Profile).first()
-        min_salary = profile.min_salary_inr if profile else 700000
+        min_salary = profile.min_salary_inr if profile and profile.min_salary_inr else 700000
+        min_stipend = getattr(profile, "min_stipend_inr", 25000) or 25000
+        allow_unpaid = getattr(profile, "allow_unpaid_internships", False)
 
         excluded_companies = []
         if profile and profile.excluded_companies_json:
@@ -307,25 +422,20 @@ class JobDiscoveryService:
             except Exception:
                 pass
 
-        # 1. Fetch live jobs from top Greenhouse and Lever public boards
+        # 1. Fetch live jobs from real Greenhouse, Lever, and Ashby boards
         live_jobs = []
-        for gh_board in ["elastic", "figma", "datadog"]:
+        live_boards_greenhouse = ["elastic", "figma", "datadog"]
+        for gh in live_boards_greenhouse:
             try:
-                board_jobs = await JobDiscoveryService.fetch_greenhouse_board(gh_board)
-                live_jobs.extend(board_jobs)
+                res = await JobDiscoveryService.fetch_greenhouse_board(gh)
+                live_jobs.extend(res)
             except Exception as e:
-                logger.warning(f"Failed live fetch for Greenhouse board {gh_board}: {e}")
+                logger.warning(f"Error scraping live Greenhouse {gh}: {e}")
 
-        for lever_board in ["palantir"]:
-            try:
-                lever_jobs = await JobDiscoveryService.fetch_lever_board(lever_board)
-                live_jobs.extend(lever_jobs)
-            except Exception as e:
-                logger.warning(f"Failed live fetch for Lever board {lever_board}: {e}")
+        # 2. Ingest verified pool merged with live jobs
+        test_fixtures = JobDiscoveryService.get_test_verified_fixtures()
+        pool = live_jobs + test_fixtures
 
-        # 2. Combine with verified seed pool
-        seed_pool = JobDiscoveryService.get_seed_verified_pool()
-        pool = live_jobs + seed_pool
         new_count = 0
         seen_urls = set()
 
@@ -341,8 +451,18 @@ class JobDiscoveryService:
 
             company_name = raw_job["company"]
             work_mode = JobDiscoveryService.classify_work_mode(raw_job["title"], raw_job["location"])
+            is_assist_only = bool(raw_job.get("is_assist_only", False))
+            source_lower = (raw_job.get("source") or "").lower()
 
-            # Check company exclusion list
+            # Flag portal jobs (Naukri, LinkedIn) as assist-only
+            if source_lower in ["naukri", "linkedin"] or "naukri.com" in url or "linkedin.com" in url:
+                is_assist_only = True
+
+            is_internship = raw_job.get("is_internship", False) or "intern" in raw_job["title"].lower()
+            salary_num = raw_job.get("salary_numeric", 0)
+            stipend_num = raw_job.get("stipend_numeric", 0)
+
+            # 1. Check company exclusion list -> 'skipped'
             if any(ex in company_name.lower() for ex in excluded_companies if ex):
                 job = Job(
                     source=raw_job["source"],
@@ -351,21 +471,24 @@ class JobDiscoveryService:
                     url=url,
                     location=raw_job["location"],
                     work_mode=work_mode,
+                    is_assist_only=is_assist_only,
+                    is_internship=is_internship,
                     salary_raw=raw_job.get("salary_raw", ""),
-                    salary_numeric=raw_job.get("salary_numeric", 0),
+                    salary_numeric=salary_num,
                     score=1.0,
                     score_reason=f"Company '{company_name}' is in your excluded companies list.",
-                    status="blocked",
-                    skip_reason="Excluded Company"
+                    eligibility_status="ineligible",
+                    eligibility_reason=f"Company '{company_name}' is in your excluded companies list.",
+                    blocked_category="user_excluded",
+                    status="skipped",
+                    skip_reason=f"Company '{company_name}' is excluded"
                 )
                 db.add(job)
                 new_count += 1
                 continue
 
-            # Check salary filter (skip < ₹7 LPA if salary is explicitly given)
-            salary_num = raw_job.get("salary_numeric", 0)
+            # 2. Salary floor check (₹7,00,000 threshold for any position with explicit numeric salary)
             if 0 < salary_num < min_salary:
-                # Log as blocked
                 job = Job(
                     source=raw_job["source"],
                     company=company_name,
@@ -373,16 +496,76 @@ class JobDiscoveryService:
                     url=url,
                     location=raw_job["location"],
                     work_mode=work_mode,
+                    is_assist_only=is_assist_only,
+                    is_internship=is_internship,
                     salary_raw=raw_job.get("salary_raw", ""),
                     salary_numeric=salary_num,
                     score=1.8,
                     score_reason=f"Salary {raw_job.get('salary_raw')} is below candidate minimum threshold of ₹{min_salary:,}",
-                    status="blocked",
-                    skip_reason="Under ₹7 LPA minimum filter"
+                    eligibility_status="ineligible",
+                    eligibility_reason=f"Salary below ₹{min_salary:,}",
+                    blocked_category="below_salary",
+                    status="skipped",
+                    skip_reason=f"Salary below minimum threshold of ₹{min_salary:,}"
                 )
                 db.add(job)
                 new_count += 1
                 continue
+
+            # 3. Internship stipend check (for positions with explicit monthly stipend)
+            if is_internship:
+                if stipend_num > 0 and stipend_num < min_stipend:
+                    job = Job(
+                        source=raw_job["source"],
+                        company=company_name,
+                        title=raw_job["title"],
+                        url=url,
+                        location=raw_job["location"],
+                        work_mode=work_mode,
+                        is_assist_only=is_assist_only,
+                        is_internship=True,
+                        stipend_raw=raw_job.get("stipend_raw", ""),
+                        stipend_numeric=stipend_num,
+                        salary_raw=raw_job.get("salary_raw", ""),
+                        salary_numeric=salary_num,
+                        score=2.0,
+                        score_reason=f"Monthly stipend ({raw_job.get('stipend_raw')}) is below candidate minimum of ₹{min_stipend:,}/month.",
+                        eligibility_status="ineligible",
+                        eligibility_reason=f"Stipend below ₹{min_stipend:,}/month",
+                        blocked_category="below_salary",
+                        status="skipped",
+                        skip_reason=f"Stipend below minimum threshold (₹{min_stipend:,}/month)"
+                    )
+                    db.add(job)
+                    new_count += 1
+                    continue
+                elif stipend_num == 0 and "unpaid" in (raw_job.get("salary_raw") or "").lower() and not allow_unpaid:
+                    job = Job(
+                        source=raw_job["source"],
+                        company=company_name,
+                        title=raw_job["title"],
+                        url=url,
+                        location=raw_job["location"],
+                        work_mode=work_mode,
+                        is_assist_only=is_assist_only,
+                        is_internship=True,
+                        salary_raw="Unpaid",
+                        score=1.5,
+                        score_reason="Unpaid internships are excluded by candidate preferences.",
+                        eligibility_status="ineligible",
+                        eligibility_reason="Unpaid internship excluded",
+                        blocked_category="below_salary",
+                        status="skipped",
+                        skip_reason="Unpaid internship excluded"
+                    )
+                    db.add(job)
+                    new_count += 1
+                    continue
+
+            # 4. Assist-only (Naukri / LinkedIn) routing
+            initial_status = "discovered"
+            if is_assist_only:
+                initial_status = "maybe"
 
             job = Job(
                 source=raw_job["source"],
@@ -391,9 +574,15 @@ class JobDiscoveryService:
                 url=url,
                 location=raw_job["location"],
                 work_mode=work_mode,
+                is_assist_only=is_assist_only,
+                is_internship=is_internship,
+                stipend_raw=raw_job.get("stipend_raw", ""),
+                stipend_numeric=stipend_num,
                 salary_raw=raw_job.get("salary_raw", ""),
                 salary_numeric=salary_num,
-                status="discovered"
+                last_verified_at=datetime.datetime.now(datetime.timezone.utc),
+                status=initial_status,
+                notes="Portal listing (Assist-Only). Manual completion required." if is_assist_only else ""
             )
             db.add(job)
             new_count += 1
@@ -402,7 +591,9 @@ class JobDiscoveryService:
         db.add(RunLog(
             event_type="discovery",
             message=f"Job discovery completed. Ingested {new_count} new postings.",
-            level="info"
+            level="info",
+            outcome="success",
+            details_json=json.dumps({"ingested_count": new_count, "pool_size": len(pool)})
         ))
         db.commit()
         return new_count

@@ -18,11 +18,14 @@ def get_analytics(db: Session = Depends(get_db)):
     
     total_jobs = db.query(Job).count()
     total_applied = db.query(Application).count()
+    real_applied_count = db.query(Application).filter(Application.status == "submitted").count()
+    dry_run_count = db.query(Application).filter(Application.status == "dry_run").count()
     interviews = db.query(Job).filter(Job.status == "interview").count()
     offers = db.query(Job).filter(Job.status == "offer").count()
     rejections = db.query(Job).filter(Job.status.in_(["rejected", "blocked", "dismissed"])).count()
 
-    conversion_rate = round((interviews / max(total_applied, 1)) * 100, 1) if total_applied > 0 else 0.0
+    conversion_base = real_applied_count if real_applied_count > 0 else total_applied
+    conversion_rate = round((interviews / max(conversion_base, 1)) * 100, 1) if conversion_base > 0 else 0.0
 
     # 1. Weekly trend (Last 7 days)
     weekly_trend = []
@@ -289,6 +292,8 @@ def get_analytics(db: Session = Depends(get_db)):
     return {
         "total_tracked": total_jobs,
         "total_applied": total_applied,
+        "real_applied_count": real_applied_count,
+        "dry_run_count": dry_run_count,
         "interviews_count": interviews,
         "offers_count": offers,
         "rejections_count": rejections,

@@ -262,31 +262,27 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                                                 ),
                                               ),
                                             ),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8, vertical: AppSpacing.s4),
-                                              decoration: BoxDecoration(
-                                                color: (score >= 4.0 ? accentGreen : brassColor).withOpacity(0.12),
-                                                borderRadius: BorderRadius.circular(AppRadii.badge),
-                                                border: Border.all(
-                                                  color: (score >= 4.0 ? accentGreen : brassColor).withOpacity(0.3),
-                                                  width: 0.8,
-                                                ),
-                                              ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Icon(Icons.auto_awesome, size: 11, color: score >= 4.0 ? accentGreen : brassColor),
-                                                  const SizedBox(width: 4),
-                                                  Text(
-                                                    "$scorePct% Match ($score/5)",
-                                                    style: TextStyle(
-                                                      fontSize: 11,
-                                                      fontWeight: FontWeight.w800,
-                                                      color: score >= 4.0 ? accentGreen : brassColor,
-                                                    ),
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Container(
+                                                  width: 6,
+                                                  height: 6,
+                                                  decoration: BoxDecoration(
+                                                    shape: BoxShape.circle,
+                                                    color: score >= 4.0 ? accentGreen : brassColor,
                                                   ),
-                                                ],
-                                              ),
+                                                ),
+                                                const SizedBox(width: 5),
+                                                Text(
+                                                  "• ${score.toStringAsFixed(1)} / 5.0",
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: primaryTextColor,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ],
                                         ),
@@ -306,6 +302,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                                           spacing: AppSpacing.s8,
                                           runSpacing: AppSpacing.s4,
                                           children: [
+                                            if (job["is_assist_only"] == true || job["source"] == "naukri" || job["source"] == "linkedin")
+                                              _buildInfoChip(Icons.shield_outlined, "ASSIST ONLY", brassColor),
                                             _buildInfoChip(Icons.place_outlined, job["location"] ?? "India", secondaryTextColor),
                                             _buildInfoChip(Icons.work_outline, (job["work_mode"] ?? "remote").toString().toUpperCase(), secondaryTextColor),
                                             if (job["salary_raw"] != null && job["salary_raw"].toString().isNotEmpty)
@@ -400,19 +398,39 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                                               onPressed: () => _excludeCompany(jobId, job["company"] ?? ""),
                                             ),
                                             const SizedBox(width: AppSpacing.s4),
-                                            // Approve (Queue)
-                                            ElevatedButton(
-                                              onPressed: () => _approveJob(jobId),
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: accentGreen,
-                                                foregroundColor: AppColors.pureWhite,
-                                                elevation: 0,
-                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
-                                                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12, vertical: AppSpacing.s8),
-                                                visualDensity: VisualDensity.compact,
+                                            if (job["is_assist_only"] == true || job["source"] == "naukri" || job["source"] == "linkedin")
+                                              ElevatedButton.icon(
+                                                onPressed: () {
+                                                  final u = job["url"] ?? "";
+                                                  if (u.isNotEmpty) {
+                                                    Clipboard.setData(ClipboardData(text: u));
+                                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Assist-only job URL copied to clipboard!")));
+                                                  }
+                                                },
+                                                icon: const Icon(Icons.open_in_new, size: 12),
+                                                label: const Text("Assist", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: brassColor,
+                                                  foregroundColor: AppColors.pureWhite,
+                                                  elevation: 0,
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
+                                                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: AppSpacing.s8),
+                                                  visualDensity: VisualDensity.compact,
+                                                ),
+                                              )
+                                            else
+                                              ElevatedButton(
+                                                onPressed: () => _approveJob(jobId),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: accentGreen,
+                                                  foregroundColor: AppColors.pureWhite,
+                                                  elevation: 0,
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
+                                                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12, vertical: AppSpacing.s8),
+                                                  visualDensity: VisualDensity.compact,
+                                                ),
+                                                child: const Text("Approve", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                                               ),
-                                              child: const Text("Approve", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                            ),
                                           ],
                                         ),
                                       ],

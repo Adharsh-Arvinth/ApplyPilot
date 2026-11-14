@@ -48,6 +48,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadCandidateRecords();
   }
 
+  String _formatIndianCurrency(int val) {
+    String s = val.toString();
+    if (s.length <= 3) return "₹$s";
+    String last3 = s.substring(s.length - 3);
+    String rest = s.substring(0, s.length - 3);
+    RegExp reg = RegExp(r'(\d+?)(?=(\d\d)+$)');
+    String formatted = rest.replaceAllMapped(reg, (Match m) => '${m[1]},');
+    return "₹$formatted,$last3";
+  }
+
   Future<void> _loadCandidateRecords() async {
     try {
       final records = await _api.fetchCandidateRecords();
@@ -429,7 +439,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: AppSpacing.s12),
                   _buildTextField("Work Authorization", _workAuthController),
                   const SizedBox(height: AppSpacing.s12),
-                  _buildTextField("Minimum Salary Expectation (INR)", _salaryController, keyboardType: TextInputType.number),
+                  _buildTextField(
+                    "Minimum Salary Expectation (INR)",
+                    _salaryController,
+                    keyboardType: TextInputType.number,
+                    prefixText: "₹ ",
+                    helperText: "Annual Floor: ${_formatIndianCurrency(int.tryParse(_salaryController.text.trim()) ?? 700000)} (₹7 LPA standard)",
+                  ),
                 ]),
 
                 const SizedBox(height: AppSpacing.s16),
@@ -531,15 +547,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                 const SizedBox(height: AppSpacing.s16),
 
-                // 5. Structured Verifiable Candidate Records
+                // 5. Facts the AI can use
                 Row(
                   children: [
-                    _buildSectionHeader("STRUCTURED CANDIDATE INTELLIGENCE", secondaryTextColor),
+                    _buildSectionHeader("FACTS THE AI CAN USE", secondaryTextColor),
                     const Spacer(),
                     TextButton.icon(
                       style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
                       icon: const Icon(Icons.add, size: 16, color: AppColors.racingGreen),
-                      label: const Text("Add Proof Point", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.racingGreen)),
+                      label: const Text("Add Fact", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.racingGreen)),
                       onPressed: () => _openAddEditRecordModal(),
                     ),
                   ],
@@ -717,13 +733,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, {TextInputType keyboardType = TextInputType.text}) {
+  Widget _buildTextField(
+    String label,
+    TextEditingController controller, {
+    TextInputType keyboardType = TextInputType.text,
+    String? helperText,
+    String? prefixText,
+  }) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
       decoration: InputDecoration(
         labelText: label,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        prefixText: prefixText,
+        helperText: helperText,
+        filled: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12, vertical: AppSpacing.s12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadii.control),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadii.control),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadii.control),
+          borderSide: const BorderSide(color: AppColors.accentDark, width: 1.5),
+        ),
       ),
     );
   }

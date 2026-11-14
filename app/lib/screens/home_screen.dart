@@ -39,6 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<String, dynamic> _analytics = {};
   Map<String, dynamic> _profile = {};
   List<dynamic> _logs = [];
+  final Set<int> _expandedLogIndices = {};
 
   DashboardPreferences _prefs = DashboardPreferences.defaults();
   String _dateFilter = "Today"; // "Today", "This Week", "All Time"
@@ -111,6 +112,48 @@ class _HomeScreenState extends State<HomeScreen> {
           _error = e.toString();
           if (!silent) _loading = false;
         });
+      }
+    }
+  }
+
+  Future<void> _resumeAutomationFlow() async {
+    HapticFeedback.mediumImpact();
+    try {
+      final res = await _api.resumeAutomation();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.successEmerald,
+            content: Text(res["message"] ?? "Automation resumed successfully!"),
+          ),
+        );
+      }
+      _fetchDashboardData(silent: true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.errorCoral,
+            content: Text("Cannot resume: $e"),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _pauseAutomationFlow() async {
+    HapticFeedback.mediumImpact();
+    try {
+      await _api.pauseAutomation(reason: "paused_by_user", details: "Paused manually from dashboard");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Automation paused.")),
+        );
+      }
+      _fetchDashboardData(silent: true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to pause: $e")));
       }
     }
   }
@@ -365,6 +408,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   const SizedBox(height: AppSpacing.s12),
 
+                  // Prominent Authoritative Automation Status Banner
+                  _buildAutomationStatusBanner(isDark),
+
                   // 2. Render Ordered Smart Widgets
                   ...finalWidgetOrder.map((key) {
                     final isPinned = _prefs.pinned.contains(key);
@@ -405,7 +451,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: secondaryTextColor),
                             ),
                             Text(
-                              "Updated just now",
+                              "Real-time audit log",
                               style: TextStyle(fontSize: 10, color: secondaryTextColor),
                             ),
                           ],
@@ -414,26 +460,118 @@ class _HomeScreenState extends State<HomeScreen> {
                         if (_logs.isEmpty)
                           Text("No execution events logged yet.", style: TextStyle(fontSize: 11, color: secondaryTextColor))
                         else
-                          ..._logs.map((log) {
-                            final msg = log["message"] ?? "";
-                            final level = log["level"] ?? "info";
+                          ...List.generate(_logs.length, (idx) {
+                            final log = _logs[idx];
+                            final msg = (log["message"] ?? "").toString();
+                            final level = (log["level"] ?? "info").toString();
                             final isErr = level == "error" || level == "critical";
-                            final color = isErr ? AppColors.getSemanticColor("coral", isDark) : secondaryTextColor;
+                            final isWarn = level == "warning";
+                            final outcome = (log["outcome"] ?? "").toString();
+                            final company = (log["company"] ?? "").toString();
+                            final role = (log["role"] ?? "").toString();
+                            final timestamp = (log["timestamp"] ?? "").toString();
+                            final details = (log["details_json"] ?? "").toString();
+                            final isExpanded = _expandedLogIndices.contains(idx);
 
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: AppSpacing.s6),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text("›", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color)),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      msg,
-                                      style: TextStyle(fontSize: 11, fontFamily: 'monospace', color: isErr ? color : primaryTextColor),
+                            final color = isErr
+                                ? AppColors.getSemanticColor("coral", isDark)
+                                : (isWarn ? AppColors.getSemanticColor("amber", isDark) : emerald);
+
+                            return InkWell(
+                              onTap: () {
+                                setState(() {
+                                  if (isExpanded) {
+                                    _expandedLogIndices.remove(idx);
+                                  } else {
+                                    _expandedLogIndices.add(idx);
+                                  }
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(4),
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: AppSpacing.s8),
+                                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                                decoration: BoxDecoration(
+                                  color: isExpanded ? borderColor.withOpacity(0.2) : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text("›", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color)),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                children: [
+                                                  Expanded(
+                                                    child: Text(
+                                                      company.isNotEmpty ? "$company · $role" : msg,
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        fontWeight: FontWeight.w600,
+                                                        fontFamily: 'monospace',
+                                                        color: isErr ? color : primaryTextColor,
+                                                      ),
+                                                      maxLines: isExpanded ? null : 1,
+                                                      overflow: isExpanded ? null : TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                  if (outcome.isNotEmpty)
+                                                    Container(
+                                                      margin: const EdgeInsets.only(left: 6),
+                                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                                      decoration: BoxDecoration(
+                                                        color: color.withOpacity(0.12),
+                                                        borderRadius: BorderRadius.circular(3),
+                                                      ),
+                                                      child: Text(
+                                                        outcome.toUpperCase(),
+                                                        style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: color),
+                                                      ),
+                                                    ),
+                                                ],
+                                              ),
+                                              if (company.isNotEmpty && msg.isNotEmpty && msg != company)
+                                                Padding(
+                                                  padding: const EdgeInsets.only(top: 2),
+                                                  child: Text(
+                                                    msg,
+                                                    style: TextStyle(fontSize: 10, color: secondaryTextColor),
+                                                    maxLines: isExpanded ? null : 1,
+                                                    overflow: isExpanded ? null : TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ),
-                                ],
+                                    if (isExpanded) ...[
+                                      const SizedBox(height: 6),
+                                      Padding(
+                                        padding: const EdgeInsets.only(left: 18),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            if (timestamp.isNotEmpty)
+                                              Text("Time: $timestamp", style: TextStyle(fontSize: 10, color: secondaryTextColor)),
+                                            if (details.isNotEmpty) ...[
+                                              const SizedBox(height: 2),
+                                              Text("Details: $details", style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: secondaryTextColor)),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
                               ),
                             );
                           }),
@@ -453,6 +591,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case WidgetConfig.goal:
         return ApplicationGoalWidget(
           goalData: _analytics["goal"] ?? {},
+          statsData: _stats,
           isCompact: _prefs.isCompact,
           onAdjustTarget: widget.onNavigateToControlCenter,
         );
@@ -529,6 +668,157 @@ class _HomeScreenState extends State<HomeScreen> {
             color: isSelected ? Colors.white : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildAutomationStatusBanner(bool isDark) {
+    final state = (_stats["automation_state"] ?? (_profile["is_paused"] == true ? "paused_by_user" : "running")).toString();
+    final isPaused = state.startsWith("paused") || (_profile["is_paused"] == true);
+    final pauseReason = _stats["pause_reason"] ?? _profile["pause_reason"] ?? "Automation paused";
+    final pauseDetails = _stats["pause_details"] ?? _profile["pause_details"] ?? "";
+    final pausedAt = _stats["paused_at"] ?? _profile["paused_at"] ?? "";
+    final recovery = _stats["recovery_instruction"] ?? "Resume automation to process queued applications.";
+    final queueCount = _stats["queue_count"] ?? 0;
+
+    final primaryTextColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
+    final secondaryTextColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final cardBg = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
+    final accentGreen = isDark ? AppColors.accentDark : AppColors.racingGreen;
+    final coral = AppColors.getSemanticColor("coral", isDark);
+    final amber = AppColors.getSemanticColor("amber", isDark);
+
+    if (!isPaused) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: AppSpacing.s12),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12, vertical: AppSpacing.s8),
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(AppRadii.control),
+          border: Border.all(color: accentGreen.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: accentGreen,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.s8),
+            Expanded(
+              child: Text(
+                "Automation Running · $queueCount queued applications",
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: primaryTextColor),
+              ),
+            ),
+            InkWell(
+              onTap: _pauseAutomationFlow,
+              borderRadius: BorderRadius.circular(AppRadii.control),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Text("Pause", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: amber)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final isCap = state == "paused_by_daily_cap";
+    final isBreaker = state == "paused_by_circuit_breaker";
+    final stateBadgeColor = isCap ? amber : (isBreaker ? coral : amber);
+    final stateTitle = isCap
+        ? "PAUSED BY DAILY CAP"
+        : (isBreaker ? "PAUSED BY CIRCUIT BREAKER" : (state == "paused_by_captcha" ? "PAUSED BY CAPTCHA" : "AUTOMATION PAUSED"));
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.s12),
+      padding: const EdgeInsets.all(AppSpacing.s16),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: stateBadgeColor.withOpacity(0.5), width: 1.2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.pause_circle_filled, size: 16, color: stateBadgeColor),
+                  const SizedBox(width: AppSpacing.s6),
+                  Text(
+                    stateTitle,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.9,
+                      color: stateBadgeColor,
+                    ),
+                  ),
+                ],
+              ),
+              if (pausedAt.toString().isNotEmpty)
+                Text(
+                  pausedAt.toString().contains("T") ? "at ${pausedAt.toString().split('T')[1].substring(0, 5)} IST" : "",
+                  style: TextStyle(fontSize: 10, color: secondaryTextColor),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s8),
+          Text(
+            pauseReason.toString().replaceAll('_', ' ').toUpperCase(),
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: primaryTextColor),
+          ),
+          if (pauseDetails.toString().isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              pauseDetails.toString(),
+              style: TextStyle(fontSize: 11, height: 1.35, color: secondaryTextColor),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.s8),
+          Row(
+            children: [
+              Icon(Icons.info_outline, size: 13, color: secondaryTextColor),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  recovery.toString(),
+                  style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: secondaryTextColor),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "$queueCount jobs pending in queue",
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: secondaryTextColor),
+              ),
+              ElevatedButton.icon(
+                onPressed: _resumeAutomationFlow,
+                icon: const Icon(Icons.play_arrow, size: 15),
+                label: const Text("Resume Automation", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: accentGreen,
+                  foregroundColor: AppColors.pureWhite,
+                  visualDensity: VisualDensity.compact,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

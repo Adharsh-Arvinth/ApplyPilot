@@ -62,18 +62,18 @@ class AppColors {
   static const Color errorLight = Color(0xFFBA1A1A);
   static const Color blueLight = Color(0xFF1D4E89);
 
-  // Dark Theme Palette (Deep Forest Slate / Obsidian & Racing Green Glow)
-  static const Color canvasDark = Color(0xFF0D1912);
-  static const Color surfaceDark = Color(0xFF14251B);
-  static const Color surfaceSubtleDark = Color(0xFF1A2F23);
-  static const Color borderHairlineDark = Color(0xFF253F30);
-  static const Color textPrimaryDark = Color(0xFFFAFAF7);
-  static const Color textSecondaryDark = Color(0xFFA3B8AD);
-  static const Color textMutedDark = Color(0xFF6C8074);
-  static const Color accentDark = Color(0xFF40916C);
-  static const Color accentOnAccentDark = Color(0xFFFFFFFF);
+  // Dark Theme Palette (Strict Phase 3 Spec Tokens)
+  static const Color canvasDark = Color(0xFF0E0F0E);
+  static const Color surfaceDark = Color(0xFF161816);
+  static const Color surfaceSubtleDark = Color(0xFF1E211E);
+  static const Color borderHairlineDark = Color(0xFF262926);
+  static const Color textPrimaryDark = Color(0xFFECEEEC);
+  static const Color textSecondaryDark = Color(0xFFA5ACA5);
+  static const Color textMutedDark = Color(0xFF8A908A);
+  static const Color accentDark = Color(0xFF7FD1A8);
+  static const Color accentOnAccentDark = Color(0xFF0E0F0E);
   static const Color brassDark = Color(0xFFD4AF37);
-  static const Color successDark = Color(0xFF52B788);
+  static const Color successDark = Color(0xFF7FD1A8);
   static const Color warningDark = Color(0xFFE9C46A);
   static const Color errorDark = Color(0xFFFF6B6B);
   static const Color blueDark = Color(0xFF64DFDF);
@@ -164,31 +164,29 @@ class AppTheme {
       ),
       fontFamily: 'Inter',
       appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.canvasLight,
+        backgroundColor: AppColors.surfaceLight,
         foregroundColor: AppColors.textPrimaryLight,
         elevation: 0,
+        scrolledUnderElevation: 0,
         centerTitle: false,
       ),
       textTheme: const TextTheme(
         displayLarge: TextStyle(
           fontSize: 32,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w600,
           color: AppColors.textPrimaryLight,
-          letterSpacing: -0.6,
           fontFeatures: [FontFeature.tabularFigures()],
         ),
         displayMedium: TextStyle(
           fontSize: 24,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w600,
           color: AppColors.textPrimaryLight,
-          letterSpacing: -0.4,
           fontFeatures: [FontFeature.tabularFigures()],
         ),
         titleLarge: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimaryLight,
-          letterSpacing: -0.2,
         ),
         titleMedium: TextStyle(
           fontSize: 16,
@@ -242,7 +240,7 @@ class AppTheme {
           }
           return const TextStyle(
             fontSize: 11,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w400,
             color: AppColors.textMutedLight,
           );
         }),
@@ -264,31 +262,29 @@ class AppTheme {
       ),
       fontFamily: 'Inter',
       appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.canvasDark,
+        backgroundColor: AppColors.surfaceDark,
         foregroundColor: AppColors.textPrimaryDark,
         elevation: 0,
+        scrolledUnderElevation: 0,
         centerTitle: false,
       ),
       textTheme: const TextTheme(
         displayLarge: TextStyle(
           fontSize: 32,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w600,
           color: AppColors.textPrimaryDark,
-          letterSpacing: -0.6,
           fontFeatures: [FontFeature.tabularFigures()],
         ),
         displayMedium: TextStyle(
           fontSize: 24,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w600,
           color: AppColors.textPrimaryDark,
-          letterSpacing: -0.4,
           fontFeatures: [FontFeature.tabularFigures()],
         ),
         titleLarge: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimaryDark,
-          letterSpacing: -0.2,
         ),
         titleMedium: TextStyle(
           fontSize: 16,
@@ -342,7 +338,7 @@ class AppTheme {
           }
           return const TextStyle(
             fontSize: 11,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w400,
             color: AppColors.textMutedDark,
           );
         }),

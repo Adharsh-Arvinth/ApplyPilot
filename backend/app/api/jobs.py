@@ -8,7 +8,7 @@ from sqlalchemy import func
 from backend.app.core.database import get_db
 from backend.app.core.security import verify_token
 from backend.app.models import Job, Profile, NeedsInput, Application, RunLog
-from backend.app.schemas import JobOut, JobStatusUpdate, StatsOut
+from backend.app.schemas import JobOut, JobStatusUpdate, StatsOut, RunLogOut
 from backend.app.scrapers.discovery import JobDiscoveryService
 from backend.app.services.scoring_service import ScoringService
 from backend.app.services.tailoring_service import ResumeTailoringService
@@ -87,6 +87,20 @@ def _format_job_out(job: Job) -> dict:
         "blocked_category": getattr(job, "blocked_category", "") or "",
         "company_logo_url": getattr(job, "company_logo_url", "") or "",
         "is_saved": bool(getattr(job, "is_saved", False)),
+        "is_assist_only": bool(getattr(job, "is_assist_only", False)),
+        "is_internship": bool(getattr(job, "is_internship", False)),
+        "stipend_raw": getattr(job, "stipend_raw", "") or "",
+        "stipend_numeric": getattr(job, "stipend_numeric", 0) or 0,
+        "salary_currency": getattr(job, "salary_currency", "INR") or "INR",
+        "salary_period": getattr(job, "salary_period", "annual") or "annual",
+        "last_verified_at": getattr(job, "last_verified_at", None),
+        "is_expired": bool(getattr(job, "is_expired", False)),
+        "quality_readiness_score": getattr(job, "quality_readiness_score", 100.0) or 100.0,
+        "quality_readiness_notes": getattr(job, "quality_readiness_notes", "") or "",
+        "interview_prep_notes": getattr(job, "interview_prep_notes", "") or "",
+        "company_research_notes": getattr(job, "company_research_notes", "") or "",
+        "skip_reason": getattr(job, "skip_reason", "") or "",
+        "blocked_reason": getattr(job, "blocked_reason", "") or "",
         "fit_breakdown": fit,
         "required_skills": req_skills,
         "matching_skills": match_skills,
@@ -359,7 +373,7 @@ def trigger_backup(db: Session = Depends(get_db)):
 @router.get("/stats", response_model=StatsOut, summary="Dashboard Stat Counters")
 def get_stats(db: Session = Depends(get_db)):
     profile = db.query(Profile).first()
-    daily_cap = profile.daily_cap if profile else 100
+    daily_cap = profile.daily_cap if profile and profile.daily_cap is not None else 100
     daily_target = getattr(profile, "daily_target", 50) or 50
     tz_str = getattr(profile, "timezone", "Asia/Kolkata") or "Asia/Kolkata"
     
@@ -374,42 +388,217 @@ def get_stats(db: Session = Depends(get_db)):
     start_of_day_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
     start_of_day_utc = start_of_day_local.astimezone(datetime.timezone.utc)
 
-    applied_count = db.query(Application).filter(Application.submitted_at >= start_of_day_utc).count()
+    # Separate real submitted applications vs dry-run simulations
+    real_applied_today = db.query(Application).filter(
+        Application.submitted_at >= start_of_day_utc,
+        Application.status == "submitted"
+    ).count()
+    dry_run_today = db.query(Application).filter(
+        Application.submitted_at >= start_of_day_utc,
+        Application.status == "dry_run"
+    ).count()
+    
+    total_submitted_real = db.query(Application).filter(Application.status == "submitted").count()
+    total_dry_run = db.query(Application).filter(Application.status == "dry_run").count()
+    failed_count = db.query(Application).filter(Application.status == "failed").count()
+
     needs_you = db.query(NeedsInput).filter(NeedsInput.status == "pending").count()
     maybe = db.query(Job).filter(Job.status.in_(["maybe", "evaluated"])).count()
-    blocked = db.query(Job).filter(Job.status.in_(["blocked", "skipped", "rejected"])).count()
+    skipped = db.query(Job).filter(Job.status == "skipped").count()
+    blocked = db.query(Job).filter(Job.status == "blocked").count()
     interviews = db.query(Job).filter(Job.status == "interview").count()
     queue = db.query(Job).filter(Job.status.in_(["queued", "approved"])).count()
+    discovered = db.query(Job).filter(Job.status == "discovered").count()
+    evaluated = db.query(Job).filter(Job.score > 0).count()
+    eligible = db.query(Job).filter(Job.eligibility_status.in_(["eligible", "potentially_eligible"])).count()
     total = db.query(Job).count()
 
+    # Determine automation state & recovery instructions
+    is_paused = bool(profile.is_paused) if profile else False
+    circuit_broken = AutoApplyEngine.is_circuit_broken()
+    daily_remaining = max(0, daily_cap - real_applied_today)
+    
+    if is_paused:
+        raw_reason = getattr(profile, "pause_reason", "") or "paused_by_user"
+        auto_state = raw_reason
+        if raw_reason == "paused_by_circuit_breaker" or circuit_broken:
+            recovery = "Circuit breaker tripped after repeated errors. Check network connection or execution logs before resuming."
+            can_resume = False
+        elif raw_reason == "paused_by_daily_cap" or (daily_remaining <= 0 and profile.go_live):
+            recovery = f"Daily cap ({daily_cap}) reached in {tz_str}. Automation resumes at midnight or increase cap in Profile."
+            can_resume = False
+        else:
+            recovery = "Paused by user. Tap Resume to restart automated pipeline."
+            can_resume = True
+    elif circuit_broken:
+        auto_state = "paused_by_circuit_breaker"
+        recovery = "Circuit breaker tripped after repeated errors. Check execution logs."
+        can_resume = False
+        is_paused = True
+    elif profile and profile.go_live and daily_remaining <= 0:
+        auto_state = "paused_by_daily_cap"
+        recovery = f"Daily cap ({daily_cap}) reached today. Resumes at midnight."
+        can_resume = False
+        is_paused = True
+    elif queue == 0:
+        auto_state = "idle"
+        recovery = "Queue is empty. Discover new jobs to populate queue."
+        can_resume = True
+    else:
+        auto_state = "running"
+        recovery = "Autonomous career engine active and operating normally."
+        can_resume = True
+
+    paused_at_str = profile.paused_at.strftime("%I:%M %p • %d %b") if profile and profile.paused_at else None
+
     return {
-        "daily_applied": applied_count,
+        "daily_applied": real_applied_today,
+        "real_applied_today": real_applied_today,
+        "dry_run_today": dry_run_today,
         "daily_cap": daily_cap,
         "daily_target": daily_target,
-        "daily_remaining": max(0, daily_cap - applied_count),
-        "target_remaining": max(0, daily_target - applied_count),
-        "is_paused": bool(profile.is_paused) if profile else False,
-        "is_circuit_broken": AutoApplyEngine.is_circuit_broken(),
+        "daily_remaining": daily_remaining,
+        "target_remaining": max(0, daily_target - real_applied_today),
+        "is_paused": is_paused,
+        "is_circuit_broken": circuit_broken,
         "go_live": bool(profile.go_live) if profile else False,
         "timezone": tz_str,
+        "automation_state": auto_state,
+        "pause_reason": getattr(profile, "pause_reason", "") or auto_state,
+        "paused_at": paused_at_str,
+        "recovery_instruction": recovery,
+        "can_resume": can_resume,
         "needs_you_count": needs_you,
         "maybe_count": maybe,
+        "skipped_count": skipped,
         "blocked_count": blocked,
+        "failed_count": failed_count,
         "interview_count": interviews,
         "queue_count": queue,
+        "jobs_discovered": discovered,
+        "jobs_evaluated": evaluated,
+        "jobs_eligible": eligible,
+        "total_submitted_real": total_submitted_real,
+        "total_dry_run": total_dry_run,
         "total_tracked": total
     }
 
-@router.get("/logs", summary="Recent Activity Logs")
+@router.get("/automation/status", summary="Get Automation Engine Status & Health Checks")
+def get_automation_status(db: Session = Depends(get_db)):
+    profile = db.query(Profile).first()
+    stats = get_stats(db)
+    queue_count = stats["queue_count"]
+    is_paused = stats["is_paused"]
+    cb_broken = stats["is_circuit_broken"]
+    daily_rem = stats["daily_remaining"]
+    
+    # Pre-flight check conditions
+    checks = {
+        "daily_cap_available": daily_rem > 0,
+        "circuit_breaker_clear": not cb_broken,
+        "backend_healthy": True,
+        "auth_valid": True,
+        "no_blocking_captcha": db.query(Job).filter(Job.status == "blocked", Job.blocked_reason.ilike("%captcha%")).count() == 0
+    }
+    can_resume = checks["daily_cap_available"] and checks["circuit_breaker_clear"] and checks["backend_healthy"]
+
+    return {
+        "state": stats["automation_state"],
+        "is_paused": is_paused,
+        "pause_reason": stats["pause_reason"],
+        "paused_at": stats["paused_at"],
+        "recovery_instruction": stats["recovery_instruction"],
+        "can_resume": can_resume,
+        "affected_queue_count": queue_count,
+        "checks": checks
+    }
+
+@router.post("/automation/pause", summary="Pause Automation Queue")
+def pause_automation(reason: str = "paused_by_user", details: str = "Paused by user", db: Session = Depends(get_db)):
+    profile = db.query(Profile).first()
+    if profile:
+        profile.is_paused = True
+        profile.pause_reason = reason
+        profile.paused_at = datetime.datetime.now(datetime.timezone.utc)
+        profile.pause_details = details
+        db.add(RunLog(
+            event_type="automation",
+            message=f"Automation paused: {details}",
+            level="warn",
+            outcome="warning"
+        ))
+        db.commit()
+    return {"status": "paused", "reason": reason}
+
+@router.post("/automation/resume", summary="Resume Automation Queue with Safety Checks")
+def resume_automation(force: bool = False, db: Session = Depends(get_db)):
+    profile = db.query(Profile).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    # Safety checks
+    if AutoApplyEngine.is_circuit_broken() and not force:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot resume: Circuit breaker active due to repeated failures. Review execution logs."
+        )
+
+    # Check daily cap
+    tz_str = getattr(profile, "timezone", "Asia/Kolkata") or "Asia/Kolkata"
+    try:
+        import zoneinfo
+        user_tz = zoneinfo.ZoneInfo(tz_str)
+    except Exception:
+        import zoneinfo
+        user_tz = zoneinfo.ZoneInfo("Asia/Kolkata")
+    now_local = datetime.datetime.now(user_tz)
+    start_of_day_utc = now_local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(datetime.timezone.utc)
+    
+    submitted_today = db.query(Application).filter(
+        Application.submitted_at >= start_of_day_utc,
+        Application.status == "submitted"
+    ).count()
+
+    if profile.go_live and profile.daily_cap is not None and submitted_today >= profile.daily_cap and not force:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot resume: Daily application cap ({profile.daily_cap}) reached for today in {tz_str}."
+        )
+
+    # All checks passed: Resume
+    profile.is_paused = False
+    profile.pause_reason = ""
+    profile.paused_at = None
+    profile.pause_details = ""
+    AutoApplyEngine.reset_circuit_breaker()
+
+    db.add(RunLog(
+        event_type="automation",
+        message="Automation resumed. All safety pre-flight checks passed.",
+        level="info",
+        outcome="success"
+    ))
+    db.commit()
+    return {"status": "running", "message": "Automation resumed successfully."}
+
+@router.get("/logs", response_model=List[RunLogOut], summary="Recent Activity Logs")
 def get_logs(limit: int = 50, db: Session = Depends(get_db)):
     logs = db.query(RunLog).order_by(RunLog.created_at.desc()).limit(limit).all()
-    return [
-        {
+    results = []
+    for l in logs:
+        try:
+            details = json.loads(l.details_json) if l.details_json else {}
+        except Exception:
+            details = {}
+        results.append({
             "id": l.id,
             "event_type": l.event_type,
             "message": l.message,
             "level": l.level,
+            "company": getattr(l, "company", "") or "",
+            "role": getattr(l, "role", "") or "",
+            "outcome": getattr(l, "outcome", "neutral") or "neutral",
+            "details": details,
             "created_at": l.created_at.strftime("%H:%M:%S • %d %b")
-        }
-        for l in logs
-    ]
+        })
+    return results

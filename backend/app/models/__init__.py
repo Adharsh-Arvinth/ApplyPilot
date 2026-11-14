@@ -30,6 +30,9 @@ class Profile(Base):
     widget_preferences_json = Column(Text, default='{}')
     
     min_salary_inr = Column(Integer, default=700000) # 7 LPA
+    min_stipend_inr = Column(Integer, default=25000) # ₹25,000/month
+    allow_unpaid_internships = Column(Boolean, default=False)
+    allow_unknown_salary = Column(Boolean, default=True)
     daily_cap = Column(Integer, default=100)
     daily_target = Column(Integer, default=50)
     hourly_cap = Column(Integer, default=10)
@@ -40,6 +43,9 @@ class Profile(Base):
     active_hours_start = Column(Integer, default=8)  # 08:00
     active_hours_end = Column(Integer, default=22)    # 22:00
     is_paused = Column(Boolean, default=False)
+    pause_reason = Column(String(128), default="") # paused_by_user, paused_by_daily_cap, paused_by_circuit_breaker, etc.
+    paused_at = Column(DateTime, nullable=True)
+    pause_details = Column(Text, default="")
     go_live = Column(Boolean, default=False) # Strict safety switch
     
     # Verified facts and proof points (Immutable truth source)
@@ -68,6 +74,10 @@ class AnswerBank(Base):
     is_verified = Column(Boolean, default=True) # True = human/system verified, False = AI suggested
     supporting_evidence = Column(Text, default="")
     allow_reuse = Column(Boolean, default=True)
+    canonical_key = Column(String(128), index=True, default="")
+    aliases_json = Column(Text, default="[]")
+    user_approved = Column(Boolean, default=True)
+    application_references_json = Column(Text, default="[]")
     
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
@@ -129,10 +139,25 @@ class Job(Base):
     company_logo_url = Column(String(512), default="")
     is_saved = Column(Boolean, default=False)
     
+    # Assist-Only & Compensation Specification
+    is_assist_only = Column(Boolean, default=False) # True for Naukri, LinkedIn (Automated submit prohibited)
+    is_internship = Column(Boolean, default=False)
+    stipend_raw = Column(String(128), default="")
+    stipend_numeric = Column(Integer, default=0) # Monthly in INR
+    salary_currency = Column(String(16), default="INR")
+    salary_period = Column(String(16), default="annual") # annual, monthly, stipend
+    last_verified_at = Column(DateTime, default=utcnow)
+    is_expired = Column(Boolean, default=False)
+    quality_readiness_score = Column(Float, default=100.0) # Quality Control readiness score
+    quality_readiness_notes = Column(Text, default="")
+    interview_prep_notes = Column(Text, default="")
+    company_research_notes = Column(Text, default="")
+    
     # Complete Application Lifecycle Progression:
-    # DISCOVERED -> EVALUATED -> APPROVED (QUEUED) -> PREPARING -> AWAITING_REVIEW -> SUBMITTED -> INTERVIEW -> OFFER / REJECTED / WITHDRAWN / BLOCKED
+    # DISCOVERED -> EVALUATED -> APPROVED (QUEUED) -> PREPARING -> AWAITING_REVIEW -> SUBMITTED -> INTERVIEW -> OFFER / REJECTED / WITHDRAWN / SKIPPED / BLOCKED
     status = Column(String(32), index=True, default="discovered")
     skip_reason = Column(Text, default="")
+    blocked_reason = Column(Text, default="")
     
     # Tracking & CRM fields
     notes = Column(Text, default="")
@@ -195,6 +220,11 @@ class RunLog(Base):
     event_type = Column(String(64), index=True, default="engine")
     message = Column(Text, nullable=False)
     level = Column(String(16), default="info") # info, warn, error
+    job_id = Column(Integer, ForeignKey("jobs.id", ondelete="SET NULL"), nullable=True)
+    company = Column(String(128), default="")
+    role = Column(String(128), default="")
+    outcome = Column(String(32), default="neutral") # success, warning, failure, neutral
+    details_json = Column(Text, default="{}")
     created_at = Column(DateTime, default=utcnow)
 
 

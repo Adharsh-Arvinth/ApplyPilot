@@ -111,6 +111,12 @@ class AutoApplyEngine:
             logger.info(f"Skipping {job.company} — {job.title}: Global queue is paused.")
             return {"status": "paused", "reason": "global_pause_active"}
 
+        # 0b. Assist-only source check (Naukri, LinkedIn)
+        if getattr(job, "is_assist_only", False) or (job.source or "").lower() in ["naukri", "linkedin"] or "naukri.com" in (job.url or "") or "linkedin.com" in (job.url or ""):
+            logger.info(f"Skipping automated submission for {job.company}: Source is assist-only (Naukri/LinkedIn).")
+            AutoApplyEngine._record_transition(db, job, "maybe", "Assist-only source (Naukri/LinkedIn). Automated submission disabled.", "assist_only")
+            return {"status": "assist_only", "reason": "Job is an assist-only portal listing. Please complete manually via official application link."}
+
         # 1. Deduplication & Idempotency check
         existing_app = db.query(Application).filter(
             Application.job_id == job.id,
@@ -122,8 +128,10 @@ class AutoApplyEngine:
 
         if AutoApplyEngine._is_company_cooldown_active(db, job.company):
             logger.info(f"Skipping {job.company}: Applied within 30-day cooldown window.")
-            AutoApplyEngine._record_transition(db, job, "blocked", "30-day company cooldown active", "cooldown_active")
+            AutoApplyEngine._record_transition(db, job, "skipped", "30-day company cooldown active", "cooldown_active")
+            job.status = "skipped"
             job.skip_reason = "30-day company cooldown active"
+            job.blocked_category = "duplicate"
             db.commit()
             return {"status": "skipped", "reason": "30-day cooldown"}
 
@@ -138,12 +146,45 @@ class AutoApplyEngine:
         start_of_day_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
         start_of_day_utc = start_of_day_local.astimezone(datetime.timezone.utc)
 
-        daily_count = db.query(Application).filter(Application.submitted_at >= start_of_day_utc).count()
-        if profile.daily_cap is not None and daily_count >= profile.daily_cap:
-            logger.info(f"Daily application cap ({profile.daily_cap}) reached ({daily_count} applied today in {tz_str}).")
-            db.add(RunLog(event_type="engine", message=f"Daily cap ({profile.daily_cap}) reached. Queue paused.", level="warn"))
+        # Distinguish missing, null, zero and valid values
+        if profile.daily_cap is None:
+            profile.daily_cap = 100
             db.commit()
-            return {"status": "halted", "reason": "daily_cap_reached", "daily_count": daily_count, "daily_cap": profile.daily_cap}
+
+        # Check if cap is intentionally configured as 0
+        if profile.daily_cap == 0:
+            logger.info("Daily application cap is set to 0. Applications halted by policy.")
+            profile.is_paused = True
+            profile.pause_reason = "paused_by_daily_cap"
+            profile.paused_at = datetime.datetime.now(datetime.timezone.utc)
+            profile.pause_details = "Daily cap is set to 0 in Profile. Submissions halted until cap is increased."
+            db.add(RunLog(event_type="engine", message="Daily cap is 0. Queue halted.", level="warn", outcome="warning"))
+            db.commit()
+            return {"status": "halted", "reason": "daily_cap_reached", "detail": "daily_cap_zero", "daily_count": 0, "daily_cap": 0}
+
+        # Count ONLY actual submitted applications toward the real application cap
+        submitted_count = db.query(Application).filter(
+            Application.submitted_at >= start_of_day_utc,
+            Application.status == "submitted"
+        ).count()
+
+        is_live = profile.go_live and not force_dry_run
+        if is_live:
+            if submitted_count >= profile.daily_cap:
+                logger.info(f"Daily application cap ({profile.daily_cap}) reached ({submitted_count} submitted today in {tz_str}).")
+                profile.is_paused = True
+                profile.pause_reason = "paused_by_daily_cap"
+                profile.paused_at = datetime.datetime.now(datetime.timezone.utc)
+                profile.pause_details = f"Daily cap ({profile.daily_cap}) reached for today in {tz_str}. Queue paused until midnight reset or cap increase in Profile."
+                db.add(RunLog(event_type="engine", message=f"Daily cap ({profile.daily_cap}) reached ({submitted_count} submitted). Queue paused.", level="warn", outcome="warning"))
+                db.commit()
+                return {"status": "halted", "reason": "daily_cap_reached", "daily_count": submitted_count, "daily_cap": profile.daily_cap}
+        else:
+            # Enforce simulation quota
+            total_runs_today = db.query(Application).filter(Application.submitted_at >= start_of_day_utc).count()
+            if total_runs_today >= profile.daily_cap:
+                logger.info(f"Daily simulation cap ({profile.daily_cap}) reached ({total_runs_today} simulations today in {tz_str}).")
+                return {"status": "halted", "reason": "daily_cap_reached", "daily_count": total_runs_today, "daily_cap": profile.daily_cap}
 
         # 3. State transition -> PREPARING
         AutoApplyEngine._record_transition(db, job, "preparing", "Starting resume generation and form preparation")

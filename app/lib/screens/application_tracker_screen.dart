@@ -16,13 +16,13 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
   bool _loading = true;
   bool _isKanban = false;
   String _searchQuery = "";
-  String _selectedStage = "queue"; // queue, maybe, applied, blocked
+  String _selectedStage = "queue"; // queue, maybe, applied, skipped, blocked
 
   List<dynamic> _allJobs = [];
   Map<String, dynamic> _kanbanData = {};
 
   final List<String> _stages = [
-    "queue", "maybe", "applied", "blocked"
+    "queue", "maybe", "applied", "skipped", "blocked"
   ];
 
   @override
@@ -71,7 +71,8 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
     final queueCount = _allJobs.where((j) => ["queued", "approved"].contains(j["status"])).length;
     final maybeCount = _allJobs.where((j) => ["maybe", "evaluated", "discovered"].contains(j["status"])).length;
     final appliedCount = _allJobs.where((j) => ["applied", "submitted", "dry_run", "interview", "offer"].contains(j["status"])).length;
-    final blockedCount = _allJobs.where((j) => ["blocked", "skipped", "rejected", "failed"].contains(j["status"])).length;
+    final skippedCount = _allJobs.where((j) => ["skipped", "cooldown", "below_salary", "ineligible"].contains(j["status"])).length;
+    final blockedCount = _allJobs.where((j) => ["blocked", "captcha", "auth_required", "failed"].contains(j["status"])).length;
 
     final filteredJobs = _allJobs.where((j) {
       final matchSearch = _searchQuery.isEmpty ||
@@ -86,8 +87,10 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
         matchTab = st == "maybe" || st == "evaluated" || st == "discovered";
       } else if (_selectedStage == "applied") {
         matchTab = st == "applied" || st == "submitted" || st == "dry_run" || st == "interview" || st == "offer";
+      } else if (_selectedStage == "skipped") {
+        matchTab = st == "skipped" || st == "cooldown" || st == "below_salary" || st == "ineligible";
       } else if (_selectedStage == "blocked") {
-        matchTab = st == "blocked" || st == "skipped" || st == "rejected" || st == "failed";
+        matchTab = st == "blocked" || st == "captcha" || st == "auth_required" || st == "failed";
       }
       return matchSearch && matchTab;
     }).toList();
@@ -154,6 +157,8 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
                         _buildFilterPill("Maybe ($maybeCount)", "maybe", brassColor),
                         const SizedBox(width: AppSpacing.s8),
                         _buildFilterPill("Applied ($appliedCount)", "applied", AppColors.successEmerald),
+                        const SizedBox(width: AppSpacing.s8),
+                        _buildFilterPill("Skipped ($skippedCount)", "skipped", AppColors.warningLight),
                         const SizedBox(width: AppSpacing.s8),
                         _buildFilterPill("Blocked ($blockedCount)", "blocked", AppColors.errorCoral),
                       ],
@@ -252,17 +257,27 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
                           ),
                         ),
                         if (score > 0) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: accentGreen.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(AppRadii.badge),
-                              border: Border.all(color: accentGreen.withOpacity(0.3)),
-                            ),
-                            child: Text(
-                              "${score.toStringAsFixed(1)} / 5.0 ($matchPercent%)",
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: accentGreen),
-                            ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: score >= 4.0 ? accentGreen : brassColor,
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                "• ${score.toStringAsFixed(1)} / 5.0",
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: primaryTextColor,
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(width: AppSpacing.s8),
                         ],
@@ -538,6 +553,7 @@ class _ApplicationDetailSheetState extends State<_ApplicationDetailSheet> {
     final primaryTextColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
     final secondaryTextColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
     final accentGreen = isDark ? AppColors.accentDark : AppColors.racingGreen;
+    final borderColor = isDark ? AppColors.borderHairlineDark : AppColors.borderHairlineLight;
     final apps = (widget.job["applications"] as List<dynamic>?) ?? [];
     final latestApp = apps.isNotEmpty ? apps.last : null;
 
@@ -563,6 +579,80 @@ class _ApplicationDetailSheetState extends State<_ApplicationDetailSheet> {
           Expanded(
             child: ListView(
               children: [
+                // Assist-Only Banner if applicable
+                if (widget.job["is_assist_only"] == true ||
+                    widget.job["source"] == "naukri" ||
+                    widget.job["source"] == "linkedin") ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: AppSpacing.s16),
+                    padding: const EdgeInsets.all(AppSpacing.s12),
+                    decoration: BoxDecoration(
+                      color: AppColors.getSemanticColor("amber", isDark).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(AppRadii.control),
+                      border: Border.all(color: AppColors.getSemanticColor("amber", isDark).withOpacity(0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.shield_outlined, size: 16, color: AppColors.getSemanticColor("amber", isDark)),
+                            const SizedBox(width: 6),
+                            Text(
+                              "Assist-Only Flow (${widget.job['source']?.toString().toUpperCase() ?? 'PORTAL'})",
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.getSemanticColor("amber", isDark)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          "This application requires human submission on the portal to comply with platform access terms.",
+                          style: TextStyle(fontSize: 11, height: 1.35, color: secondaryTextColor),
+                        ),
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                          onPressed: () {
+                            final u = widget.job["url"] ?? "";
+                            if (u.isNotEmpty) {
+                              Clipboard.setData(ClipboardData(text: u));
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Application URL copied to clipboard!")));
+                            }
+                          },
+                          icon: const Icon(Icons.copy, size: 14),
+                          label: const Text("Copy Job URL", style: TextStyle(fontSize: 11)),
+                          style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                if (widget.job["quality_readiness_score"] != null) ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: AppSpacing.s16),
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12, vertical: AppSpacing.s8),
+                    decoration: BoxDecoration(
+                      color: cardBg,
+                      borderRadius: BorderRadius.circular(AppRadii.control),
+                      border: Border.all(color: borderColor),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text("Application Readiness Score", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: secondaryTextColor)),
+                        Row(
+                          children: [
+                            Container(width: 6, height: 6, decoration: BoxDecoration(shape: BoxShape.circle, color: accentGreen)),
+                            const SizedBox(width: 6),
+                            Text(
+                              "${((widget.job['quality_readiness_score'] as num?)?.toDouble() ?? 0.0).toStringAsFixed(1)} / 5.0",
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: primaryTextColor),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 // 1. Lifecycle Status Selector
                 Text("LIFECYCLE STATUS", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: secondaryTextColor)),
                 const SizedBox(height: 6),

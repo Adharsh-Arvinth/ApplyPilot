@@ -55,14 +55,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final emerald = AppColors.getSemanticColor("emerald", isDark);
     final blue = AppColors.getSemanticColor("blue", isDark);
     final violet = AppColors.getSemanticColor("violet", isDark);
-    final amber = AppColors.getSemanticColor("amber", isDark);
     final teal = AppColors.getSemanticColor("teal", isDark);
 
     final totalTracked = _data["total_tracked"] ?? 0;
-    final totalApplied = _data["total_applied"] ?? 0;
+    final realApplied = _data["real_applied_count"] ?? 0;
+    final dryRuns = _data["dry_run_count"] ?? 0;
     final interviewsCount = _data["interviews_count"] ?? 0;
     final conversionRate = _data["conversion_rate_percent"] ?? 0.0;
-    final avgResponseDays = _data["avg_response_days"] ?? 0.0;
 
     final weeklyTrend = (_data["weekly_trend"] as List<dynamic>?) ?? [];
     final monthlyTrend = (_data["monthly_trend"] as List<dynamic>?) ?? [];
@@ -133,15 +132,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                         children: [
                           _buildKpiCard("Tracked Jobs", "$totalTracked", Icons.radar, blue, cardBg, borderColor, primaryTextColor, secondaryTextColor),
                           const SizedBox(width: AppSpacing.s12),
-                          _buildKpiCard("Submitted", "$totalApplied", Icons.send_outlined, emerald, cardBg, borderColor, primaryTextColor, secondaryTextColor),
+                          _buildKpiCard("Real Submitted", "$realApplied", Icons.send_outlined, emerald, cardBg, borderColor, primaryTextColor, secondaryTextColor),
                         ],
                       ),
                       const SizedBox(height: AppSpacing.s12),
                       Row(
                         children: [
-                          _buildKpiCard("Interviews", "$interviewsCount", Icons.event_available, teal, cardBg, borderColor, primaryTextColor, secondaryTextColor),
+                          _buildKpiCard("Dry-Run Sims", "$dryRuns", Icons.science_outlined, violet, cardBg, borderColor, primaryTextColor, secondaryTextColor),
                           const SizedBox(width: AppSpacing.s12),
-                          _buildKpiCard("Conversion", "$conversionRate%", Icons.trending_up, amber, cardBg, borderColor, primaryTextColor, secondaryTextColor),
+                          _buildKpiCard("Interviews", "$interviewsCount ($conversionRate%)", Icons.event_available, teal, cardBg, borderColor, primaryTextColor, secondaryTextColor),
                         ],
                       ),
 

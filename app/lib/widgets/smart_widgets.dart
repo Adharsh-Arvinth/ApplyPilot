@@ -103,12 +103,14 @@ class DashboardPreferences {
 // ---------------------------------------------------------------------------
 class ApplicationGoalWidget extends StatefulWidget {
   final Map<String, dynamic> goalData;
+  final Map<String, dynamic>? statsData;
   final bool isCompact;
   final VoidCallback onAdjustTarget;
 
   const ApplicationGoalWidget({
     super.key,
     required this.goalData,
+    this.statsData,
     this.isCompact = false,
     required this.onAdjustTarget,
   });
@@ -129,14 +131,19 @@ class _ApplicationGoalWidgetState extends State<ApplicationGoalWidget> {
     final secondaryTextColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
     final emerald = AppColors.getSemanticColor("emerald", isDark);
 
+    final realApplied = widget.statsData?["real_applied_today"] ?? widget.statsData?["daily_applied"] ?? widget.goalData["daily_applied"] ?? 0;
+    final dryRunCount = widget.statsData?["dry_run_today"] ?? 0;
+    final dailyCap = widget.statsData?["daily_cap"] ?? 100;
+
     final dailyTarget = widget.goalData["daily_target"] ?? 50;
-    final dailyApplied = widget.goalData["daily_applied"] ?? 0;
-    final dailyRemaining = widget.goalData["daily_remaining"] ?? 50;
-    final dailyPercent = (widget.goalData["daily_percent"] as num?)?.toDouble() ?? 0.0;
+    final dailyApplied = widget.goalData["daily_applied"] ?? realApplied;
+    final dailyRemaining = widget.goalData["daily_remaining"] ?? math.max(0, (dailyTarget as int) - (dailyApplied as int));
+    final dailyPercent = (widget.goalData["daily_percent"] as num?)?.toDouble() ??
+        (dailyTarget > 0 ? ((dailyApplied / dailyTarget) * 100.0) : 0.0);
 
     final weeklyTarget = widget.goalData["weekly_target"] ?? 250;
-    final weeklyApplied = widget.goalData["weekly_applied"] ?? 0;
-    final weeklyRemaining = widget.goalData["weekly_remaining"] ?? 250;
+    final weeklyApplied = widget.goalData["weekly_applied"] ?? dailyApplied;
+    final weeklyRemaining = widget.goalData["weekly_remaining"] ?? math.max(0, (weeklyTarget as int) - (weeklyApplied as int));
     final weeklyPercent = (widget.goalData["weekly_percent"] as num?)?.toDouble() ?? 0.0;
 
     final target = _showWeekly ? weeklyTarget : dailyTarget;
@@ -237,6 +244,41 @@ class _ApplicationGoalWidgetState extends State<ApplicationGoalWidget> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: AppSpacing.s12),
+          // Distinct Real vs Dry-run telemetry bar
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: 7),
+            decoration: BoxDecoration(
+              color: borderColor.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(AppRadii.control),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                Row(
+                  children: [
+                    Container(width: 6, height: 6, decoration: BoxDecoration(shape: BoxShape.circle, color: emerald)),
+                    const SizedBox(width: 6),
+                    Text(
+                      "Real Submitted: $realApplied / $dailyCap",
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: primaryTextColor),
+                    ),
+                  ],
+                ),
+                Container(width: 1, height: 12, color: borderColor),
+                Row(
+                  children: [
+                    Container(width: 6, height: 6, decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.getSemanticColor("blue", isDark))),
+                    const SizedBox(width: 6),
+                    Text(
+                      "Dry-Run: $dryRunCount",
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: secondaryTextColor),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),

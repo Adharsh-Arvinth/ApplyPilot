@@ -20,6 +20,9 @@ class ProfileBase(BaseModel):
     excluded_companies: List[str] = []
     widget_preferences: Dict[str, Any] = {}
     min_salary_inr: int
+    min_stipend_inr: int = 25000
+    allow_unpaid_internships: bool = False
+    allow_unknown_salary: bool = True
     daily_cap: int
     daily_target: int = 50
     hourly_cap: int
@@ -29,6 +32,9 @@ class ProfileBase(BaseModel):
     active_hours_start: int
     active_hours_end: int
     is_paused: bool
+    pause_reason: str = ""
+    paused_at: Optional[datetime.datetime] = None
+    pause_details: str = ""
     go_live: bool
     proof_points_text: str
 
@@ -50,6 +56,9 @@ class ProfileUpdate(BaseModel):
     excluded_companies: Optional[List[str]] = None
     widget_preferences: Optional[Dict[str, Any]] = None
     min_salary_inr: Optional[int] = None
+    min_stipend_inr: Optional[int] = None
+    allow_unpaid_internships: Optional[bool] = None
+    allow_unknown_salary: Optional[bool] = None
     daily_cap: Optional[int] = None
     daily_target: Optional[int] = None
     hourly_cap: Optional[int] = None
@@ -59,6 +68,9 @@ class ProfileUpdate(BaseModel):
     active_hours_start: Optional[int] = None
     active_hours_end: Optional[int] = None
     is_paused: Optional[bool] = None
+    pause_reason: Optional[str] = None
+    paused_at: Optional[datetime.datetime] = None
+    pause_details: Optional[str] = None
     go_live: Optional[bool] = None
     proof_points_text: Optional[str] = None
 
@@ -176,7 +188,20 @@ class JobBase(BaseModel):
     blocked_category: str = ""
     company_logo_url: str = ""
     is_saved: bool = False
+    is_assist_only: bool = False
+    is_internship: bool = False
+    stipend_raw: str = ""
+    stipend_numeric: int = 0
+    salary_currency: str = "INR"
+    salary_period: str = "annual"
+    is_expired: bool = False
+    quality_readiness_score: float = 100.0
+    quality_readiness_notes: str = ""
+    interview_prep_notes: str = ""
+    company_research_notes: str = ""
     status: str = "discovered"
+    skip_reason: str = ""
+    blocked_reason: str = ""
     notes: str = ""
     recruiter_info: str = ""
 
@@ -199,6 +224,7 @@ class JobOut(JobBase):
     posted_at: datetime.datetime
     created_at: datetime.datetime
     updated_at: datetime.datetime
+    last_verified_at: Optional[datetime.datetime] = None
     follow_up_date: Optional[datetime.datetime] = None
     applications: List[ApplicationOut] = []
     model_config = ConfigDict(from_attributes=True)
@@ -232,10 +258,12 @@ class HealthOut(BaseModel):
     last_seen: datetime.datetime
     queue_paused: bool
     go_live: bool
-    version: str = "1.1.0"
+    version: str = "1.2.0"
 
 class StatsOut(BaseModel):
-    daily_applied: int
+    daily_applied: int # Submitted applications count today (authoritative for cap)
+    real_applied_today: int = 0
+    dry_run_today: int = 0
     daily_cap: int
     daily_target: int = 50
     daily_remaining: int = 100
@@ -244,12 +272,41 @@ class StatsOut(BaseModel):
     is_circuit_broken: bool = False
     go_live: bool = False
     timezone: str = "Asia/Kolkata"
+    automation_state: str = "running"
+    pause_reason: str = ""
+    paused_at: Optional[str] = None
+    recovery_instruction: str = ""
+    can_resume: bool = True
     needs_you_count: int
     maybe_count: int
+    skipped_count: int = 0
     blocked_count: int
+    failed_count: int = 0
     interview_count: int
     queue_count: int
+    jobs_discovered: int = 0
+    jobs_evaluated: int = 0
+    jobs_eligible: int = 0
+    total_submitted_real: int = 0
+    total_dry_run: int = 0
     total_tracked: int
+
+class AutomationPauseRequest(BaseModel):
+    reason: str = "paused_by_user"
+    details: Optional[str] = "Automation paused by user from Home cockpit."
+
+class AutomationResumeRequest(BaseModel):
+    force: bool = False
+
+class AutomationStatusOut(BaseModel):
+    state: str
+    is_paused: bool
+    pause_reason: str
+    paused_at: Optional[str]
+    recovery_instruction: str
+    can_resume: bool
+    affected_queue_count: int
+    checks: Dict[str, Any]
 
 class CandidateRecordBase(BaseModel):
     category: str # education, work_experience, projects, publications, patents, certifications, technical_skills, achievements
@@ -281,6 +338,8 @@ class CandidateRecordOut(CandidateRecordBase):
 class AnalyticsOut(BaseModel):
     total_tracked: int
     total_applied: int
+    real_applied_count: int = 0
+    dry_run_count: int = 0
     interviews_count: int
     offers_count: int
     rejections_count: int
@@ -305,3 +364,14 @@ class TokenRotationOut(BaseModel):
     status: str
     new_token: str
     message: str
+
+class RunLogOut(BaseModel):
+    id: int
+    event_type: str
+    message: str
+    level: str
+    company: str = ""
+    role: str = ""
+    outcome: str = "neutral"
+    details: Dict[str, Any] = {}
+    created_at: str

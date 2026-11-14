@@ -4,6 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+// Global reactive notifiers for system-wide synchronizations
+final ValueNotifier<int> needsYouCountNotifier = ValueNotifier<int>(0);
+final ValueNotifier<Map<String, dynamic>> automationStatusNotifier = ValueNotifier<Map<String, dynamic>>({});
+
 class ApiClient {
   static final ApiClient _instance = ApiClient._internal();
   factory ApiClient() => _instance;
@@ -285,28 +289,69 @@ class ApiClient {
     if (res.statusCode != 200) {
       throw Exception("Failed to resolve question: ${res.statusCode}");
     }
+    if (needsYouCountNotifier.value > 0) {
+      needsYouCountNotifier.value--;
+    }
   }
 
   Future<void> dismissNeedsYou(int id) async {
     await http.post(Uri.parse("$_baseUrl/api/v1/needs-you/$id/dismiss"), headers: _headers());
+    if (needsYouCountNotifier.value > 0) {
+      needsYouCountNotifier.value--;
+    }
   }
 
   // 8. Stats & Logs
   Future<Map<String, dynamic>> getStats() async {
     final res = await http.get(Uri.parse("$_baseUrl/api/v1/stats"), headers: _headers());
     if (res.statusCode == 200) {
-      return jsonDecode(res.body);
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      final nyCount = (data["needs_you_count"] ?? 0) as int;
+      needsYouCountNotifier.value = nyCount;
+      automationStatusNotifier.value = data;
+      return data;
     }
     return {
       "daily_applied": 0,
       "daily_cap": 100,
       "needs_you_count": 0,
       "maybe_count": 0,
+      "skipped_count": 0,
       "blocked_count": 0,
       "interview_count": 0,
       "queue_count": 0,
       "total_tracked": 0,
+      "automation_state": "idle"
     };
+  }
+
+  Future<Map<String, dynamic>> getAutomationStatus() async {
+    final res = await http.get(Uri.parse("$_baseUrl/api/v1/automation/status"), headers: _headers());
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    return {"state": "unknown", "can_resume": false};
+  }
+
+  Future<Map<String, dynamic>> pauseAutomation({String reason = "paused_by_user", String details = "Paused by user"}) async {
+    final res = await http.post(
+      Uri.parse("$_baseUrl/api/v1/automation/pause?reason=$reason&details=${Uri.encodeComponent(details)}"),
+      headers: _headers()
+    );
+    await getStats();
+    return jsonDecode(res.body);
+  }
+
+  Future<Map<String, dynamic>> resumeAutomation({bool force = false}) async {
+    final res = await http.post(
+      Uri.parse("$_baseUrl/api/v1/automation/resume?force=$force"),
+      headers: _headers()
+    );
+    await getStats();
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    throw Exception(jsonDecode(res.body)["detail"] ?? "Failed to resume automation.");
   }
 
   Future<List<dynamic>> getRunLogs() async {

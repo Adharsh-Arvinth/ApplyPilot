@@ -136,36 +136,55 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         index: _currentIndex,
         children: screens,
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: _navigateToTab,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
-            label: "Dashboard",
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.radar_outlined),
-            selectedIcon: Icon(Icons.radar),
-            label: "Discover",
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.view_kanban_outlined),
-            selectedIcon: Icon(Icons.view_kanban),
-            label: "Tracker",
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.help_outline),
-            selectedIcon: Icon(Icons.help),
-            label: "Needs You",
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.grid_view_outlined),
-            selectedIcon: Icon(Icons.grid_view),
-            label: "Hub",
-          ),
-        ],
+      bottomNavigationBar: ValueListenableBuilder<int>(
+        valueListenable: needsYouCountNotifier,
+        builder: (context, nyCount, _) {
+          return NavigationBar(
+            selectedIndex: _currentIndex,
+            onDestinationSelected: _navigateToTab,
+            destinations: [
+              const NavigationDestination(
+                icon: Icon(Icons.dashboard_outlined),
+                selectedIcon: Icon(Icons.dashboard),
+                label: "Dashboard",
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.radar_outlined),
+                selectedIcon: Icon(Icons.radar),
+                label: "Discover",
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.view_kanban_outlined),
+                selectedIcon: Icon(Icons.view_kanban),
+                label: "Tracker",
+              ),
+              NavigationDestination(
+                icon: nyCount > 0
+                    ? Badge.count(
+                        count: nyCount,
+                        backgroundColor: AppColors.coralDark,
+                        textColor: Colors.white,
+                        child: const Icon(Icons.help_outline),
+                      )
+                    : const Icon(Icons.help_outline),
+                selectedIcon: nyCount > 0
+                    ? Badge.count(
+                        count: nyCount,
+                        backgroundColor: AppColors.coralDark,
+                        textColor: Colors.white,
+                        child: const Icon(Icons.help),
+                      )
+                    : const Icon(Icons.help),
+                label: "Needs You",
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.grid_view_outlined),
+                selectedIcon: Icon(Icons.grid_view),
+                label: "Hub",
+              ),
+            ],
+          );
+        },
       ),
     );
   }

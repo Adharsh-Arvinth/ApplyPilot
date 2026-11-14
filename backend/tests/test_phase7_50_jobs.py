@@ -172,7 +172,7 @@ def test_phase7_50_jobs_end_to_end_simulation():
         assert res_stats.status_code == 200
         stats = res_stats.json()
         assert stats["total_tracked"] == 50
-        assert stats["daily_applied"] >= 5
+        assert stats["dry_run_today"] >= 5 or stats["daily_applied"] >= 5
         assert stats["maybe_count"] == maybe_count
         assert stats["blocked_count"] == blocked_count
 
