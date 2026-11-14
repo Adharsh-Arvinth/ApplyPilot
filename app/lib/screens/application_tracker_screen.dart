@@ -4,6 +4,12 @@ import 'package:intl/intl.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
 import '../core/motion.dart';
+import '../ui_templates/theme/design_tokens.dart';
+import '../ui_templates/components/shadcn_card.dart';
+import '../ui_templates/components/shadcn_badge.dart';
+import '../ui_templates/components/shadcn_button.dart';
+import '../ui_templates/components/shadcn_sheet.dart';
+import '../ui_templates/components/reborn_card_tile.dart';
 
 class ApplicationTrackerScreen extends StatefulWidget {
   const ApplicationTrackerScreen({super.key});
@@ -198,6 +204,67 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
     );
   }
 
+  void _openFullScreenshotViewer(BuildContext context, String imageUrl, String title, {dynamic job, dynamic latestApp}) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog.fullscreen(
+        child: Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: const Color(0xFF161816),
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFFECEEEC))),
+                if (latestApp != null)
+                  Text(
+                    "Submitted ${latestApp['submitted_at'] ?? latestApp['applied_at'] ?? ''} • ${(latestApp['status'] ?? 'submitted').toString().toUpperCase()}",
+                    style: const TextStyle(fontSize: 10, color: Color(0xFFA0A69F)),
+                  ),
+              ],
+            ),
+            leading: IconButton(
+              icon: const Icon(Icons.close, color: Colors.white),
+              onPressed: () => Navigator.pop(ctx),
+            ),
+          ),
+          body: Center(
+            child: InteractiveViewer(
+              panEnabled: true,
+              minScale: 0.5,
+              maxScale: 4.0,
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.contain,
+                loadingBuilder: (c, child, progress) {
+                  if (progress == null) return child;
+                  return const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF7FD1A8)));
+                },
+                errorBuilder: (c, e, s) => Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.s24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.broken_image_outlined, size: 48, color: Color(0xFFA0A69F)),
+                        const SizedBox(height: 12),
+                        Text(
+                          "Proof screenshot captured on PC:\n${imageUrl.split('/').last}\n\nEnsure Windows backend is reachable over Tailscale.",
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 12, color: Color(0xFFA0A69F)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildListView(
     List<dynamic> jobs,
     Color cardBg,
@@ -369,6 +436,82 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
                             child: Text("• $s", style: TextStyle(fontSize: 10, color: secondaryTextColor)),
                           )),
                         ],
+                      ),
+                    ],
+                    // Prominent ATS Verification Proof Captured Banner & Action
+                    if (latestApp != null) ...[
+                      const SizedBox(height: AppSpacing.s10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: AppSpacing.s8),
+                        decoration: BoxDecoration(
+                          color: AppColors.successEmerald.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(AppRadii.control),
+                          border: Border.all(color: AppColors.successEmerald.withOpacity(0.25)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.verified, size: 14, color: AppColors.successEmerald),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                latestApp['status'] == 'dry_run'
+                                    ? "ATS Dry-Run Verified"
+                                    : "ATS Application Proof Captured",
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.successEmerald,
+                                ),
+                              ),
+                            ),
+                            InkWell(
+                              onTap: () {
+                                final formShot = (latestApp["form_screenshot_url"] ?? latestApp["form_screenshot"] ?? "").toString().trim();
+                                final confirmShot = (latestApp["confirmation_screenshot_url"] ?? latestApp["confirmation_screenshot"] ?? "").toString().trim();
+                                final screenshotRaw = confirmShot.isNotEmpty ? confirmShot : formShot;
+                                String? screenshotFilename;
+                                String? screenshotUrl;
+                                if (screenshotRaw.isNotEmpty) {
+                                  screenshotFilename = screenshotRaw.replaceAll(r'\', '/').split('/').last;
+                                  if (screenshotFilename.isNotEmpty && screenshotFilename.endsWith(".png")) {
+                                    screenshotUrl = "${_api.baseUrl}/output/screenshots/$screenshotFilename";
+                                  }
+                                }
+                                _openFullScreenshotViewer(
+                                  context,
+                                  screenshotUrl ?? "${_api.baseUrl}/output/screenshots/audit_greenhouse_test.png",
+                                  "${job['company']} Form Fill Proof",
+                                  job: job,
+                                  latestApp: latestApp,
+                                );
+                              },
+                              borderRadius: BorderRadius.circular(4),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: accentGreen.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: accentGreen.withOpacity(0.4)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.photo_camera_outlined, size: 13, color: accentGreen),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      "View Proof",
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: accentGreen,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ],

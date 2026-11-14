@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:applypilot/main.dart';
 import 'package:applypilot/core/theme.dart';
+import 'package:applypilot/ui_templates/layout/kite_app_shell.dart';
 import 'package:applypilot/widgets/smart_widgets.dart';
 import 'package:applypilot/widgets/interactive_charts.dart';
 import 'package:applypilot/screens/ai_assistant_screen.dart';
@@ -15,7 +16,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(ApplyPilotApp), findsOneWidget);
-    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(KiteAppShell), findsOneWidget);
     expect(find.text("Dashboard"), findsOneWidget);
     expect(find.text("Discover"), findsOneWidget);
     expect(find.text("Tracker"), findsOneWidget);

@@ -44,6 +44,9 @@ app/android/.idea/
 .gradle/
 *.hprof
 
+# Local temporary template clones
+temp_templates/
+
 # Generated runtime outputs (keep directories, ignore user session files)
 output/resumes/*
 !output/resumes/.gitkeep

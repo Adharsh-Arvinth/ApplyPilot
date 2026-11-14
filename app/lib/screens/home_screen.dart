@@ -4,6 +4,11 @@ import 'package:flutter/services.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
 import '../widgets/smart_widgets.dart';
+import '../ui_templates/theme/design_tokens.dart';
+import '../ui_templates/components/shadcn_card.dart';
+import '../ui_templates/components/shadcn_badge.dart';
+import '../ui_templates/components/shadcn_alert.dart';
+import '../ui_templates/components/kite_stat_card.dart';
 import 'ai_assistant_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -340,7 +345,7 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8, vertical: AppSpacing.s4),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
               decoration: BoxDecoration(
                 color: accentGreen.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(AppRadii.badge),
@@ -351,20 +356,21 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
-                  letterSpacing: 1.0,
+                  letterSpacing: 0.8,
                   color: accentGreen,
                 ),
               ),
             ),
             const SizedBox(width: AppSpacing.s8),
-            Flexible(
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 135),
               child: Text(
                 "Command Center",
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
                 softWrap: false,
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 15,
                   fontWeight: FontWeight.w700,
                   color: primaryTextColor,
                 ),
@@ -380,7 +386,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: ApplyPilotColors.aiViolet.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.auto_awesome, size: 18, color: ApplyPilotColors.aiViolet),
+              child: const Icon(Icons.auto_awesome, size: 17, color: ApplyPilotColors.aiViolet),
             ),
             tooltip: "Gemini Career Advisor",
             onPressed: () {
@@ -388,20 +394,26 @@ class _HomeScreenState extends State<HomeScreen> {
               Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantScreen()));
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.dashboard_customize_outlined, size: 22),
-            tooltip: "Customize Widgets",
-            onPressed: _openCustomizer,
-          ),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, size: 22),
+            icon: const Icon(Icons.more_vert, size: 20),
             tooltip: "More Options",
             onSelected: (val) {
+              if (val == "customize") _openCustomizer();
               if (val == "analytics") widget.onNavigateToAnalytics();
               if (val == "control") widget.onNavigateToControlCenter();
               if (val == "settings") widget.onNavigateToSettings();
             },
             itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: "customize",
+                child: Row(
+                  children: [
+                    Icon(Icons.dashboard_customize_outlined, size: 18),
+                    SizedBox(width: 8),
+                    Text("Customize Widgets"),
+                  ],
+                ),
+              ),
               const PopupMenuItem(
                 value: "analytics",
                 child: Row(
@@ -434,6 +446,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: _loading
@@ -450,7 +463,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             )
-          : RefreshIndicator(
+          : (_error != null && _stats.isEmpty)
+              ? _buildOfflineRecoveryView(context, isDark, primaryTextColor, secondaryTextColor, accentGreen)
+              : RefreshIndicator(
               onRefresh: () => _fetchDashboardData(),
               color: accentGreen,
               child: ListView(
@@ -902,6 +917,78 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildOfflineRecoveryView(
+    BuildContext context,
+    bool isDark,
+    Color primaryTextColor,
+    Color secondaryTextColor,
+    Color accentGreen,
+  ) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(AppSpacing.s24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.s16),
+              decoration: BoxDecoration(
+                color: AppColors.errorCoral.withOpacity(0.12),
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.errorCoral.withOpacity(0.3)),
+              ),
+              child: const Icon(Icons.cloud_off_rounded, size: 40, color: AppColors.errorCoral),
+            ),
+            const SizedBox(height: AppSpacing.s16),
+            Text(
+              "Backend Host Offline",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: primaryTextColor,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.s8),
+            Text(
+              "Could not synchronize with ApplyPilot Windows backend at ${_api.baseUrl}.\nEnsure Tailscale is connected on both your PC and phone.",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.4,
+                color: secondaryTextColor,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.s24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: widget.onNavigateToSettings,
+                  icon: const Icon(Icons.settings_outlined, size: 16),
+                  label: const Text("Settings"),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: primaryTextColor,
+                    side: BorderSide(color: isDark ? AppColors.borderHairlineDark : AppColors.borderHairlineLight),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.s12),
+                ElevatedButton.icon(
+                  onPressed: () => _fetchDashboardData(),
+                  icon: const Icon(Icons.refresh, size: 16),
+                  label: const Text("Retry Connection"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accentGreen,
+                    foregroundColor: AppColors.pureWhite,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

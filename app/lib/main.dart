@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/theme.dart';
 import 'core/api_client.dart';
+import 'ui_templates/layout/kite_app_shell.dart';
+import 'ui_templates/components/reborn_card_tile.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/discover_screen.dart';
@@ -16,7 +18,7 @@ import 'screens/automation_control_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/ai_assistant_screen.dart';
 
-final ValueNotifier<ThemeMode> themeModeNotifier = ValueNotifier<ThemeMode>(ThemeMode.light);
+final ValueNotifier<ThemeMode> themeModeNotifier = ValueNotifier<ThemeMode>(ThemeMode.dark);
 
 void setThemeMode(ThemeMode mode) async {
   final prefs = await SharedPreferences.getInstance();
@@ -31,13 +33,13 @@ void main() async {
   final prefs = await SharedPreferences.getInstance();
   final onboardingDone = prefs.getBool("onboarding_complete") ?? false;
 
-  final savedTheme = prefs.getString("theme_mode") ?? "light";
-  if (savedTheme == "dark") {
-    themeModeNotifier.value = ThemeMode.dark;
+  final savedTheme = prefs.getString("theme_mode") ?? "dark";
+  if (savedTheme == "light") {
+    themeModeNotifier.value = ThemeMode.light;
   } else if (savedTheme == "system") {
     themeModeNotifier.value = ThemeMode.system;
   } else {
-    themeModeNotifier.value = ThemeMode.light;
+    themeModeNotifier.value = ThemeMode.dark;
   }
 
   runApp(ApplyPilotApp(initialOnboardingDone: onboardingDone));
@@ -131,61 +133,54 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       ),
     ];
 
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: screens,
-      ),
-      bottomNavigationBar: ValueListenableBuilder<int>(
-        valueListenable: needsYouCountNotifier,
-        builder: (context, nyCount, _) {
-          return NavigationBar(
-            selectedIndex: _currentIndex,
-            onDestinationSelected: _navigateToTab,
-            destinations: [
-              const NavigationDestination(
-                icon: Icon(Icons.dashboard_outlined),
-                selectedIcon: Icon(Icons.dashboard),
-                label: "Dashboard",
-              ),
-              const NavigationDestination(
-                icon: Icon(Icons.radar_outlined),
-                selectedIcon: Icon(Icons.radar),
-                label: "Discover",
-              ),
-              const NavigationDestination(
-                icon: Icon(Icons.view_kanban_outlined),
-                selectedIcon: Icon(Icons.view_kanban),
-                label: "Tracker",
-              ),
-              NavigationDestination(
-                icon: nyCount > 0
-                    ? Badge.count(
-                        count: nyCount,
-                        backgroundColor: AppColors.coralDark,
-                        textColor: Colors.white,
-                        child: const Icon(Icons.help_outline),
-                      )
-                    : const Icon(Icons.help_outline),
-                selectedIcon: nyCount > 0
-                    ? Badge.count(
-                        count: nyCount,
-                        backgroundColor: AppColors.coralDark,
-                        textColor: Colors.white,
-                        child: const Icon(Icons.help),
-                      )
-                    : const Icon(Icons.help),
-                label: "Needs You",
-              ),
-              const NavigationDestination(
-                icon: Icon(Icons.grid_view_outlined),
-                selectedIcon: Icon(Icons.grid_view),
-                label: "Hub",
-              ),
-            ],
-          );
-        },
-      ),
+    return ValueListenableBuilder<int>(
+      valueListenable: needsYouCountNotifier,
+      builder: (context, nyCount, _) {
+        final navItems = [
+          const ShellNavItem(
+            id: "dashboard",
+            label: "Dashboard",
+            icon: Icons.dashboard_outlined,
+            activeIcon: Icons.dashboard,
+          ),
+          const ShellNavItem(
+            id: "discover",
+            label: "Discover",
+            icon: Icons.radar_outlined,
+            activeIcon: Icons.radar,
+          ),
+          const ShellNavItem(
+            id: "tracker",
+            label: "Tracker",
+            icon: Icons.view_kanban_outlined,
+            activeIcon: Icons.view_kanban,
+          ),
+          ShellNavItem(
+            id: "needs_you",
+            label: "Needs You",
+            icon: Icons.help_outline,
+            activeIcon: Icons.help,
+            badgeCount: nyCount,
+          ),
+          const ShellNavItem(
+            id: "hub",
+            label: "Hub",
+            icon: Icons.grid_view_outlined,
+            activeIcon: Icons.grid_view,
+          ),
+        ];
+
+        return KiteAppShell(
+          currentIndex: _currentIndex,
+          onNavigationChanged: _navigateToTab,
+          items: navItems,
+          showAppBar: false,
+          body: IndexedStack(
+            index: _currentIndex,
+            children: screens,
+          ),
+        );
+      },
     );
   }
 }
@@ -345,26 +340,50 @@ class HubScreen extends StatelessWidget {
     Color secondaryTextColor,
     VoidCallback onTap,
   ) {
-    return Material(
-      color: cardBg,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        side: BorderSide(color: borderColor),
-      ),
-      child: ListTile(
-        onTap: onTap,
-        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16, vertical: AppSpacing.s8),
-        leading: Container(
-          padding: const EdgeInsets.all(AppSpacing.s8),
-          decoration: BoxDecoration(
-            color: iconColor.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(AppRadii.control),
+    return RebornCardTile(
+      onTap: onTap,
+      backgroundColor: cardBg,
+      borderColor: borderColor,
+      margin: const EdgeInsets.only(bottom: AppSpacing.s8),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s14, vertical: AppSpacing.s12),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.s8),
+            decoration: BoxDecoration(
+              color: iconColor.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(AppRadii.control),
+              border: Border.all(color: iconColor.withOpacity(0.25)),
+            ),
+            child: Icon(icon, color: iconColor, size: 20),
           ),
-          child: Icon(icon, color: iconColor, size: 22),
-        ),
-        title: Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: primaryTextColor)),
-        subtitle: Text(subtitle, style: TextStyle(fontSize: 11, color: secondaryTextColor)),
-        trailing: const Icon(Icons.chevron_right, size: 18),
+          const SizedBox(width: AppSpacing.s12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: primaryTextColor,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 11,
+                    height: 1.3,
+                    color: secondaryTextColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right, size: 18, color: secondaryTextColor),
+        ],
       ),
     );
   }
