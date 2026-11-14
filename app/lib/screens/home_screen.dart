@@ -118,6 +118,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _resumeAutomationFlow() async {
     HapticFeedback.mediumImpact();
+    // 1. Optimistic state update: flip immediately to Running
+    setState(() {
+      _profile["is_paused"] = false;
+      _stats["is_paused"] = false;
+      _stats["automation_state"] = "running";
+      _stats["pause_reason"] = "";
+    });
     try {
       final res = await _api.resumeAutomation();
       if (mounted) {
@@ -125,12 +132,23 @@ class _HomeScreenState extends State<HomeScreen> {
           SnackBar(
             backgroundColor: AppColors.successEmerald,
             content: Text(res["message"] ?? "Automation resumed successfully!"),
+            action: SnackBarAction(
+              label: "PAUSE",
+              textColor: AppColors.pureWhite,
+              onPressed: _pauseAutomationFlow,
+            ),
           ),
         );
       }
       _fetchDashboardData(silent: true);
     } catch (e) {
       if (mounted) {
+        // Revert on error
+        setState(() {
+          _profile["is_paused"] = true;
+          _stats["is_paused"] = true;
+          _stats["automation_state"] = "paused_by_user";
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: AppColors.errorCoral,
@@ -143,16 +161,38 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _pauseAutomationFlow() async {
     HapticFeedback.mediumImpact();
+    // 1. Optimistic state update: flip immediately to Paused
+    setState(() {
+      _profile["is_paused"] = true;
+      _stats["is_paused"] = true;
+      _stats["automation_state"] = "paused_by_user";
+      _stats["pause_reason"] = "paused_by_user";
+      _stats["pause_details"] = "Paused manually from dashboard";
+      _stats["recovery_instruction"] = "Tap 'Resume Automation' to restart autonomous processing.";
+    });
     try {
       await _api.pauseAutomation(reason: "paused_by_user", details: "Paused manually from dashboard");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Automation paused.")),
+          SnackBar(
+            content: const Text("Automation paused."),
+            action: SnackBarAction(
+              label: "RESUME",
+              textColor: AppColors.successEmerald,
+              onPressed: _resumeAutomationFlow,
+            ),
+          ),
         );
       }
       _fetchDashboardData(silent: true);
     } catch (e) {
       if (mounted) {
+        // Revert on error
+        setState(() {
+          _profile["is_paused"] = false;
+          _stats["is_paused"] = false;
+          _stats["automation_state"] = "running";
+        });
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to pause: $e")));
       }
     }

@@ -81,6 +81,17 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     }
   }
 
+  Future<void> _rejectJob(int jobId) async {
+    HapticFeedback.lightImpact();
+    try {
+      await _api.swipeJob(jobId, "dismiss");
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Job rejected & removed from discovery.")));
+      _loadJobs();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+    }
+  }
+
   Future<void> _excludeCompany(int jobId, String company) async {
     HapticFeedback.mediumImpact();
     try {
@@ -397,6 +408,12 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                                               icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
                                               tooltip: "Preview Tailored Resume",
                                               onPressed: () => _showTailoringModal(job),
+                                            ),
+                                            // Reject Job
+                                            IconButton(
+                                              icon: Icon(Icons.close, size: 18, color: AppColors.getSemanticColor("coral", isDark)),
+                                              tooltip: "Reject Job",
+                                              onPressed: () => _rejectJob(jobId),
                                             ),
                                             // Exclude Company
                                             IconButton(

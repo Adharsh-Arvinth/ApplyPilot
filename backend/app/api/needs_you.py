@@ -1,8 +1,9 @@
 import json
 import datetime
 import logging
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from backend.app.core.database import get_db, SessionLocal
@@ -165,6 +166,10 @@ def resolve_needs_you(
         "job_id": item.job_id
     }
 
+class NeedsInputReject(BaseModel):
+    block_company: bool = False
+    reason: str = "Rejected by candidate"
+
 @router.post("/{item_id}/dismiss", summary="Dismiss Question and Skip Job")
 def dismiss_needs_you(item_id: int, db: Session = Depends(get_db)):
     item = db.query(NeedsInput).filter(NeedsInput.id == item_id).first()
@@ -177,3 +182,56 @@ def dismiss_needs_you(item_id: int, db: Session = Depends(get_db)):
         item.job.skip_reason = f"Dismissed by candidate on question: {item.question_text[:80]}"
     db.commit()
     return {"status": "dismissed", "job_id": item.job_id}
+
+@router.post("/{item_id}/reject", summary="Reject Job Application & Optionally Block Company")
+def reject_needs_you(
+    item_id: int,
+    payload: Optional[NeedsInputReject] = None,
+    db: Session = Depends(get_db)
+):
+    item = db.query(NeedsInput).filter(NeedsInput.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Needs You question not found.")
+
+    block_comp = payload.block_company if payload else False
+    reason_text = payload.reason if payload and payload.reason else "Rejected by candidate during manual input"
+
+    item.status = "dismissed"
+    company_name = item.job.company if item.job else "Unknown"
+
+    if item.job:
+        if block_comp:
+            item.job.status = "blocked"
+            item.job.blocked_category = "excluded_company"
+            item.job.skip_reason = f"Company '{company_name}' blocked by candidate."
+            # Add to excluded companies in Profile
+            profile = db.query(Profile).first()
+            if profile:
+                try:
+                    ex = json.loads(profile.excluded_companies_json) if profile.excluded_companies_json else []
+                except Exception:
+                    ex = []
+                if company_name not in ex:
+                    ex.append(company_name)
+                    profile.excluded_companies_json = json.dumps(ex)
+            db.add(RunLog(
+                event_type="needs_you",
+                message=f"Candidate rejected and permanently blocked {company_name}.",
+                level="warn"
+            ))
+        else:
+            item.job.status = "rejected"
+            item.job.skip_reason = reason_text
+            db.add(RunLog(
+                event_type="needs_you",
+                message=f"Candidate rejected application for {company_name}.",
+                level="info"
+            ))
+
+    db.commit()
+    return {
+        "status": "rejected",
+        "company_blocked": block_comp,
+        "company": company_name,
+        "job_id": item.job_id
+    }

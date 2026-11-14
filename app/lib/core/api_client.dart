@@ -301,6 +301,21 @@ class ApiClient {
     }
   }
 
+  Future<Map<String, dynamic>> rejectNeedsYou(int id, {bool blockCompany = false, String reason = "Rejected by candidate"}) async {
+    final res = await http.post(
+      Uri.parse("$_baseUrl/api/v1/needs-you/$id/reject"),
+      headers: _headers(),
+      body: jsonEncode({"block_company": blockCompany, "reason": reason}),
+    );
+    if (needsYouCountNotifier.value > 0) {
+      needsYouCountNotifier.value--;
+    }
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    return {"status": "error"};
+  }
+
   // 8. Stats & Logs
   Future<Map<String, dynamic>> getStats() async {
     final res = await http.get(Uri.parse("$_baseUrl/api/v1/stats"), headers: _headers());

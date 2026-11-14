@@ -91,11 +91,116 @@ class _NeedsYouScreenState extends State<NeedsYouScreen> {
     HapticFeedback.lightImpact();
     try {
       await _api.dismissNeedsYou(id);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Question dismissed.")));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Question skipped.")));
       _loadNeedsYou();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
     }
+  }
+
+  Future<void> _rejectItem(int id, {bool blockCompany = false, String reason = "Rejected by candidate"}) async {
+    HapticFeedback.mediumImpact();
+    try {
+      final res = await _api.rejectNeedsYou(id, blockCompany: blockCompany, reason: reason);
+      final company = res["company"] ?? "Application";
+      final msg = blockCompany
+          ? "Rejected & permanently blocked '$company' from future job discovery."
+          : "Rejected application for '$company'.";
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          backgroundColor: blockCompany ? AppColors.errorCoral : AppColors.racingGreen,
+          content: Text(msg),
+        ));
+      }
+      _loadNeedsYou();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      }
+    }
+  }
+
+  void _showRejectDialog(dynamic item) {
+    final id = item["id"] as int;
+    final company = item["company"] ?? "this company";
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final coral = AppColors.getSemanticColor("coral", isDark);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.card)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(AppSpacing.s20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, size: 22, color: coral),
+                const SizedBox(width: AppSpacing.s8),
+                Text(
+                  "Reject $company",
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.s8),
+            Text(
+              "Choose whether to decline only this specific application, or permanently block $company from your future job search.",
+              style: TextStyle(fontSize: 12, height: 1.4, color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+            ),
+            const SizedBox(height: AppSpacing.s16),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: coral.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.cancel_outlined, size: 20, color: coral),
+              ),
+              title: const Text("Reject this application only", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              subtitle: const Text("Skips this position. You can still apply to other roles at this company.", style: TextStyle(fontSize: 11)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _rejectItem(id, blockCompany: false);
+              },
+            ),
+            const Divider(),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.errorCoral.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.block_outlined, size: 20, color: AppColors.errorCoral),
+              ),
+              title: Text("Reject & Block $company", style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.errorCoral)),
+              subtitle: Text("Permanently adds $company to your excluded companies list. ApplyPilot will never scan or apply there again.", style: const TextStyle(fontSize: 11)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _rejectItem(id, blockCompany: true);
+              },
+            ),
+            const SizedBox(height: AppSpacing.s12),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text("Cancel"),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -513,30 +618,48 @@ class _NeedsYouScreenState extends State<NeedsYouScreen> {
                             ),
                           ),
 
-                          // Action Buttons
+                          // Action Buttons: Reject & Accept Options
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16, vertical: AppSpacing.s12),
                             decoration: BoxDecoration(
                               border: Border(top: BorderSide(color: borderColor)),
                             ),
                             child: Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                TextButton(
-                                  onPressed: () => _dismissItem(id),
-                                  child: Text("Dismiss", style: TextStyle(color: secondaryTextColor)),
-                                ),
-                                const SizedBox(width: AppSpacing.s8),
-                                ElevatedButton.icon(
-                                  onPressed: () => _resolveItem(id),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: accentGreen,
-                                    foregroundColor: AppColors.pureWhite,
+                                OutlinedButton.icon(
+                                  onPressed: () => _showRejectDialog(item),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: coral,
+                                    side: BorderSide(color: coral.withOpacity(0.5)),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
-                                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16, vertical: AppSpacing.s10),
+                                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12, vertical: AppSpacing.s8),
+                                    visualDensity: VisualDensity.compact,
                                   ),
-                                  icon: const Icon(Icons.send, size: 16),
-                                  label: const Text("Submit & Auto-Resume", style: TextStyle(fontWeight: FontWeight.bold)),
+                                  icon: Icon(Icons.close, size: 14, color: coral),
+                                  label: const Text("Reject", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                                ),
+                                Row(
+                                  children: [
+                                    TextButton(
+                                      onPressed: () => _dismissItem(id),
+                                      style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                                      child: Text("Skip", style: TextStyle(color: secondaryTextColor, fontSize: 11)),
+                                    ),
+                                    const SizedBox(width: AppSpacing.s8),
+                                    ElevatedButton.icon(
+                                      onPressed: () => _resolveItem(id),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: accentGreen,
+                                        foregroundColor: AppColors.pureWhite,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
+                                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s14, vertical: AppSpacing.s8),
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                      icon: const Icon(Icons.check, size: 15),
+                                      label: const Text("Accept & Continue", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
