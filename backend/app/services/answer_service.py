@@ -163,6 +163,8 @@ def clean_and_deduplicate_answer_bank(db: Session):
 
     # 2. Canonical synonym deduplication
     all_entries = db.query(AnswerBank).all()
+    # Process exact canonical keys first so they are selected as primary
+    all_entries.sort(key=lambda e: 0 if e.question_key.lower().strip() == SYNONYM_MAP.get(e.question_key.lower().strip(), e.question_key.lower().strip()) else 1)
     canonical_lookup = {}
 
     for entry in all_entries:
@@ -171,6 +173,7 @@ def clean_and_deduplicate_answer_bank(db: Session):
         entry.canonical_key = canonical
 
         if canonical not in canonical_lookup:
+            entry.question_key = canonical
             canonical_lookup[canonical] = entry
             # Ensure aliases list contains question_text
             try:
@@ -179,6 +182,8 @@ def clean_and_deduplicate_answer_bank(db: Session):
                 aliases = []
             if entry.question_text and entry.question_text not in aliases:
                 aliases.append(entry.question_text)
+            if key != canonical and key not in aliases:
+                aliases.append(key)
             entry.aliases_json = json.dumps(aliases)
         else:
             # Merge duplicate into canonical row

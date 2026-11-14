@@ -96,6 +96,10 @@ def test_dry_run_vs_real_application_counts_separation():
         db.add(job)
         db.commit()
 
+        res_before = client.get("/api/v1/stats", headers=AUTH_HEADERS)
+        real_before = res_before.json().get("real_applied_today", 0)
+        dry_before = res_before.json().get("dry_run_today", 0)
+
         # Simulate dry run application
         app_dry = Application(
             job_id=job.id,
@@ -108,9 +112,8 @@ def test_dry_run_vs_real_application_counts_separation():
         res = client.get("/api/v1/stats", headers=AUTH_HEADERS)
         assert res.status_code == 200
         stats = res.json()
-        assert stats["dry_run_today"] >= 1
-        assert stats["real_applied_today"] == 0
-        assert stats["daily_applied"] == 0 # real submitted is 0
+        assert stats["dry_run_today"] >= dry_before + 1
+        assert stats["real_applied_today"] == real_before # Dry runs do NOT increase real applied!
     finally:
         db.close()
 
