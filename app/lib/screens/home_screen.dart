@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
+import '../main.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback onNavigateToNeedsYou;
@@ -26,11 +27,16 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _loading = true;
   bool _serverOnline = false;
   String _hostStatus = "Connecting...";
-  
+
   int _applied = 0;
   int _cap = 100;
   int _needsYou = 0;
+  int _maybe = 0;
+  int _blocked = 0;
+  int _queue = 0;
   int _interviews = 0;
+  int _total = 0;
+
   bool _isPaused = false;
   bool _goLive = false;
   List<dynamic> _recentLogs = [];
@@ -39,7 +45,8 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _fetchData();
-    _pollingTimer = Timer.periodic(const Duration(seconds: 4), (_) => _fetchData());
+    // 2-second real-time polling loop
+    _pollingTimer = Timer.periodic(const Duration(seconds: 2), (_) => _fetchData());
   }
 
   @override
@@ -70,76 +77,35 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           _serverOnline = true;
-          _hostStatus = "PC Active";
+          _hostStatus = "PC Online (Tailscale)";
           _applied = stats["daily_applied"] ?? 0;
           _cap = stats["daily_cap"] ?? 100;
           _needsYou = stats["needs_you_count"] ?? 0;
+          _maybe = stats["maybe_count"] ?? 0;
+          _blocked = stats["blocked_count"] ?? 0;
+          _queue = stats["queue_count"] ?? 0;
           _interviews = stats["interview_count"] ?? 0;
+          _total = stats["total_tracked"] ?? 0;
+
           _isPaused = health["queue_paused"] ?? false;
           _goLive = health["go_live"] ?? false;
-          _recentLogs = logs.take(6).toList();
+          _recentLogs = logs.take(8).toList();
           _loading = false;
         });
       }
     } catch (_) {
-      if (mounted) {
-        setState(() {
-          _serverOnline = true;
-          _hostStatus = "PC Active";
-          _loading = false;
-        });
-      }
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   Future<void> _togglePause() async {
-    setState(() => _isPaused = !_isPaused);
-    try {
-      final res = await _api.togglePause();
-      setState(() => _isPaused = res["is_paused"] ?? _isPaused);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error toggling pause: $e")));
-    }
+    final res = await _api.togglePause();
+    setState(() => _isPaused = res["is_paused"] ?? false);
   }
 
-  void _showGoLiveDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.card)),
-        title: Text(
-          _goLive ? "Switch to Dry-Run Mode?" : "Enable Live Submission?",
-          style: const TextStyle(fontWeight: FontWeight.w500),
-        ),
-        content: Text(
-          _goLive
-              ? "The engine will switch back to safe preview mode. Forms will be filled and screenshots captured, but no applications will be submitted."
-              : "WARNING: Turning this ON will allow Playwright to click 'Submit Application' for eligible positions. Please ensure you have reviewed dry-run screenshots before enabling.",
-          style: const TextStyle(height: 1.45),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Cancel"),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: _goLive ? AppColors.accentLight : AppColors.blockedLight,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
-            ),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              final res = await _api.toggleGoLive();
-              setState(() => _goLive = res["go_live"] ?? _goLive);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text("Application Mode: ${res["mode"]}")),
-              );
-            },
-            child: Text(_goLive ? "Set Dry-Run" : "Confirm Live"),
-          ),
-        ],
-      ),
-    );
+  Future<void> _toggleGoLive() async {
+    final res = await _api.toggleGoLive();
+    setState(() => _goLive = res["go_live"] ?? false);
   }
 
   @override
@@ -149,259 +115,475 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("ApplyPilot", style: TextStyle(fontWeight: FontWeight.w500, fontSize: 18)),
+        title: Row(
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _serverOnline ? AppColors.successDark : AppColors.blockedDark,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.s8),
+            Text("ApplyPilot", style: theme.textTheme.titleLarge),
+            const SizedBox(width: AppSpacing.s8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.appleMusicRose.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(AppRadii.pill),
+              ),
+              child: const Text(
+                "LIVE 2s",
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.appleMusicRose,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          ],
+        ),
         actions: [
-          // Server status pill
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8, vertical: AppSpacing.s4),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.surfaceSubtleDark : AppColors.surfaceSubtleLight,
-              borderRadius: BorderRadius.circular(AppRadii.badge),
-              border: Border.all(color: isDark ? AppColors.borderHairlineDark : AppColors.borderHairlineLight),
+          IconButton(
+            tooltip: "Toggle Theme",
+            icon: Icon(
+              isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: _serverOnline ? (_isPaused ? AppColors.warningLight : AppColors.accentLight) : AppColors.blockedLight,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.s8),
-                Text(
-                  _hostStatus,
-                  style: theme.textTheme.labelSmall?.copyWith(fontSize: 11),
-                ),
-              ],
-            ),
+            onPressed: () => toggleThemeMode(),
           ),
           IconButton(
-            icon: const Icon(Icons.settings_outlined, size: 20),
+            tooltip: "Settings",
+            icon: const Icon(Icons.settings_outlined),
             onPressed: widget.onNavigateToSettings,
           ),
-          const SizedBox(width: AppSpacing.s8),
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+          ? const Center(child: CircularProgressIndicator(color: AppColors.appleMusicRose))
           : RefreshIndicator(
+              color: AppColors.appleMusicRose,
               onRefresh: _fetchData,
               child: ListView(
-                padding: const EdgeInsets.all(AppSpacing.s20),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20, vertical: AppSpacing.s16),
                 children: [
-                  // Mode banner
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16, vertical: AppSpacing.s12),
-                    decoration: BoxDecoration(
-                      color: _goLive ? AppColors.blockedLight.withOpacity(0.08) : AppColors.accentLight.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(AppRadii.control),
-                      border: Border.all(
-                        color: _goLive ? AppColors.blockedLight.withOpacity(0.2) : AppColors.accentLight.withOpacity(0.2),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              _goLive ? Icons.warning_amber_rounded : Icons.shield_outlined,
-                              size: 18,
-                              color: _goLive ? AppColors.blockedLight : AppColors.accentLight,
-                            ),
-                            const SizedBox(width: AppSpacing.s8),
-                            Text(
-                              _goLive ? "Live Submission Active" : "Dry-Run Preview (Safe Mode)",
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontSize: 13,
-                                color: _goLive ? AppColors.blockedLight : AppColors.accentLight,
-                              ),
-                            ),
-                          ],
-                        ),
-                        InkWell(
-                          onTap: _showGoLiveDialog,
-                          child: Text(
-                            "Change",
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: _goLive ? AppColors.blockedLight : AppColors.accentLight,
-                              decoration: TextDecoration.underline,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
+                  // 1. Apple Music Hero Progress Ring & Status
+                  _buildHeroCockpitCard(theme, isDark),
                   const SizedBox(height: AppSpacing.s20),
 
-                  // Progress Card (Daily Applications Gauge)
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.s20),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text("Today's Progress", style: theme.textTheme.titleMedium),
-                              TextButton.icon(
-                                onPressed: _togglePause,
-                                icon: Icon(_isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded, size: 18),
-                                label: Text(_isPaused ? "Resume" : "Pause"),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: _isPaused ? AppColors.accentLight : AppColors.textSecondaryLight,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: AppSpacing.s16),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.baseline,
-                            textBaseline: TextBaseline.alphabetic,
-                            children: [
-                              Text("$_applied", style: theme.textTheme.displayLarge),
-                              Text(" / $_cap", style: theme.textTheme.titleLarge?.copyWith(
-                                color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
-                              )),
-                            ],
-                          ),
-                          const SizedBox(height: AppSpacing.s4),
-                          Text(
-                            _isPaused ? "Queue paused by user" : "Target: up to $_cap suitable jobs today",
-                            style: theme.textTheme.labelSmall,
-                          ),
-                          const SizedBox(height: AppSpacing.s16),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(AppRadii.badge),
-                            child: LinearProgressIndicator(
-                              value: _cap > 0 ? (_applied / _cap).clamp(0.0, 1.0) : 0,
-                              minHeight: 6,
-                              backgroundColor: isDark ? AppColors.surfaceSubtleDark : AppColors.surfaceSubtleLight,
-                              color: _goLive ? AppColors.blockedLight : AppColors.accentLight,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: AppSpacing.s16),
-
-                  // Stats Row
-                  Row(
-                    children: [
-                      Expanded(
-                        child: InkWell(
-                          onTap: widget.onNavigateToNeedsYou,
-                          borderRadius: BorderRadius.circular(AppRadii.card),
-                          child: Card(
-                            child: Padding(
-                              padding: const EdgeInsets.all(AppSpacing.s16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text("Needs You", style: theme.textTheme.titleMedium?.copyWith(fontSize: 13)),
-                                      if (_needsYou > 0)
-                                        Container(
-                                          width: 8,
-                                          height: 8,
-                                          decoration: const BoxDecoration(
-                                            color: AppColors.warningLight,
-                                            shape: BoxShape.circle,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: AppSpacing.s8),
-                                  Text("$_needsYou", style: theme.textTheme.displayMedium),
-                                  Text("Awaiting response", style: theme.textTheme.labelSmall),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.s12),
-                      Expanded(
-                        child: InkWell(
-                          onTap: widget.onNavigateToJobs,
-                          borderRadius: BorderRadius.circular(AppRadii.card),
-                          child: Card(
-                            child: Padding(
-                              padding: const EdgeInsets.all(AppSpacing.s16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text("Interviews", style: theme.textTheme.titleMedium?.copyWith(fontSize: 13)),
-                                  const SizedBox(height: AppSpacing.s8),
-                                  Text("$_interviews", style: theme.textTheme.displayMedium),
-                                  Text("Invites received", style: theme.textTheme.labelSmall),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
+                  // 2. Safety Controls (Pause / Go-Live)
+                  _buildSafetyControls(theme, isDark),
                   const SizedBox(height: AppSpacing.s24),
 
-                  // Recent Execution Stream
+                  // 3. Category Breakdown Cards
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text("Execution Log", style: theme.textTheme.titleMedium),
-                      InkWell(
-                        onTap: widget.onNavigateToJobs,
-                        child: Text("View all jobs", style: theme.textTheme.labelSmall?.copyWith(
-                          decoration: TextDecoration.underline,
-                        )),
+                      Text("Categories & Status", style: theme.textTheme.titleLarge),
+                      Text("Total: $_total jobs", style: theme.textTheme.bodyMedium),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.s12),
+                  _buildCategoryGrid(theme, isDark),
+                  const SizedBox(height: AppSpacing.s24),
+
+                  // 4. Live Activity Stream
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text("Live Engine Stream", style: theme.textTheme.titleLarge),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: isDark ? AppColors.surfaceSubtleDark : AppColors.surfaceSubtleLight,
+                          borderRadius: BorderRadius.circular(AppRadii.pill),
+                        ),
+                        child: Text(
+                          "Auto-updating",
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          ),
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: AppSpacing.s12),
-                  Card(
-                    child: _recentLogs.isEmpty
-                        ? Padding(
-                            padding: const EdgeInsets.all(AppSpacing.s24),
-                            child: Center(
-                              child: Text("No applications run yet today.", style: theme.textTheme.bodyMedium),
-                            ),
-                          )
-                        : ListView.separated(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: _recentLogs.length,
-                            separatorBuilder: (_, __) => const Divider(height: 1),
-                            itemBuilder: (ctx, i) {
-                              final log = _recentLogs[i];
-                              return ListTile(
-                                dense: true,
-                                title: Text(log["message"] ?? "", style: theme.textTheme.bodyLarge?.copyWith(fontSize: 13)),
-                                subtitle: Text(log["created_at"] ?? "", style: theme.textTheme.labelSmall?.copyWith(fontSize: 11)),
-                                trailing: Icon(
-                                  log["level"] == "error" ? Icons.error_outline : Icons.check_circle_outline,
-                                  size: 16,
-                                  color: log["level"] == "error" ? AppColors.blockedLight : AppColors.accentLight,
-                                ),
-                              );
-                            },
-                          ),
-                  ),
+                  _buildLiveLogs(theme, isDark),
+                  const SizedBox(height: AppSpacing.s32),
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildHeroCockpitCard(ThemeData theme, bool isDark) {
+    final progress = _cap > 0 ? (_applied / _cap).clamp(0.0, 1.0) : 0.0;
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.s20),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(
+          color: isDark ? AppColors.borderHairlineDark : AppColors.borderHairlineLight,
+          width: 0.8,
+        ),
+      ),
+      child: Row(
+        children: [
+          // Circular Progress Indicator
+          SizedBox(
+            width: 80,
+            height: 80,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                CircularProgressIndicator(
+                  value: progress,
+                  strokeWidth: 8,
+                  backgroundColor: isDark ? AppColors.surfaceSubtleDark : AppColors.surfaceSubtleLight,
+                  color: AppColors.appleMusicRose,
+                  strokeCap: StrokeCap.round,
+                ),
+                Center(
+                  child: Text(
+                    "${(progress * 100).toInt()}%",
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      fontFeatures: [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.s20),
+          // Progress Stats
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("TODAY'S SUBMISSIONS", style: theme.textTheme.labelSmall),
+                const SizedBox(height: AppSpacing.s4),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      "$_applied",
+                      style: theme.textTheme.displayMedium?.copyWith(
+                        color: AppColors.appleMusicRose,
+                      ),
+                    ),
+                    Text(
+                      " / $_cap cap",
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.s8),
+                Row(
+                  children: [
+                    Icon(
+                      _serverOnline ? Icons.check_circle_rounded : Icons.cloud_off_rounded,
+                      size: 14,
+                      color: _serverOnline ? AppColors.successDark : AppColors.blockedDark,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(_hostStatus, style: theme.textTheme.labelSmall),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSafetyControls(ThemeData theme, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16, vertical: AppSpacing.s12),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(
+          color: isDark ? AppColors.borderHairlineDark : AppColors.borderHairlineLight,
+          width: 0.8,
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    _isPaused ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded,
+                    color: _isPaused ? AppColors.warningDark : AppColors.appleMusicRose,
+                  ),
+                  const SizedBox(width: AppSpacing.s12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Auto-Apply Queue", style: theme.textTheme.titleMedium),
+                      Text(
+                        _isPaused ? "Paused by safety switch" : "Active & monitoring jobs",
+                        style: theme.textTheme.labelSmall,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Switch(
+                value: !_isPaused,
+                activeColor: AppColors.appleMusicRose,
+                onChanged: (_) => _togglePause(),
+              ),
+            ],
+          ),
+          const Divider(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    _goLive ? Icons.send_rounded : Icons.visibility_rounded,
+                    color: _goLive ? AppColors.successDark : AppColors.blueDark,
+                  ),
+                  const SizedBox(width: AppSpacing.s12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _goLive ? "LIVE SUBMISSION ON" : "DRY-RUN PREVIEW MODE",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: _goLive ? AppColors.successDark : AppColors.blueDark,
+                        ),
+                      ),
+                      Text(
+                        _goLive ? "Submitting applications to ATS" : "Screenshots & verifies before submit",
+                        style: theme.textTheme.labelSmall,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Switch(
+                value: _goLive,
+                activeColor: AppColors.successDark,
+                onChanged: (_) => _toggleGoLive(),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryGrid(ThemeData theme, bool isDark) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _buildCategoryCard(
+                theme: theme,
+                isDark: isDark,
+                title: "Applied",
+                count: _applied,
+                subtitle: "View Proofs & Screenshots",
+                icon: Icons.verified_rounded,
+                color: AppColors.successDark,
+                onTap: widget.onNavigateToJobs,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.s12),
+            Expanded(
+              child: _buildCategoryCard(
+                theme: theme,
+                isDark: isDark,
+                title: "Needs You",
+                count: _needsYou,
+                subtitle: _needsYou > 0 ? "Action Required" : "All answered",
+                icon: Icons.mark_chat_unread_rounded,
+                color: _needsYou > 0 ? AppColors.appleMusicRose : AppColors.textMutedDark,
+                onTap: widget.onNavigateToNeedsYou,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.s12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildCategoryCard(
+                theme: theme,
+                isDark: isDark,
+                title: "In Queue",
+                count: _queue,
+                subtitle: "Score >= 4.0",
+                icon: Icons.hourglass_top_rounded,
+                color: AppColors.blueDark,
+                onTap: widget.onNavigateToJobs,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.s12),
+            Expanded(
+              child: _buildCategoryCard(
+                theme: theme,
+                isDark: isDark,
+                title: "Maybe",
+                count: _maybe,
+                subtitle: "Swipe Review",
+                icon: Icons.swipe_rounded,
+                color: AppColors.purpleDark,
+                onTap: widget.onNavigateToJobs,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.s12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildCategoryCard(
+                theme: theme,
+                isDark: isDark,
+                title: "Blocked",
+                count: _blocked,
+                subtitle: "Below 7 LPA / Senior",
+                icon: Icons.block_rounded,
+                color: AppColors.blockedDark,
+                onTap: widget.onNavigateToJobs,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.s12),
+            Expanded(
+              child: _buildCategoryCard(
+                theme: theme,
+                isDark: isDark,
+                title: "Interviews",
+                count: _interviews,
+                subtitle: "Scheduled",
+                icon: Icons.emoji_events_rounded,
+                color: AppColors.warningDark,
+                onTap: widget.onNavigateToJobs,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCategoryCard({
+    required ThemeData theme,
+    required bool isDark,
+    required String title,
+    required int count,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadii.card),
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.s16),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(AppRadii.card),
+          border: Border.all(
+            color: isDark ? AppColors.borderHairlineDark : AppColors.borderHairlineLight,
+            width: 0.8,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Icon(icon, size: 20, color: color),
+                Text(
+                  "$count",
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.s8),
+            Text(title, style: theme.textTheme.titleMedium),
+            const SizedBox(height: AppSpacing.s4),
+            Text(subtitle, style: theme.textTheme.labelSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLiveLogs(ThemeData theme, bool isDark) {
+    if (_recentLogs.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(AppSpacing.s16),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(AppRadii.card),
+        ),
+        child: Center(
+          child: Text("No engine events recorded yet.", style: theme.textTheme.bodyMedium),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(
+          color: isDark ? AppColors.borderHairlineDark : AppColors.borderHairlineLight,
+          width: 0.8,
+        ),
+      ),
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: _recentLogs.length,
+        separatorBuilder: (_, __) => Divider(
+          height: 1,
+          color: isDark ? AppColors.borderHairlineDark : AppColors.borderHairlineLight,
+        ),
+        itemBuilder: (_, idx) {
+          final log = _recentLogs[idx];
+          return ListTile(
+            dense: true,
+            leading: Icon(
+              Icons.radio_button_checked,
+              size: 12,
+              color: AppColors.appleMusicRose,
+            ),
+            title: Text(log["message"] ?? "", style: theme.textTheme.bodyMedium),
+            trailing: Text(log["created_at"] ?? "", style: theme.textTheme.labelSmall),
+          );
+        },
+      ),
     );
   }
 }

@@ -77,6 +77,20 @@ class ApiClient {
     throw Exception("Failed to update profile: ${res.statusCode}");
   }
 
+  Future<Map<String, dynamic>> uploadResume(List<int> bytes, String filename) async {
+    final request = http.MultipartRequest("POST", Uri.parse("$_baseUrl/api/v1/profile/resume"));
+    request.headers.addAll({
+      "Authorization": "Bearer $_token",
+    });
+    request.files.add(http.MultipartFile.fromBytes("file", bytes, filename: filename));
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+    throw Exception("Resume upload failed: ${response.statusCode} - ${response.body}");
+  }
+
   Future<Map<String, dynamic>> togglePause() async {
     final res = await http.post(Uri.parse("$_baseUrl/api/v1/profile/toggle-pause"), headers: _headers());
     return jsonDecode(res.body);

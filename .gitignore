@@ -42,6 +42,7 @@ app/android/app/build/
 app/android/.idea/
 *.iml
 .gradle/
+*.hprof
 
 # Generated runtime outputs (keep directories, ignore user session files)
 output/resumes/*

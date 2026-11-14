@@ -10,11 +10,41 @@ import 'screens/answer_bank_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/settings_screen.dart';
 
+final ValueNotifier<ThemeMode> themeModeNotifier = ValueNotifier<ThemeMode>(ThemeMode.dark);
+
+void toggleThemeMode() async {
+  final prefs = await SharedPreferences.getInstance();
+  if (themeModeNotifier.value == ThemeMode.dark) {
+    themeModeNotifier.value = ThemeMode.light;
+    await prefs.setString("theme_mode", "light");
+  } else {
+    themeModeNotifier.value = ThemeMode.dark;
+    await prefs.setString("theme_mode", "dark");
+  }
+}
+
+void setThemeMode(ThemeMode mode) async {
+  final prefs = await SharedPreferences.getInstance();
+  themeModeNotifier.value = mode;
+  final str = mode == ThemeMode.light ? "light" : (mode == ThemeMode.dark ? "dark" : "system");
+  await prefs.setString("theme_mode", str);
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ApiClient().init();
   final prefs = await SharedPreferences.getInstance();
   final onboardingDone = prefs.getBool("onboarding_complete") ?? false;
+  
+  final savedTheme = prefs.getString("theme_mode") ?? "dark";
+  if (savedTheme == "light") {
+    themeModeNotifier.value = ThemeMode.light;
+  } else if (savedTheme == "system") {
+    themeModeNotifier.value = ThemeMode.system;
+  } else {
+    themeModeNotifier.value = ThemeMode.dark;
+  }
+
   runApp(ApplyPilotApp(initialOnboardingDone: onboardingDone));
 }
 
@@ -38,21 +68,26 @@ class _ApplyPilotAppState extends State<ApplyPilotApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'ApplyPilot',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
-      home: _onboardingDone
-          ? const MainNavigationShell()
-          : OnboardingScreen(
-              onFinish: () {
-                setState(() {
-                  _onboardingDone = true;
-                });
-              },
-            ),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeModeNotifier,
+      builder: (context, currentMode, _) {
+        return MaterialApp(
+          title: 'ApplyPilot',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: currentMode,
+          home: _onboardingDone
+              ? const MainNavigationShell()
+              : OnboardingScreen(
+                  onFinish: () {
+                    setState(() {
+                      _onboardingDone = true;
+                    });
+                  },
+                ),
+        );
+      },
     );
   }
 }
@@ -69,6 +104,8 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     final screens = [
       HomeScreen(
         onNavigateToNeedsYou: () => setState(() => _currentIndex = 1),
@@ -92,31 +129,32 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (idx) => setState(() => _currentIndex = idx),
-        indicatorColor: AppColors.accentLight.withOpacity(0.12),
-        destinations: const [
+        backgroundColor: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+        indicatorColor: AppColors.appleMusicRose.withOpacity(0.15),
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home_rounded, color: AppColors.accentLight),
-            label: "Home",
+            icon: const Icon(Icons.home_outlined),
+            selectedIcon: const Icon(Icons.home_rounded, color: AppColors.appleMusicRose),
+            label: "Cockpit",
           ),
           NavigationDestination(
-            icon: Icon(Icons.mark_chat_unread_outlined),
-            selectedIcon: Icon(Icons.mark_chat_unread_rounded, color: AppColors.accentLight),
+            icon: const Icon(Icons.mark_chat_unread_outlined),
+            selectedIcon: const Icon(Icons.mark_chat_unread_rounded, color: AppColors.appleMusicRose),
             label: "Needs You",
           ),
           NavigationDestination(
-            icon: Icon(Icons.work_outline_rounded),
-            selectedIcon: Icon(Icons.work_rounded, color: AppColors.accentLight),
+            icon: const Icon(Icons.work_outline_rounded),
+            selectedIcon: const Icon(Icons.work_rounded, color: AppColors.appleMusicRose),
             label: "Jobs",
           ),
           NavigationDestination(
-            icon: Icon(Icons.menu_book_outlined),
-            selectedIcon: Icon(Icons.menu_book_rounded, color: AppColors.accentLight),
+            icon: const Icon(Icons.menu_book_outlined),
+            selectedIcon: const Icon(Icons.menu_book_rounded, color: AppColors.appleMusicRose),
             label: "Answers",
           ),
           NavigationDestination(
-            icon: Icon(Icons.person_outline_rounded),
-            selectedIcon: Icon(Icons.person_rounded, color: AppColors.accentLight),
+            icon: const Icon(Icons.person_outline_rounded),
+            selectedIcon: const Icon(Icons.person_rounded, color: AppColors.appleMusicRose),
             label: "Profile",
           ),
         ],

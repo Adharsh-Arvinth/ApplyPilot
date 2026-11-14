@@ -1,9 +1,13 @@
+import io
 import json
-from fastapi import APIRouter, Depends, HTTPException
+from pathlib import Path
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from pypdf import PdfReader
 from sqlalchemy.orm import Session
+from backend.app.core.config import settings
 from backend.app.core.database import get_db
 from backend.app.core.security import verify_token
-from backend.app.models import Profile
+from backend.app.models import Profile, RunLog
 from backend.app.schemas import ProfileOut, ProfileUpdate
 
 router = APIRouter(prefix="/profile", tags=["Profile"], dependencies=[Depends(verify_token)])
@@ -89,3 +93,54 @@ def toggle_go_live(db: Session = Depends(get_db)):
     profile.go_live = not profile.go_live
     db.commit()
     return {"go_live": profile.go_live, "mode": "LIVE" if profile.go_live else "DRY_RUN"}
+
+@router.post("/resume", summary="Upload and parse Master Resume PDF")
+async def upload_resume(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    profile = db.query(Profile).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not initialized.")
+    
+    if not file.filename.lower().endswith((".pdf", ".txt")):
+        raise HTTPException(status_code=400, detail="Only PDF and text resume files are supported.")
+    
+    content = await file.read()
+    if len(content) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    # Save to output/resumes
+    resumes_dir = settings.OUTPUT_DIR / "resumes"
+    resumes_dir.mkdir(parents=True, exist_ok=True)
+    target_path = resumes_dir / "master_resume.pdf"
+    with open(target_path, "wb") as f:
+        f.write(content)
+
+    extracted_text = ""
+    if file.filename.lower().endswith(".pdf"):
+        try:
+            reader = PdfReader(io.BytesIO(content))
+            for page in reader.pages:
+                text = page.extract_text()
+                if text:
+                    extracted_text += text + "\n"
+        except Exception as e:
+            extracted_text = f"Error extracting text: {e}"
+    else:
+        extracted_text = content.decode("utf-8", errors="ignore")
+
+    # Record run log
+    log = RunLog(
+        event_type="profile_update",
+        message=f"Uploaded master resume: {file.filename} ({len(content)} bytes, {len(extracted_text)} chars parsed).",
+        level="info"
+    )
+    db.add(log)
+    db.commit()
+
+    return {
+        "status": "success",
+        "filename": file.filename,
+        "bytes_received": len(content),
+        "saved_path": "/output/resumes/master_resume.pdf",
+        "extracted_text_snippet": extracted_text[:400] if extracted_text else "",
+        "message": "Resume uploaded successfully and ready for auto-tailoring."
+    }

@@ -104,14 +104,6 @@ class JobBase(BaseModel):
 class JobCreate(JobBase):
     pass
 
-class JobOut(JobBase):
-    id: int
-    posted_at: datetime.datetime
-    created_at: datetime.datetime
-    updated_at: datetime.datetime
-    model_config = ConfigDict(from_attributes=True)
-
-
 class ApplicationOut(BaseModel):
     id: int
     job_id: int
@@ -121,6 +113,15 @@ class ApplicationOut(BaseModel):
     confirmation_screenshot: str
     status: str
     failure_reason: str
+    model_config = ConfigDict(from_attributes=True)
+
+
+class JobOut(JobBase):
+    id: int
+    posted_at: datetime.datetime
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+    applications: List[ApplicationOut] = []
     model_config = ConfigDict(from_attributes=True)
 
 

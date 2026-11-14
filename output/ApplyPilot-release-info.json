@@ -1,17 +1,19 @@
 {
   "appName": "ApplyPilot",
-  "version": "1.0.0",
-  "buildNumber": 1,
-  "package": "org.applypilot.app",
-  "builtAt": "2026-11-14T11:30:00Z",
-  "backendCompatibility": ">=1.0.0",
-  "theme": "Unslopped Material 3 (Ivory & Racing Green)",
+  "version": "1.1.0",
+  "buildNumber": 2,
+  "package": "org.applypilot.applypilot",
+  "builtAt": "2026-11-14T07:56:44Z",
+  "sha256": "862E5A7A3E0393D83A32A6DEF7246BE0B97976B5A0980A0A22C795B78AEE6429",
+  "backendCompatibility": ">=1.1.0",
+  "theme": "Apple Music Signature (OLED Black, #FA243C Crimson, Frosted Glass & Hairline Dividers)",
   "features": [
-    "One-click Auto-Apply Cockpit",
-    "Tailscale Zero-Port VPN Connection",
-    "Needs You Push & Instant Auto-Resume",
-    "Answer Bank Synchronization",
-    "Assist Mode for LinkedIn & Naukri",
-    "Strict Dry-Run Default Safety Gate"
+    "Application Proof: Full confirmation screenshots, timestamps, tailored resume link",
+    "Profile & Resume Upload: Dynamic PDF master resume upload and PyPDF extraction",
+    "Live Category Breakdown: Applied, Needs You, Queue, Maybe, Blocked, Interviews",
+    "Real-Time Engine Sync: 1.5-second live auto-refresh without loading stutter",
+    "Dark Mode Switcher: OLED Pure Black, Light, and System modes with persistent toggle",
+    "One-click Auto-Apply Cockpit over Tailscale VPN",
+    "Strict Dry-Run Default Safety Gate with Go-Live switch"
   ]
 }
