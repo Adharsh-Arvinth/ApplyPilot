@@ -285,7 +285,12 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
                             ),
                             const SizedBox(width: AppSpacing.s8),
                           ],
-                          _buildStatusPill(status, accentGreen, brassColor),
+                          _buildStatusPill(
+                            status,
+                            accentGreen,
+                            brassColor,
+                            latestApp: latestApp is Map<String, dynamic> ? latestApp : null,
+                          ),
                         ],
                       ),
                     const SizedBox(height: 6),
@@ -307,7 +312,11 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
                         Icon(Icons.history, size: 12, color: secondaryTextColor),
                         const SizedBox(width: 4),
                         Text(
-                          latestApp != null ? "Applied ${latestApp['submitted_at'].toString().split('T')[0]}" : "Tracked",
+                          latestApp != null
+                              ? (latestApp['status'] == 'dry_run'
+                                  ? "Simulated ${latestApp['submitted_at'].toString().split('T')[0]}"
+                                  : "Applied ${latestApp['submitted_at'].toString().split('T')[0]}")
+                              : "Tracked",
                           style: TextStyle(fontSize: 11, color: secondaryTextColor),
                         ),
                       ],
@@ -469,9 +478,18 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
     );
   }
 
-  Widget _buildStatusPill(String status, Color accentGreen, Color brassColor) {
+  Widget _buildStatusPill(String status, Color accentGreen, Color brassColor, {Map<String, dynamic>? latestApp}) {
     Color col = accentGreen;
-    if (status == "interview" || status == "offer") {
+    String displayStatus = status;
+
+    final appStatus = latestApp?["status"]?.toString().toLowerCase();
+    if (appStatus == "dry_run" || status == "dry_run") {
+      displayStatus = "DRY RUN";
+      col = const Color(0xFF0284C7); // Sky/Cyan 600 - safe simulation indicator
+    } else if (appStatus == "submitted" || status == "submitted") {
+      displayStatus = "SUBMITTED";
+      col = AppColors.successEmerald;
+    } else if (status == "interview" || status == "offer") {
       col = brassColor;
     } else if (status == "rejected" || status == "blocked") {
       col = AppColors.errorLight;
@@ -485,7 +503,7 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
         border: Border.all(color: col.withOpacity(0.3)),
       ),
       child: Text(
-        status.toUpperCase(),
+        displayStatus.toUpperCase(),
         style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: col),
       ),
     );
@@ -548,6 +566,47 @@ class _ApplicationDetailSheetState extends State<_ApplicationDetailSheet> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to update: $e")));
     }
+  }
+
+  void _openFullScreenshot(BuildContext context, String imageUrl, String title) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog.fullscreen(
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            leading: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.pop(ctx),
+            ),
+          ),
+          body: Center(
+            child: InteractiveViewer(
+              panEnabled: true,
+              minScale: 0.5,
+              maxScale: 4.0,
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.contain,
+                loadingBuilder: (c, child, progress) {
+                  if (progress == null) return child;
+                  return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                },
+                errorBuilder: (c, e, s) => Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.s24),
+                    child: Text(
+                      "Cannot load proof image over network: $e\nEnsure Windows host is online over Tailscale.",
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -731,33 +790,228 @@ class _ApplicationDetailSheetState extends State<_ApplicationDetailSheet> {
                 ),
                 const SizedBox(height: AppSpacing.s16),
 
-                // 5. Submission Evidence
-                Text("SUBMISSION EVIDENCE", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: secondaryTextColor)),
+                // 5. Submission Evidence & Proof
+                Text("SUBMISSION EVIDENCE & AUTOMATION AUDIT", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: secondaryTextColor)),
                 const SizedBox(height: 6),
-                if (latestApp != null && latestApp["confirmation_screenshot"] != null && latestApp["confirmation_screenshot"].toString().isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(AppSpacing.s12),
-                    decoration: BoxDecoration(
-                      color: isDark ? AppColors.surfaceSubtleDark : AppColors.surfaceSubtleLight,
-                      borderRadius: BorderRadius.circular(AppRadii.control),
-                    ),
-                    child: Column(
+                Builder(
+                  builder: (context) {
+                    final formShot = (latestApp?["form_screenshot_url"] ?? latestApp?["form_screenshot"] ?? "").toString().trim();
+                    final confirmShot = (latestApp?["confirmation_screenshot_url"] ?? latestApp?["confirmation_screenshot"] ?? "").toString().trim();
+                    final screenshotRaw = confirmShot.isNotEmpty ? confirmShot : formShot;
+                    String? screenshotUrl;
+                    String? screenshotFilename;
+                    if (screenshotRaw.isNotEmpty) {
+                      screenshotFilename = screenshotRaw.replaceAll(r'\', '/').split('/').last;
+                      if (screenshotFilename.isNotEmpty && screenshotFilename.endsWith(".png")) {
+                        screenshotUrl = "${_api.baseUrl}/output/screenshots/$screenshotFilename";
+                      }
+                    }
+
+                    final resumeRaw = (latestApp?["resume_file_url"] ?? latestApp?["resume_file"] ?? "").toString().trim();
+                    String? resumeUrl;
+                    String? resumeFilename;
+                    if (resumeRaw.isNotEmpty && resumeRaw != "manual_tracking_submission" && resumeRaw != "test.pdf") {
+                      resumeFilename = resumeRaw.replaceAll(r'\', '/').split('/').last;
+                      resumeUrl = "${_api.baseUrl}/output/resumes/$resumeFilename";
+                    }
+
+                    final appStatus = (latestApp?["status"] ?? widget.job["status"] ?? "").toString().toLowerCase();
+                    final isDryRun = appStatus == "dry_run";
+                    final isSubmitted = appStatus == "submitted";
+
+                    return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.check_circle, size: 16, color: AppColors.successLight),
-                            const SizedBox(width: 6),
-                            Text("Proof Screenshot Captured", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primaryTextColor)),
-                          ],
+                        // A. Mode & Safety Explanation Pill
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(AppSpacing.s12),
+                          decoration: BoxDecoration(
+                            color: isDryRun
+                                ? const Color(0xFF0284C7).withOpacity(0.08)
+                                : (isSubmitted ? AppColors.successEmerald.withOpacity(0.08) : (isDark ? AppColors.surfaceSubtleDark : AppColors.surfaceSubtleLight)),
+                            borderRadius: BorderRadius.circular(AppRadii.control),
+                            border: Border.all(
+                              color: isDryRun
+                                  ? const Color(0xFF0284C7).withOpacity(0.25)
+                                  : (isSubmitted ? AppColors.successEmerald.withOpacity(0.25) : borderColor),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    isDryRun ? Icons.science_outlined : (isSubmitted ? Icons.verified : Icons.help_outline),
+                                    size: 16,
+                                    color: isDryRun ? const Color(0xFF0284C7) : (isSubmitted ? AppColors.successEmerald : secondaryTextColor),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    isDryRun
+                                        ? "Simulated Dry-Run (Safety Gate Active)"
+                                        : (isSubmitted ? "Live Application Submitted" : "Tracking Record"),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDryRun ? const Color(0xFF0284C7) : (isSubmitted ? AppColors.successEmerald : primaryTextColor),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                isDryRun
+                                    ? "Form filled automatically by Playwright on ATS (Greenhouse/Lever). All fields validated. Final submit was safely halted because GO_LIVE_ENABLED is set to False."
+                                    : (isSubmitted
+                                        ? "Application was submitted live to the ATS with complete candidate profile and tailored resume."
+                                        : "This role is tracked in your pipeline. Automated form execution pending."),
+                                style: TextStyle(fontSize: 11, height: 1.35, color: secondaryTextColor),
+                              ),
+                            ],
+                          ),
                         ),
-                        const SizedBox(height: 6),
-                        Text("Path: ${latestApp['confirmation_screenshot']}", style: TextStyle(fontSize: 11, color: secondaryTextColor)),
+
+                        // B. Screenshot Preview Card
+                        if (screenshotUrl != null) ...[
+                          const SizedBox(height: AppSpacing.s12),
+                          Text("ATS FORM SCREENSHOT PROOF", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: secondaryTextColor)),
+                          const SizedBox(height: 6),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: isDark ? AppColors.surfaceSubtleDark : AppColors.surfaceSubtleLight,
+                              borderRadius: BorderRadius.circular(AppRadii.control),
+                              border: Border.all(color: borderColor),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                GestureDetector(
+                                  onTap: () => _openFullScreenshot(context, screenshotUrl!, "${widget.job['company']} Form Fill Proof"),
+                                  child: Stack(
+                                    children: [
+                                      Image.network(
+                                        screenshotUrl,
+                                        height: 180,
+                                        width: double.infinity,
+                                        fit: BoxFit.cover,
+                                        alignment: Alignment.topCenter,
+                                        loadingBuilder: (ctx, child, progress) {
+                                          if (progress == null) return child;
+                                          return Container(
+                                            height: 180,
+                                            color: isDark ? AppColors.surfaceSubtleDark : AppColors.surfaceSubtleLight,
+                                            child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                          );
+                                        },
+                                        errorBuilder: (ctx, err, stack) => Container(
+                                          height: 100,
+                                          padding: const EdgeInsets.all(AppSpacing.s12),
+                                          alignment: Alignment.center,
+                                          child: Text(
+                                            "Screenshot saved on host: $screenshotFilename\n(Ensure Windows backend is reachable over Tailscale)",
+                                            style: TextStyle(fontSize: 11, color: secondaryTextColor),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                      ),
+                                      Positioned(
+                                        bottom: 8,
+                                        right: 8,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withOpacity(0.7),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: const Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.fullscreen, size: 14, color: Colors.white),
+                                              SizedBox(width: 4),
+                                              Text("Tap to Zoom", style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.w600)),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(AppSpacing.s8),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.photo_camera_outlined, size: 14, color: AppColors.mutedGray),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          screenshotFilename ?? "",
+                                          style: TextStyle(fontSize: 10, color: secondaryTextColor),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => _openFullScreenshot(context, screenshotUrl!, "${widget.job['company']} Form Fill Proof"),
+                                        style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                                        child: const Text("Inspect Full Proof", style: TextStyle(fontSize: 11)),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+
+                        // C. Tailored Resume File
+                        if (resumeUrl != null && resumeFilename != null) ...[
+                          const SizedBox(height: AppSpacing.s12),
+                          Text("GENERATED TAILORED RESUME", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: secondaryTextColor)),
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.all(AppSpacing.s12),
+                            decoration: BoxDecoration(
+                              color: isDark ? AppColors.surfaceSubtleDark : AppColors.surfaceSubtleLight,
+                              borderRadius: BorderRadius.circular(AppRadii.control),
+                              border: Border.all(color: borderColor),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.picture_as_pdf_outlined, size: 20, color: AppColors.errorCoral),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        resumeFilename,
+                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: primaryTextColor),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      Text("Tailored by Gemini for ATS compliance", style: TextStyle(fontSize: 10, color: secondaryTextColor)),
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.copy, size: 16),
+                                  tooltip: "Copy Resume Link",
+                                  onPressed: () {
+                                    Clipboard.setData(ClipboardData(text: resumeUrl!));
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text("Resume PDF URL copied to clipboard!")),
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
-                    ),
-                  )
-                else
-                  Text("No submission proof recorded yet (Dry-run or manual tracking).", style: TextStyle(fontSize: 12, color: secondaryTextColor)),
+                    );
+                  },
+                ),
               ],
             ),
           ),

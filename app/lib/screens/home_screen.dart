@@ -295,7 +295,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        titleSpacing: AppSpacing.s12,
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8, vertical: AppSpacing.s4),
@@ -307,20 +309,25 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Text(
                 "APPLYPILOT",
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 10,
                   fontWeight: FontWeight.w800,
-                  letterSpacing: 1.2,
+                  letterSpacing: 1.0,
                   color: accentGreen,
                 ),
               ),
             ),
             const SizedBox(width: AppSpacing.s8),
-            Text(
-              "Command Center",
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-                color: primaryTextColor,
+            Flexible(
+              child: Text(
+                "Command Center",
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+                softWrap: false,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: primaryTextColor,
+                ),
               ),
             ),
           ],
@@ -346,26 +353,62 @@ class _HomeScreenState extends State<HomeScreen> {
             tooltip: "Customize Widgets",
             onPressed: _openCustomizer,
           ),
-          IconButton(
-            icon: const Icon(Icons.analytics_outlined, size: 22),
-            tooltip: "Analytics",
-            onPressed: widget.onNavigateToAnalytics,
-          ),
-          IconButton(
-            icon: const Icon(Icons.tune_outlined, size: 22),
-            tooltip: "Control Center",
-            onPressed: widget.onNavigateToControlCenter,
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined, size: 22),
-            tooltip: "Settings",
-            onPressed: widget.onNavigateToSettings,
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, size: 22),
+            tooltip: "More Options",
+            onSelected: (val) {
+              if (val == "analytics") widget.onNavigateToAnalytics();
+              if (val == "control") widget.onNavigateToControlCenter();
+              if (val == "settings") widget.onNavigateToSettings();
+            },
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: "analytics",
+                child: Row(
+                  children: [
+                    Icon(Icons.analytics_outlined, size: 18),
+                    SizedBox(width: 8),
+                    Text("Analytics"),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: "control",
+                child: Row(
+                  children: [
+                    Icon(Icons.tune_outlined, size: 18),
+                    SizedBox(width: 8),
+                    Text("Control Center"),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: "settings",
+                child: Row(
+                  children: [
+                    Icon(Icons.settings_outlined, size: 18),
+                    SizedBox(width: 8),
+                    Text("Settings"),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
       body: _loading
           ? Center(
-              child: CircularProgressIndicator(strokeWidth: 2, color: accentGreen),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(strokeWidth: 2.5, color: accentGreen),
+                  const SizedBox(height: AppSpacing.s16),
+                  Text(
+                    "Synchronizing Command Center...",
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: secondaryTextColor),
+                  ),
+                ],
+              ),
             )
           : RefreshIndicator(
               onRefresh: () => _fetchDashboardData(),

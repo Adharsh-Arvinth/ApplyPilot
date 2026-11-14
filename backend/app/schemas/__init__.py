@@ -156,6 +156,8 @@ class ApplicationOut(BaseModel):
     submitted_at: datetime.datetime
     form_screenshot: str
     confirmation_screenshot: str
+    form_screenshot_url: str = ""
+    confirmation_screenshot_url: str = ""
     submission_evidence: Dict[str, Any] = {}
     status: str
     failure_reason: str

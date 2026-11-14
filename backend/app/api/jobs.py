@@ -1,5 +1,6 @@
 import json
 import datetime
+from pathlib import Path
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
@@ -46,15 +47,25 @@ def _format_job_out(job: Job) -> dict:
             ev = json.loads(app.submission_evidence_json) if app.submission_evidence_json else {}
         except Exception:
             ev = {}
+
+        form_shot = app.form_screenshot or ""
+        confirm_shot = app.confirmation_screenshot or ""
+        form_shot_name = Path(form_shot).name if form_shot else ""
+        confirm_shot_name = Path(confirm_shot).name if confirm_shot else ""
+        resume_name = Path(app.resume_file).name if app.resume_file else ""
+
         apps.append({
             "id": app.id,
             "job_id": app.job_id,
             "resume_version_id": app.resume_version_id,
             "resume_file": app.resume_file,
+            "resume_file_url": f"/output/resumes/{resume_name}" if resume_name else "",
             "applied_at": app.applied_at or app.submitted_at,
             "submitted_at": app.submitted_at,
-            "form_screenshot": app.form_screenshot,
-            "confirmation_screenshot": app.confirmation_screenshot,
+            "form_screenshot": form_shot,
+            "confirmation_screenshot": confirm_shot,
+            "form_screenshot_url": f"/output/screenshots/{form_shot_name}" if form_shot_name else "",
+            "confirmation_screenshot_url": f"/output/screenshots/{confirm_shot_name}" if confirm_shot_name else "",
             "submission_evidence": ev,
             "status": app.status,
             "failure_reason": app.failure_reason,
