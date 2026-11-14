@@ -1,0 +1,17 @@
+{
+  "appName": "ApplyPilot",
+  "version": "1.0.0",
+  "buildNumber": 1,
+  "package": "org.applypilot.app",
+  "builtAt": "2026-11-14T11:30:00Z",
+  "backendCompatibility": ">=1.0.0",
+  "theme": "Unslopped Material 3 (Ivory & Racing Green)",
+  "features": [
+    "One-click Auto-Apply Cockpit",
+    "Tailscale Zero-Port VPN Connection",
+    "Needs You Push & Instant Auto-Resume",
+    "Answer Bank Synchronization",
+    "Assist Mode for LinkedIn & Naukri",
+    "Strict Dry-Run Default Safety Gate"
+  ]
+}
