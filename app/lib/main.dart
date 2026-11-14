@@ -14,6 +14,7 @@ import 'screens/resume_manager_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/automation_control_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/ai_assistant_screen.dart';
 
 final ValueNotifier<ThemeMode> themeModeNotifier = ValueNotifier<ThemeMode>(ThemeMode.light);
 
@@ -208,6 +209,23 @@ class HubScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.s16),
         children: [
+          Text(
+            "INTELLIGENCE & AI COPILOT",
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: secondaryTextColor),
+          ),
+          const SizedBox(height: AppSpacing.s8),
+          _buildHubTile(
+            "AI Career Advisor (Gemini 2.5)",
+            "Real-time interview coach, resume strategy & offer negotiation",
+            Icons.auto_awesome,
+            AppColors.getSemanticColor("violet", isDark),
+            cardBg,
+            borderColor,
+            primaryTextColor,
+            secondaryTextColor,
+            () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantScreen())),
+          ),
+          const SizedBox(height: AppSpacing.s20),
           Text(
             "CANDIDATE INTELLIGENCE & ASSETS",
             style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: secondaryTextColor),

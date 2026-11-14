@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
+import 'ai_assistant_screen.dart';
 
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({super.key});
@@ -98,6 +99,15 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => _TailoringSheet(job: job),
+    );
+  }
+
+  void _showAiJobIntelligenceModal(dynamic job) async {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _AiJobIntelligenceSheet(job: job),
     );
   }
 
@@ -371,6 +381,12 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                                         ),
                                         Row(
                                           children: [
+                                            // Gemini Job Intelligence & Interview Prep
+                                            IconButton(
+                                              icon: const Icon(Icons.auto_awesome, size: 18, color: ApplyPilotColors.aiViolet),
+                                              tooltip: "Gemini Intelligence & Interview Prep",
+                                              onPressed: () => _showAiJobIntelligenceModal(job),
+                                            ),
                                             // Tailor Simulator
                                             IconButton(
                                               icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
@@ -605,6 +621,264 @@ class _TailoringSheetState extends State<_TailoringSheet> {
             Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _AiJobIntelligenceSheet extends StatefulWidget {
+  final dynamic job;
+  const _AiJobIntelligenceSheet({required this.job});
+
+  @override
+  State<_AiJobIntelligenceSheet> createState() => _AiJobIntelligenceSheetState();
+}
+
+class _AiJobIntelligenceSheetState extends State<_AiJobIntelligenceSheet> {
+  final ApiClient _api = ApiClient();
+  bool _loading = true;
+  Map<String, dynamic> _intelligence = {};
+  Map<String, dynamic> _prep = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAiData();
+  }
+
+  Future<void> _fetchAiData() async {
+    try {
+      final intelFuture = _api.getJobIntelligence(
+        jobId: widget.job["id"] is int ? widget.job["id"] : null,
+        title: widget.job["title"],
+        company: widget.job["company"],
+        description: widget.job["score_reason"] ?? "",
+      );
+      final prepFuture = _api.generateInterviewPrep(
+        jobId: widget.job["id"] is int ? widget.job["id"] : null,
+        title: widget.job["title"],
+        company: widget.job["company"],
+        location: widget.job["location"],
+      );
+
+      final results = await Future.wait([intelFuture, prepFuture]);
+      if (mounted) {
+        setState(() {
+          _intelligence = results[0];
+          _prep = results[1];
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
+    final primaryTextColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
+    final secondaryTextColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final accentGreen = isDark ? AppColors.accentDark : AppColors.racingGreen;
+    final violet = ApplyPilotColors.aiViolet;
+
+    final requiredSkills = (_intelligence["required_skills"] as List<dynamic>?) ?? [];
+    final preferredSkills = (_intelligence["preferred_skills"] as List<dynamic>?) ?? [];
+    final techQs = (_prep["technical_questions"] as List<dynamic>?) ?? [];
+    final behavQs = (_prep["behavioral_questions"] as List<dynamic>?) ?? [];
+
+    return Container(
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+      padding: const EdgeInsets.all(AppSpacing.s24),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.card)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: violet.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.auto_awesome, color: violet, size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Gemini Job Intelligence", style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: primaryTextColor)),
+                      Text("Powered by Gemini 2.5 Flash", style: TextStyle(fontSize: 11, color: secondaryTextColor)),
+                    ],
+                  ),
+                ],
+              ),
+              IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close, size: 20)),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s12),
+          Text("${widget.job['company']} • ${widget.job['title']}", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: primaryTextColor)),
+          const Divider(height: 24),
+          if (_loading)
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: violet),
+                    const SizedBox(height: 16),
+                    Text("Gemini is extracting deep skill requirements...", style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: secondaryTextColor)),
+                  ],
+                ),
+              ),
+            )
+          else
+            Expanded(
+              child: ListView(
+                children: [
+                  // Role Summary
+                  if (_intelligence["summary"] != null) ...[
+                    Text("EXECUTIVE ROLE SUMMARY", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: secondaryTextColor)),
+                    const SizedBox(height: 4),
+                    Text(_intelligence["summary"], style: TextStyle(fontSize: 13, height: 1.4, color: primaryTextColor)),
+                    const SizedBox(height: AppSpacing.s16),
+                  ],
+
+                  // Skills Breakdown
+                  Text("REQUIRED CORE SKILLS", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: secondaryTextColor)),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: requiredSkills.map((sk) {
+                      return Chip(
+                        label: Text(sk.toString(), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                        backgroundColor: accentGreen.withOpacity(0.12),
+                        padding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                      );
+                    }).toList(),
+                  ),
+                  if (preferredSkills.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.s12),
+                    Text("PREFERRED / BONUS SKILLS", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: secondaryTextColor)),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: preferredSkills.map((sk) {
+                        return Chip(
+                          label: Text(sk.toString(), style: const TextStyle(fontSize: 11)),
+                          backgroundColor: violet.withOpacity(0.12),
+                          padding: EdgeInsets.zero,
+                          visualDensity: VisualDensity.compact,
+                        );
+                      }).toList(),
+                    ),
+                  ],
+
+                  const SizedBox(height: AppSpacing.s16),
+
+                  // Legitimacy & Safety Check
+                  Container(
+                    padding: const EdgeInsets.all(AppSpacing.s12),
+                    decoration: BoxDecoration(
+                      color: (_intelligence["is_suspicious"] == true ? ApplyPilotColors.errorCoral : ApplyPilotColors.successEmerald).withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(AppRadii.control),
+                      border: Border.all(
+                        color: (_intelligence["is_suspicious"] == true ? ApplyPilotColors.errorCoral : ApplyPilotColors.successEmerald).withOpacity(0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _intelligence["is_suspicious"] == true ? Icons.warning_amber_rounded : Icons.verified_user_outlined,
+                          size: 18,
+                          color: _intelligence["is_suspicious"] == true ? ApplyPilotColors.errorCoral : ApplyPilotColors.successEmerald,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _intelligence["is_suspicious"] == true
+                                ? "Warning: Listing flagged with suspicious patterns"
+                                : "Verified Authentic Opportunity • Zero Scam Indicators",
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: _intelligence["is_suspicious"] == true ? ApplyPilotColors.errorCoral : ApplyPilotColors.successEmerald,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: AppSpacing.s20),
+
+                  // Interview Intelligence Section
+                  Text("PREDICTED TECHNICAL INTERVIEW QUESTIONS", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: secondaryTextColor)),
+                  const SizedBox(height: 8),
+                  ...techQs.map((q) {
+                    final qMap = q as Map<String, dynamic>;
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(AppSpacing.s12),
+                      decoration: BoxDecoration(
+                        color: isDark ? ApplyPilotColors.darkCard : Colors.white,
+                        borderRadius: BorderRadius.circular(AppRadii.control),
+                        border: Border.all(color: isDark ? ApplyPilotColors.darkBorder : ApplyPilotColors.lightBorder),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(Icons.help_outline, size: 16, color: violet),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(qMap["question"] ?? "", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: primaryTextColor)),
+                              ),
+                            ],
+                          ),
+                          if (qMap["model_answer"] != null) ...[
+                            const SizedBox(height: 6),
+                            Text("Model Answer Focus: ${qMap['model_answer']}", style: TextStyle(fontSize: 11, height: 1.35, color: secondaryTextColor)),
+                          ],
+                        ],
+                      ),
+                    );
+                  }),
+
+                  const SizedBox(height: AppSpacing.s16),
+
+                  // Launch Coach Button
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantScreen()));
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: violet,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
+                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12),
+                    ),
+                    icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                    label: const Text("Practice Mock Interview with Gemini"),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
 import '../widgets/smart_widgets.dart';
+import 'ai_assistant_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback onNavigateToDiscover;
@@ -282,6 +283,21 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: ApplyPilotColors.aiViolet.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.auto_awesome, size: 18, color: ApplyPilotColors.aiViolet),
+            ),
+            tooltip: "Gemini Career Advisor",
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantScreen()));
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.dashboard_customize_outlined, size: 22),
             tooltip: "Customize Widgets",

@@ -16,6 +16,8 @@ from backend.app.api.jobs import router as jobs_router
 from backend.app.api.needs_you import router as needs_you_router
 from backend.app.api.resumes import router as resumes_router
 from backend.app.api.analytics import router as analytics_router
+from backend.app.api.ai import router as ai_router
+from backend.app.api.firebase import router as firebase_router
 
 # Configure logging
 logging.basicConfig(
@@ -72,6 +74,8 @@ app.include_router(jobs_router, prefix="/api/v1")
 app.include_router(needs_you_router, prefix="/api/v1")
 app.include_router(resumes_router, prefix="/api/v1")
 app.include_router(analytics_router, prefix="/api/v1")
+app.include_router(ai_router, prefix="/api/v1")
+app.include_router(firebase_router, prefix="/api/v1")
 
 @app.get("/")
 def root():

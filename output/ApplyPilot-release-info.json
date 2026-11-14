@@ -1,13 +1,36 @@
 {
   "appName": "ApplyPilot",
-  "version": "1.3.0",
-  "buildNumber": 4,
+  "version": "1.3.1",
+  "buildNumber": 5,
   "package": "org.applypilot.applypilot",
-  "builtAt": "2026-11-14T09:06:12Z",
-  "sha256": "2FF86D752FB538E9FE59FF622F21C6BA06446F1326D513DAF4A0274173AAF4EF",
-  "sizeBytes": 54099806,
+  "builtAt": "2026-11-14T09:35:10Z",
+  "sha256": "62A0570CFAE133EBE8BDE317AF020B7E6DE5C19939C04CA46FCC741D760283F9",
+  "sizeBytes": 54329878,
   "backendCompatibility": ">=1.3.0",
   "designSystem": "British Racing Green (#1B4332), Warm Ivory (#FAFAF7), Muted Brass (#C5A880), Obsidian Dark Mode (#0D1912), Semantic Color Matrix (Emerald, Blue, Violet, Amber, Coral, Teal), 4pt Spacing System",
+  "geminiAiLayer": {
+    "primaryModel": "gemini-2.5-flash",
+    "fallbackModel": "gemini-flash-latest",
+    "capabilities": [
+      "Deep Job Intelligence & JD Skill Extraction",
+      "Explainable 5-Factor Job Fit Scoring",
+      "ATS Keyword Analysis & Resume Bullet Point Tailoring",
+      "Truth-Grounded Answer Bank Suggestions",
+      "Predictive Technical & Behavioral Interview Preparation Guide",
+      "Conversational Career Advisor Copilot with Live System Context"
+    ],
+    "groundingSource": "Immutable Candidate Truth: Integrated MTech CSE (Data Science) VIT Vellore, 2 published patents, Agentic retrieval benchmark, AWS Solutions Architect"
+  },
+  "firebaseCloudPlatform": {
+    "projectId": "applypilot-89c65",
+    "services": [
+      "Firebase Admin SDK",
+      "Firestore Cloud Replica & Profile Sync",
+      "Firebase Cloud Messaging (FCM) Push Notifications",
+      "Firebase Auth Token Verification",
+      "Firebase Remote Config Diagnostics"
+    ]
+  },
   "smartWidgets": [
     "Application Goal Widget (Daily & Weekly Targets, Circular Meter, Remaining Count)",
     "Interview Countdown Widget (Upcoming Schedule, Countdown Badge, Proof Point Prep Sheet)",

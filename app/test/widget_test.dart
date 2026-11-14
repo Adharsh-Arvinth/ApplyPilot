@@ -5,6 +5,7 @@ import 'package:applypilot/main.dart';
 import 'package:applypilot/core/theme.dart';
 import 'package:applypilot/widgets/smart_widgets.dart';
 import 'package:applypilot/widgets/interactive_charts.dart';
+import 'package:applypilot/screens/ai_assistant_screen.dart';
 
 void main() {
   testWidgets('ApplyPilotApp boots to MainNavigationShell when onboarding is complete', (WidgetTester tester) async {
@@ -87,6 +88,18 @@ void main() {
     expect(find.text("24%"), findsOneWidget);
     expect(find.text("APPLICATION STATUS DISTRIBUTION"), findsOneWidget);
     expect(find.text("49"), findsOneWidget);
+  });
+
+  testWidgets('AiAssistantScreen renders career advisor header and quick prompts', (WidgetTester tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.lightTheme,
+      home: const AiAssistantScreen(),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text("Career Advisor"), findsOneWidget);
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.text("Review my top matched jobs today"), findsOneWidget);
   });
 }
 

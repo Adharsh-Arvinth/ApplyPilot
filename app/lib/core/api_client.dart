@@ -340,4 +340,180 @@ class ApiClient {
     }
     return {};
   }
+
+  // 10. Gemini AI Intelligence
+  Future<Map<String, dynamic>> getAiStatus() async {
+    try {
+      final res = await http.get(Uri.parse("$_baseUrl/api/v1/ai/status"), headers: _headers());
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
+      }
+      return {"service": "Gemini AI", "is_connected": false, "error": "HTTP ${res.statusCode}"};
+    } catch (e) {
+      return {"service": "Gemini AI", "is_connected": false, "error": e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> chatWithAdvisor(String message, {List<Map<String, String>> history = const []}) async {
+    final res = await http.post(
+      Uri.parse("$_baseUrl/api/v1/ai/chat"),
+      headers: _headers(),
+      body: jsonEncode({
+        "message": message,
+        "history": history,
+      }),
+    );
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    throw Exception("AI Chat failed: ${res.statusCode} - ${res.body}");
+  }
+
+  Future<Map<String, dynamic>> getJobIntelligence({int? jobId, String? title, String? company, String? description}) async {
+    final res = await http.post(
+      Uri.parse("$_baseUrl/api/v1/ai/job-intelligence"),
+      headers: _headers(),
+      body: jsonEncode({
+        if (jobId != null) "job_id": jobId,
+        if (title != null) "title": title,
+        if (company != null) "company": company,
+        if (description != null) "description": description,
+      }),
+    );
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    throw Exception("Job intelligence failed: ${res.statusCode}");
+  }
+
+  Future<Map<String, dynamic>> calculateMatch({
+    int? jobId,
+    String? title,
+    String? company,
+    String? location,
+    String? workMode,
+    String? experienceRequired,
+    String? salaryRaw,
+  }) async {
+    final res = await http.post(
+      Uri.parse("$_baseUrl/api/v1/ai/match-analysis"),
+      headers: _headers(),
+      body: jsonEncode({
+        if (jobId != null) "job_id": jobId,
+        if (title != null) "title": title,
+        if (company != null) "company": company,
+        if (location != null) "location": location,
+        if (workMode != null) "work_mode": workMode,
+        if (experienceRequired != null) "experience_required": experienceRequired,
+        if (salaryRaw != null) "salary_raw": salaryRaw,
+      }),
+    );
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    throw Exception("Match analysis failed: ${res.statusCode}");
+  }
+
+  Future<Map<String, dynamic>> tailorResume({int? jobId, String? title, String? company, String? location, int? masterResumeId}) async {
+    final res = await http.post(
+      Uri.parse("$_baseUrl/api/v1/ai/tailor-resume"),
+      headers: _headers(),
+      body: jsonEncode({
+        if (jobId != null) "job_id": jobId,
+        if (title != null) "title": title,
+        if (company != null) "company": company,
+        if (location != null) "location": location,
+        if (masterResumeId != null) "master_resume_id": masterResumeId,
+      }),
+    );
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    throw Exception("Resume tailoring failed: ${res.statusCode}");
+  }
+
+  Future<Map<String, dynamic>> suggestAnswer(String questionText, {String fieldType = "text", int? jobId}) async {
+    final res = await http.post(
+      Uri.parse("$_baseUrl/api/v1/ai/answer-suggest"),
+      headers: _headers(),
+      body: jsonEncode({
+        "question_text": questionText,
+        "field_type": fieldType,
+        if (jobId != null) "job_id": jobId,
+      }),
+    );
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    throw Exception("Answer suggestion failed: ${res.statusCode}");
+  }
+
+  Future<Map<String, dynamic>> generateInterviewPrep({int? jobId, String? title, String? company, String? location}) async {
+    final res = await http.post(
+      Uri.parse("$_baseUrl/api/v1/ai/interview-prep"),
+      headers: _headers(),
+      body: jsonEncode({
+        if (jobId != null) "job_id": jobId,
+        if (title != null) "title": title,
+        if (company != null) "company": company,
+        if (location != null) "location": location,
+      }),
+    );
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    throw Exception("Interview prep generation failed: ${res.statusCode}");
+  }
+
+  // 11. Firebase Cloud Platform
+  Future<Map<String, dynamic>> getFirebaseStatus() async {
+    try {
+      final res = await http.get(Uri.parse("$_baseUrl/api/v1/firebase/status"), headers: _headers());
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
+      }
+      return {"initialized": false, "error": "HTTP ${res.statusCode}"};
+    } catch (e) {
+      return {"initialized": false, "error": e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> syncToCloud({bool syncJobs = true, bool syncProfile = true}) async {
+    final res = await http.post(
+      Uri.parse("$_baseUrl/api/v1/firebase/sync"),
+      headers: _headers(),
+      body: jsonEncode({
+        "sync_jobs": syncJobs,
+        "sync_profile": syncProfile,
+      }),
+    );
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    throw Exception("Firebase sync failed: ${res.statusCode}");
+  }
+
+  Future<Map<String, dynamic>> sendTestNotification(String title, String body, {String? topic}) async {
+    final res = await http.post(
+      Uri.parse("$_baseUrl/api/v1/firebase/test-notification"),
+      headers: _headers(),
+      body: jsonEncode({
+        "title": title,
+        "body": body,
+        if (topic != null) "topic": topic,
+      }),
+    );
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    throw Exception("Test notification failed: ${res.statusCode}");
+  }
+
+  Future<Map<String, dynamic>> getCloudConfig() async {
+    final res = await http.get(Uri.parse("$_baseUrl/api/v1/firebase/config"), headers: _headers());
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    return {};
+  }
 }

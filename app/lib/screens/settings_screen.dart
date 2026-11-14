@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
 import '../main.dart';
+import 'ai_assistant_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   final VoidCallback? onNavigateToProfile;
@@ -26,12 +27,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _tokenController = TextEditingController();
   bool _testing = false;
   String? _testResult;
+  Map<String, dynamic>? _firebaseStatus;
+  Map<String, dynamic>? _aiStatus;
+  bool _syncingCloud = false;
 
   @override
   void initState() {
     super.initState();
     _urlController.text = _api.baseUrl;
     _tokenController.text = _api.token;
+    _fetchCloudStatus();
+  }
+
+  Future<void> _fetchCloudStatus() async {
+    try {
+      final fb = await _api.getFirebaseStatus();
+      final ai = await _api.getAiStatus();
+      if (mounted) {
+        setState(() {
+          _firebaseStatus = fb;
+          _aiStatus = ai;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _triggerCloudSync() async {
+    HapticFeedback.mediumImpact();
+    setState(() => _syncingCloud = true);
+    try {
+      final res = await _api.syncToCloud();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Cloud Sync complete: Profile synced, ${res['jobs_synced_count']} jobs synced to Firestore.")),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Cloud Sync error: $e")));
+    } finally {
+      if (mounted) setState(() => _syncingCloud = false);
+    }
+  }
+
+  Future<void> _testPushNotification() async {
+    HapticFeedback.lightImpact();
+    try {
+      final res = await _api.sendTestNotification("ApplyPilot Test Alert", "Push notifications are operational.");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(res["message"] ?? "Push notification dispatched.")),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Push error: $e")));
+    }
   }
 
   @override
@@ -265,11 +310,165 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           const SizedBox(height: AppSpacing.s20),
 
-          // 4. About & Version
+          // 4. Firebase Cloud Synchronization
+          _buildSectionHeader("FIREBASE CLOUD INFRASTRUCTURE", secondaryTextColor),
+          const SizedBox(height: AppSpacing.s8),
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.s16),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(AppRadii.card),
+              border: Border.all(color: borderColor),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text("Firebase Cloud Replica", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: primaryTextColor)),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: (_firebaseStatus != null && _firebaseStatus!["initialized"] == true
+                                ? AppColors.successLight
+                                : AppColors.warningLight)
+                            .withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(AppRadii.badge),
+                      ),
+                      child: Text(
+                        _firebaseStatus != null && _firebaseStatus!["initialized"] == true
+                            ? "Connected (applypilot-89c65)"
+                            : "Offline / Standby",
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: _firebaseStatus != null && _firebaseStatus!["initialized"] == true
+                              ? AppColors.successLight
+                              : AppColors.warningLight,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "Replicates your candidate profile & discovered jobs to Firestore cloud database with Cloud Messaging alerts.",
+                  style: TextStyle(fontSize: 11, color: secondaryTextColor),
+                ),
+                const SizedBox(height: AppSpacing.s12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _syncingCloud ? null : _triggerCloudSync,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: accentGreen,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
+                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12),
+                        ),
+                        icon: _syncingCloud
+                            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : const Icon(Icons.cloud_sync_outlined, size: 16),
+                        label: const Text("Sync to Cloud Now", style: TextStyle(fontSize: 12)),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.s8),
+                    OutlinedButton.icon(
+                      onPressed: _testPushNotification,
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
+                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12, horizontal: AppSpacing.s12),
+                      ),
+                      icon: const Icon(Icons.notifications_active_outlined, size: 16),
+                      label: const Text("Test Push", style: TextStyle(fontSize: 12)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.s20),
+
+          // 5. Gemini AI Intelligence Layer
+          _buildSectionHeader("GEMINI AI INTELLIGENCE LAYER", secondaryTextColor),
+          const SizedBox(height: AppSpacing.s8),
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.s16),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(AppRadii.card),
+              border: Border.all(color: borderColor),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.auto_awesome, color: ApplyPilotColors.aiViolet, size: 18),
+                        const SizedBox(width: 6),
+                        Text("Gemini 2.5 Flash", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: primaryTextColor)),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: (_aiStatus != null && _aiStatus!["is_connected"] == true
+                                ? ApplyPilotColors.aiViolet
+                                : AppColors.warningLight)
+                            .withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(AppRadii.badge),
+                      ),
+                      child: Text(
+                        _aiStatus != null && _aiStatus!["is_connected"] == true
+                            ? "Active • ${_aiStatus!['latency_ms']}ms"
+                            : "Standby",
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: _aiStatus != null && _aiStatus!["is_connected"] == true
+                              ? ApplyPilotColors.aiViolet
+                              : AppColors.warningLight,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "Powers 5-factor explainable matching, ATS resume tailoring, Answer Bank grounding, and predictive interview coaching.",
+                  style: TextStyle(fontSize: 11, color: secondaryTextColor),
+                ),
+                const SizedBox(height: AppSpacing.s12),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantScreen()));
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: ApplyPilotColors.aiViolet,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
+                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12, horizontal: AppSpacing.s16),
+                  ),
+                  icon: const Icon(Icons.psychology_outlined, size: 18),
+                  label: const Text("Launch AI Career Advisor", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.s20),
+
+          // 6. About & Version
           Center(
             child: Column(
               children: [
-                Text("ApplyPilot • Autonomous Career Cockpit v1.2.0", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: secondaryTextColor)),
+                Text("ApplyPilot • Autonomous Career Cockpit v1.3.0", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: secondaryTextColor)),
                 const SizedBox(height: 2),
                 Text("FastAPI + Playwright on Windows Host ↔ Flutter on Android", style: TextStyle(fontSize: 10, color: secondaryTextColor)),
               ],

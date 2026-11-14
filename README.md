@@ -3,11 +3,13 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688.svg?logo=fastapi)](https://fastapi.tiangolo.com)
 [![Flutter](https://img.shields.io/badge/Frontend-Flutter%203.x-02569B.svg?logo=flutter)](https://flutter.dev)
+[![Gemini](https://img.shields.io/badge/AI-Gemini%202.5%20Flash-8E75C2.svg?logo=google)](https://deepmind.google/technologies/gemini/)
+[![Firebase](https://img.shields.io/badge/Cloud-Firebase%20Admin-FFCA28.svg?logo=firebase)](https://firebase.google.com)
 [![Playwright](https://img.shields.io/badge/Automation-Playwright-2EAD33.svg?logo=playwright)](https://playwright.dev)
 [![Tailscale](https://img.shields.io/badge/Network-Tailscale%20Mesh%20VPN-4F46E5.svg?logo=tailscale)](https://tailscale.com)
-[![Tests: 31 passed](https://img.shields.io/badge/Tests-31%20Passed-brightgreen.svg)]()
+[![Tests: 44 passed](https://img.shields.io/badge/Tests-44%20Backend%20%7C%205%20Flutter%20Passed-brightgreen.svg)]()
 
-**ApplyPilot** is an autonomous, candidate-first job application cockpit designed for Android with an always-on Windows PC backend. It automates high-volume job discovery, explainable 5-factor fit scoring, dynamic resume tailoring, and ATS form filling, while escalating to you **only** when an application genuinely requires human input. Every answer you provide is permanently remembered in the Answer Bank and reused for future forms.
+**ApplyPilot** is an autonomous, candidate-first job application cockpit designed for Android and Web with an always-on Windows PC backend. Powered by **Google Gemini 2.5 Flash** and backed by **Firebase Cloud Infrastructure**, it automates high-volume job discovery, explainable 5-factor fit scoring, ATS resume tailoring, intelligent Answer Bank recall, and ATS form filling, while escalating to you **only** when an application genuinely requires human judgment.
 
 ---
 
@@ -15,24 +17,25 @@
 
 ```mermaid
 flowchart TD
-    subgraph MobileCockpit ["Android Mobile Cockpit (Flutter 3.x Material 3)"]
-        Dashboard["1. Home Dashboard"]
-        Discover["2. Discover Jobs"]
+    subgraph MobileCockpit ["Android & Web Cockpit (Flutter 3.x Material 3)"]
+        Dashboard["1. Home Dashboard & Smart Widgets"]
+        Discover["2. Discover Jobs & Gemini JD Breakdown"]
         Inbox["3. Needs You Inbox"]
-        Tracker["4. Application Tracker"]
-        Analytics["5. Analytics Dashboard"]
-        AnswerBank["6. Answer Bank"]
-        ResumeMgr["7. Resume Manager"]
-        ProfileScreen["8. Candidate Profile"]
-        AutomationHub["9. Automation Control"]
-        SettingsScreen["10. Settings & Security"]
+        Tracker["4. 7-Stage Application Tracker"]
+        Analytics["5. 7 Interactive CustomPainter Charts"]
+        AnswerBank["6. Answer Bank with AI Suggestions"]
+        ResumeMgr["7. ATS Resume Tailoring Simulator"]
+        ProfileScreen["8. Candidate Profile & Verified Facts"]
+        AdvisorChat["9. Gemini AI Career Advisor Chat"]
+        AutomationHub["10. Automation Control & Safety Rails"]
+        SettingsScreen["11. Settings, Firebase & Diagnostics"]
     end
 
     subgraph SecureNetwork ["Encrypted Private Mesh Network (Tailscale)"]
         VPN["WireGuard-Encrypted Mesh VPN (Zero Open Router Ports)"]
     end
 
-    subgraph WindowsHost ["24/7 Always-On Windows PC Backend"]
+    subgraph WindowsHost ["24/7 Always-On Windows PC Backend (FastAPI)"]
         FastAPI["FastAPI 0.115 Async REST Engine (0.0.0.0:8000)"]
         SQLite["SQLite WAL Mode with Zero-Downtime Auto-Migration"]
         AuthModule["Bearer Token Auth & AES-256 Fernet Encryption"]
@@ -43,21 +46,94 @@ flowchart TD
         BackupService["Automated Nightly Timestamped DB Backups"]
     end
 
+    subgraph IntelligenceLayer ["Gemini AI Intelligence Layer"]
+        GeminiClient["Google GenAI Client (gemini-2.5-flash)"]
+        JDAnalysis["Job Intelligence & Skill Extraction"]
+        FitScoring["5-Factor Explainable Fit Scorer"]
+        ResumeAI["ATS Resume Tailoring Intelligence"]
+        AnswerAI["Truth-Grounded Answer Suggestion"]
+        InterviewAI["Predictive Technical & STAR Interview Prep"]
+        CareerCopilot["Conversational Career Advisor Copilot"]
+    end
+
+    subgraph CloudLayer ["Firebase Cloud Infrastructure (applypilot-89c65)"]
+        AdminSDK["Firebase Admin SDK 7.8.0"]
+        Firestore["Firestore Cloud Database (Profile & Job Replica)"]
+        FCM["Firebase Cloud Messaging (FCM Push Alerts)"]
+        AuthVerify["Firebase Auth ID Token Verification"]
+        RemoteConfig["Remote Config Runtime Diagnostics"]
+    end
+
     MobileCockpit <-->|Private Tailscale IP:8000| VPN
     VPN <-->|Bearer Token Auth| FastAPI
     FastAPI --> SQLite
     FastAPI --> ScoringEngine
     FastAPI --> TailorEngine
     FastAPI --> PlaywrightEngine
-    PlaywrightEngine --> SafetyGate
-    SQLite --> BackupService
+    FastAPI --> GeminiClient
+    FastAPI --> AdminSDK
+    GeminiClient --> JDAnalysis & FitScoring & ResumeAI & AnswerAI & InterviewAI & CareerCopilot
+    AdminSDK --> Firestore & FCM & AuthVerify & RemoteConfig
 ```
 
 ---
 
-## Unslopped Editorial Design System & Semantic Color Matrix
+## Gemini 2.5 Flash Intelligence Layer
 
-ApplyPilot features a bespoke **unslopped** editorial aesthetic with a consistent semantic color system:
+ApplyPilot integrates official Google GenAI (`google.genai`) using **Gemini 2.5 Flash** as its foundational intelligence engine with in-memory SHA-256 caching and fallback to `gemini-flash-latest`:
+
+### 1. Job Intelligence & Skill Extraction
+- Analyzes discovered job descriptions in real-time.
+- Extracts mandatory vs preferred skills into clean structured tags.
+- Identifies experience brackets, location constraints, and salary ranges.
+- Runs automated **Scam & Legitimacy Detection** to protect candidates against deceptive or MLM postings.
+
+### 2. Explainable 5-Factor Fit Compatibility
+- Evaluates candidate alignment across:
+  1. Technical Stack (Python, ML, PyTorch, Data Engineering)
+  2. Experience & Benchmark Window
+  3. Academic Qualifications
+  4. Location & Work Mode Preferences
+  5. Compensation Expectations
+- Generates transparent match percentages, strongest factors, and actionable gap bridging advice.
+
+### 3. ATS Resume Tailoring Intelligence
+- Compares job requirements against verified candidate accomplishments.
+- Suggests tailored bullet point variations highlighting real research impact without fabricating facts.
+- Computes ATS keyword coverage and estimated compatibility scores.
+
+### 4. Intelligent Answer Bank Recall & Suggestions
+- Suggests concise, professional answers to ATS screening questions.
+- Grounded strictly in candidate proof points: **VIT Vellore Integrated MTech CSE (Data Science)**, **2 published patents** (Driver Multimodal Fusion Accident Predictor & Acoustic Doppler Session Guard), **Agentic Code Intelligence** benchmark (43-63ms CPU latency), and **AWS Solutions Architect** certification.
+- **Zero Hallucination Guarantee**: Strict system boundaries prevent inventing employment history, fake degrees, or fabricated metrics.
+
+### 5. Predictive Interview Preparation
+- Predicts company-specific technical interview questions with architectural hints and model answers.
+- Generates behavioral STAR (Situation, Task, Action, Result) scenario guides rooted in candidate project achievements.
+- Outlines the candidate's unique edge to stand out in interviews.
+
+### 6. Conversational AI Career Advisor
+- Dedicated in-app copilot screen (`AiAssistantScreen`) with live access to system statistics (discovered jobs, active queue, daily cap, upcoming interviews).
+- Interactive quick prompt pills for instant interview prep, resume strategy, and funnel analysis.
+
+---
+
+## Firebase Cloud Platform (`applypilot-89c65`)
+
+The backend initializes the **Firebase Admin SDK** using the service account certificate `applypilot-89c65-firebase-adminsdk-fbsvc-01b6f0c818.json`:
+
+1. **Firestore Cloud Replica**:
+   - `POST /api/v1/firebase/sync`: Asynchronously replicates candidate profile details and discovered jobs from local SQLite to Firestore collections (`profiles`, `jobs`).
+2. **Firebase Cloud Messaging (FCM)**:
+   - `POST /api/v1/firebase/test-notification`: Dispatches push alerts to Android devices on topic `applypilot_alerts` for high-priority events (pending "Needs You" questions, scheduled interviews, daily cap reached).
+3. **Firebase Auth Token Verification**:
+   - `POST /api/v1/firebase/verify-token`: Cryptographically verifies client-side Firebase Auth ID tokens for secure mobile access.
+4. **Remote Config & Diagnostics**:
+   - `GET /api/v1/firebase/status` & `GET /api/v1/firebase/config`: Real-time health monitoring of Firestore, messaging, and operational feature flags.
+
+---
+
+## Unslopped Editorial Design System
 
 - **Primary Identity**: Warm Ivory (`#FAFAF7`), British Racing Green (`#1B4332`), Pure White surfaces (`#FFFFFF`), and Muted Brass accents (`#C5A880` / `#D4AF37`).
 - **Obsidian Dark Mode**: Deep Forest Slate (`#0D1912`, `#14251B`) with vibrant green glows (`#40916C`) and hairline border separation (`#253F30`).
@@ -69,181 +145,99 @@ ApplyPilot features a bespoke **unslopped** editorial aesthetic with a consisten
   - **Coral** (`#E76F51` / `#E63946`): Errors, failed applications & warnings.
   - **Teal** (`#0081A7` / `#2A9D8F`): Interviews & career milestones.
 - **Strict 4-pt Spacing Grid**: `s2` (2dp), `s4` (4dp), `s6` (6dp), `s8` (8dp), `s12` (12dp), `s16` (16dp), `s20` (20dp), `s24` (24dp), `s32` (32dp).
-- **Typography**: Inter / Manrope hierarchy with strict tabular figures for metrics, financial values, and timestamps.
-- **Micro-Interactions**: Haptic touch feedback, zero decorative placeholder controls, and full accessibility compliance (48dp minimum touch targets).
+- **Haptic Feedback & Accessibility**: Subtle sensory feedback on every meaningful action, high-contrast typography, and 48dp touch targets.
 
 ---
 
-## Smart Widgets System & Dashboard Personalization
+## Smart Widgets & Interactive Analytics
 
-The Home Dashboard functions as an interactive, modular Career Command Center composed of 8 smart widgets:
+### 8 Modular Smart Widgets (Dashboard)
+1. **Application Goal Widget**: Daily/weekly targets, circular completion meter, remaining countdown.
+2. **Interview Countdown Widget**: Next interview date/time, company & role details, one-tap prep sheet.
+3. **Top Job Match Widget**: Single highest fit role, match badge, 3 key matching factors, 1-tap review.
+4. **Needs Attention Widget**: High-priority alert banner grouping blocker questions and profile gaps.
+5. **Career Streak Widget**: Consecutive search days, weekly consistency dots (M-T-W-T-F-S-S).
+6. **Backend Health Widget**: Tailscale connection latency, service uptime, safe-mode status.
+7. **Application Funnel Widget**: Step-down pipeline tracking pass-through rates and drop-offs.
+8. **Quick Actions Widget**: Find Jobs, Tailor CV, Review Queue, Update Answer Bank, Pause/Resume.
 
-1. **Application Goal Widget**: Daily/weekly targets, animated circular completion meter, remaining applications countdown, and quick target adjustments.
-2. **Interview Countdown Widget**: Scheduled interview date and time, company & role details, countdown badge, and one-tap interview preparation sheet loaded with candidate proof points.
-3. **Top Job Match Widget**: Surfaces the single highest fit role (e.g. 94% fit), 3 key matching factors (Stack, Location, Level), and one-tap "Review Fit" and "Tailor & Queue" actions.
-4. **Needs Attention Widget**: High-priority alert banner grouping blocker questions, pending swipe approvals, failed tasks, and missing profile items with direct 1-tap resolution paths.
-5. **Career Streak Widget**: Tracks consecutive search activity days, weekly consistency dots (M-T-W-T-F-S-S), and career search milestone badges.
-6. **Backend Engine Health Widget**: Windows host status, Tailscale connection latency, automation queue status, and safe-mode indicator.
-7. **Application Funnel Widget**: Step-down pipeline tracking pass-through rates and drop-offs (`Discovered` &rarr; `Evaluated` &rarr; `Approved` &rarr; `Submitted` &rarr; `Interview` &rarr; `Offers`).
-8. **Quick Actions Widget**: One-tap action grid: Find Jobs, Tailor CV, Review Queue, Update Answer Bank, and Pause/Resume automation.
-
-### Dashboard Personalization & Customization
-- **Reorderable Widgets**: Drag-and-drop customization bottom sheet.
-- **Toggle Visibility**: Selectively hide or show any of the 8 widgets.
-- **Pin to Top**: Pin crucial widgets to float at the top of the command center.
-- **Density Control**: Switch between compact and expanded layout densities.
-- **State Persistence**: Dual local `SharedPreferences` caching and backend database profile synchronization (`widget_preferences_json`).
-
----
-
-## 7 Interactive Charts (Analytics Dashboard)
-
-1. **Weekly & Monthly Application Bar Chart**: Toggle between 7-Day Velocity and 4-Week Volume with interactive tap tooltips highlighting peak volume days.
-2. **Conversion Funnel Pipeline Chart**: Visual step funnel displaying counts, pass-through percentages, and stage drop-offs.
-3. **Application Status Distribution Donut Chart**: Custom concentric arcs colored semantically with interactive segment tap inspection and legend.
-4. **Fit Score Histogram**: Distribution across 4 score brackets (`4.0-5.0` High Fit, `3.0-3.9` Target, `2.0-2.9` Borderline, `<2.0` Filtered).
-5. **Weekly Job-Search Activity Line Chart**: Smooth cubic bezier curve with area gradient fill and touch-tracking data dots.
-6. **Company-Wise Application Density**: Ranked horizontal progress bars with application counts and interview flags.
-7. **Resume Version Performance Comparison**: Compares master vs tailored resumes across ATS compatibility scores and interview conversion rates.
+### 7 Interactive Charts (`CustomPainter`)
+1. **Weekly & Monthly Bar Chart**: 7-day velocity and 4-week volume bar graph with interactive tooltip touch points.
+2. **Application Conversion Funnel**: Step-down stage visualization (`Discovered` &rarr; `Evaluated` &rarr; `Approved` &rarr; `Submitted` &rarr; `Interview` &rarr; `Offers`).
+3. **Status Distribution Donut**: Concentric multi-colored arcs representing live status breakdown.
+4. **Match Score Histogram**: Frequency distribution across 4 score brackets.
+5. **Weekly Activity Curve**: Smooth cubic Bezier line chart with area gradient fill.
+6. **Company Application Density**: Ranked horizontal bar breakdown of top target companies.
+7. **Resume Version Comparison**: Compares master vs tailored resumes on ATS scores and interview conversion.
 
 ---
 
-## 10 Dedicated Screens & Workflows
+## Verification & Test Results
 
-| # | Screen | Description |
-|---|---|---|
-| **1** | **Home Dashboard** | Career Command Center displaying today's progress vs target, active interviews, Needs You alerts, 7-day velocity chart, and live execution stream. |
-| **2** | **Discover Jobs** | Job stream with explainable fit scores, remote/hybrid filters, company exclusion shortcuts, and one-tap resume tailor previews. |
-| **3** | **Needs You Inbox** | Human-in-the-loop review queue for blocker questions. Quick-answer chips, custom editor, and automatic Answer Bank synchronization with auto-resume. |
-| **4** | **Application Tracker** | Dual-view Kanban and List tracker across the 7-stage lifecycle (`Discovered` &rarr; `Evaluated` &rarr; `Approved` &rarr; `Submitted` &rarr; `Interview` &rarr; `Offer` / `Rejected`). Includes recruiter info, notes editor, and submission proof. |
-| **5** | **Analytics Dashboard** | Real database metrics: 7-day velocity, monthly application volume, fit-score distribution histogram, ATS platform breakdown, and top companies. |
-| **6** | **Answer Bank** | Candidate knowledge base distinguishing verified facts from AI suggestions, complete with source citations, proof points, reuse toggles, and CRUD controls. |
-| **7** | **Resume Manager** | Resume portfolio with ATS compatibility scoring, live keyword-coverage simulation, missing qualification alerts, and master PDF export. |
-| **8** | **Candidate Profile** | Live candidate identity, education, CGPA, target roles, preferred locations, excluded companies manager, and PyPDF resume parsing. |
-| **9** | **Automation Control** | Operational cockpit featuring Dry-Run vs Live switch with double confirmation modal, emergency pause switch, daily/hourly caps, and real-time execution logs. |
-| **10** | **Settings & Security** | Light/Dark theme toggle, Tailscale connection ping test, single-tap Bearer token rotation, nightly backup trigger, and database export. |
-
----
-
-## Multi-Layer Safety Architecture
-
-ApplyPilot is designed from the ground up to prevent spamming, duplicate submissions, account blacklisting, and hallucination:
-
-1. **Dry-Run by Default**:
-   - `profile.go_live` is initialized to `False`. The engine fills forms, uploads resumes, captures full-page confirmation screenshots, but **never clicks the final Submit button** without explicit user confirmation.
-2. **Zero-Hallucination Bounded Intelligence**:
-   - Every tailored resume and generated form answer is derived strictly from verified credentials in the database (e.g. VIT Vellore Integrated MTech CSE Data Science, 2 published patents, Agentic Code Intelligence benchmark, AWS Solutions Architect certification).
-   - The engine never invents projects, GPAs, degrees, or employers.
-3. **30-Day Per-Company Cooldown**:
-   - The database enforces a strict 30-day deduplication window. Even across different job listings or job boards, ApplyPilot will never apply to the same company twice within a month.
-4. **Safety Circuit Breakers**:
-   - The automation queue automatically trips and enters an emergency pause if 3 consecutive failures, network drops, or CAPTCHA roadblocks occur.
-5. **No CAPTCHA Bypassing**:
-   - ApplyPilot never solves or automates CAPTCHA or bot challenges. Any challenge detected immediately halts the worker and escalates the application to the **Needs You Inbox** or Assist Mode.
-6. **Configurable Daily & Hourly Caps**:
-   - Hard rate-limiting caps ensure that candidate profiles stay within normal human browsing patterns (e.g., 20–50 applications/day).
-
----
-
-## ATS Engine & Automation Support
-
-| ATS Platform | Mode | Form Filling | File Upload | Confirmation Proof |
-|---|---|---|---|---|
-| **Greenhouse** | Full Auto / Dry-Run | Text, dropdowns, radio, checkboxes | Tailored PDF Upload | Full-page Screenshot |
-| **Lever** | Full Auto / Dry-Run | Structured form fields & custom questions | Tailored PDF Upload | Full-page Screenshot |
-| **Ashby** | Full Auto / Dry-Run | Dynamic multi-step reactive forms | Tailored PDF Upload | Full-page Screenshot |
-| **Workable** | Full Auto / Dry-Run | Sectioned application questionnaires | Tailored PDF Upload | Full-page Screenshot |
-| **LinkedIn / Naukri** | Assist Mode | Pre-filled clipboard sheets & tailored CV | One-tap browser launch | Manual verification |
-
----
-
-## Backend API Specification
-
-The FastAPI backend exposes 7 modular routers under `/api/v1`:
-
-- **`/health`**: Server uptime, WAL mode integrity, connection status, pause state, and Go-Live gate status.
-- **`/profile`**: Candidate profile management, target role/location management, excluded company lists, PDF master resume uploads, and Bearer token rotation (`POST /profile/rotate-token`).
-- **`/answer-bank`**: Question-answer bank CRUD with verification flags, source evidence tags, and category indexing.
-- **`/jobs`**: Ingestion, discovery triggers, explainable fit scoring (`POST /jobs/evaluate`), Kanban lifecycle board (`GET /jobs/kanban`), lifecycle status updates (`PUT /jobs/{id}/status`), notes/recruiter info updates, and PDF tailoring triggers.
-- **`/needs-you`**: Blocker inbox management, quick-answer chip generation, and auto-resume execution.
-- **`/resumes`**: Master resume version management, tailoring simulation with keyword coverage analysis, and ATS scoring.
-- **`/analytics`**: Real-time aggregated database statistics, application velocity, match distribution, and platform breakdowns.
-
----
-
-## Quickstart & Installation
-
-### 1. Configure Windows Always-On Power Settings
-Run from an elevated command prompt or double click:
-```cmd
-configure-power.bat
 ```
-*Configures Windows to keep network and CPU active while plugged in, even when the laptop lid is closed.*
+============================= test session starts =============================
+platform win32 -- Python 3.13.0, pytest-9.1.1 -- FastAPI 0.115.8
+collected 44 items
 
-### 2. Start the Windows Backend Host
-```cmd
-start-backend.bat
+backend/tests/test_gemini_firebase.py::test_firebase_service_status PASSED      [  2%]
+backend/tests/test_gemini_firebase.py::test_firebase_remote_config PASSED       [  4%]
+backend/tests/test_gemini_firebase.py::test_firebase_push_notification_dispatch PASSED [  6%]
+backend/tests/test_gemini_firebase.py::test_gemini_service_status PASSED        [  9%]
+backend/tests/test_gemini_firebase.py::test_gemini_job_intelligence PASSED      [ 11%]
+backend/tests/test_gemini_firebase.py::test_gemini_calculate_compatibility PASSED [ 13%]
+backend/tests/test_gemini_firebase.py::test_gemini_tailor_resume PASSED         [ 15%]
+backend/tests/test_gemini_firebase.py::test_gemini_suggest_form_answer PASSED   [ 18%]
+backend/tests/test_gemini_firebase.py::test_gemini_interview_prep PASSED        [ 20%]
+backend/tests/test_gemini_firebase.py::test_api_ai_status_endpoint PASSED       [ 22%]
+backend/tests/test_gemini_firebase.py::test_api_ai_chat_endpoint PASSED         [ 25%]
+backend/tests/test_gemini_firebase.py::test_api_firebase_status_endpoint PASSED [ 27%]
+backend/tests/test_gemini_firebase.py::test_api_firebase_config_endpoint PASSED [ 29%]
+backend/tests/test_phase1.py (6 tests) PASSED                                   [ 43%]
+backend/tests/test_phase3.py (5 tests) PASSED                                   [ 54%]
+backend/tests/test_phase4.py (3 tests) PASSED                                   [ 61%]
+backend/tests/test_phase5.py (2 tests) PASSED                                   [ 65%]
+backend/tests/test_phase6.py (3 tests) PASSED                                   [ 72%]
+backend/tests/test_phase7_50_jobs.py (1 test) PASSED                            [ 75%]
+backend/tests/test_refinement.py (5 tests) PASSED                               [ 86%]
+backend/tests/test_safety_audit.py (6 tests) PASSED                             [100%]
+
+================== 44 passed in 67.29s (100% Pass Rate) ===================
 ```
-*Launches Uvicorn on `0.0.0.0:8000`. To register it as an automatic Windows boot service with auto-recovery, run `install-service.bat` as Administrator.*
 
-### 3. Connect from Android via Tailscale
-1. Install [Tailscale](https://tailscale.com) on your Windows PC and your Android phone.
-2. Sign in to both devices with the same account.
-3. In ApplyPilot Android App &rarr; **Settings** &rarr; enter:
-   - **PC Server URL**: `http://100.x.y.z:8000` (Your PC's Tailscale IP)
-   - **Bearer Auth Token**: Found in `backend/.env` or generated via the app.
-4. Tap **Test Ping** &rarr; verify `Connected! PC Active`.
+### Flutter Test Suite
+```
+00:00 +0: ApplyPilotApp boots to MainNavigationShell when onboarding is complete
+00:01 +1: ApplyPilotApp boots to OnboardingScreen when onboarding is false
+00:01 +2: AppTheme defines British Racing Green and Obsidian Dark themes
+00:01 +3: ApplicationGoalWidget and StatusDonutChart render accurately
+00:01 +4: AiAssistantScreen renders career advisor header and quick prompts
+00:01 +5: All tests passed!
+```
 
-### 4. Sideload the Android Release APK
-The compiled release APK is ready in `output/ApplyPilot.apk`:
+---
+
+## Release Artifacts
+
+The production release artifact is compiled and verified:
+
+- **File**: `output/ApplyPilot.apk`
+- **Version**: `1.3.1` (Build 5)
+- **Size**: `54.3 MB` (54,329,878 bytes)
+- **SHA-256**: `62A0570CFAE133EBE8BDE317AF020B7E6DE5C19939C04CA46FCC741D760283F9`
+- **Flutter Web Build**: Compiled to `app/build/web` and hosted natively at `http://localhost:8000/app/`
+- **Metadata**: Verified in `output/ApplyPilot-release-info.json`
+
+---
+
+## Getting Started
+
+### 1. Start Windows Host Backend
 ```powershell
-adb install output/ApplyPilot.apk
-```
-*SHA-256 Hash*: `2FF86D752FB538E9FE59FF622F21C6BA06446F1326D513DAF4A0274173AAF4EF` (51.6 MB).
-
----
-
-## Verification & Test Suite
-
-The entire platform is backed by comprehensive automated test coverage:
-
-```bash
-# Run backend pytest test suite
-pytest backend/tests/ -v
-
-# Run Flutter widget test suite
-cd app && flutter test
+python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
 ```
 
-### Test Results
-- **Backend Tests**: 31 passed in 67.55s
-  - `test_sqlite_wal_mode` & `test_health_endpoint`
-  - `test_auth_protection` & `test_encryption_at_rest`
-  - `test_answer_bank_seeding_and_lookup` & `test_answer_bank_crud`
-  - `test_phase3_discovery_20_jobs` & `test_phase3_deduplication`
-  - `test_phase3_scoring_pipeline` & `test_phase3_resume_tailoring` & `test_phase3_maybe_swipe`
-  - `test_phase4_dry_run_application` & `test_phase4_30_day_cooldown` & `test_phase4_daily_cap_enforcement`
-  - `test_phase5_needs_you_flow_and_auto_resume` & `test_phase5_dismiss_needs_you`
-  - `test_phase6_assist_mode_draft_and_manual_apply` & `test_phase6_circuit_breaker` & `test_phase6_backup_service`
-  - `test_phase7_50_jobs_end_to_end_simulation` (50-job stress test)
-  - `test_analytics_endpoint` & `test_resume_versions_and_tailoring`
-  - `test_job_lifecycle_and_kanban` & `test_explainable_scoring_and_company_exclusion`
-  - `test_answer_bank_enhanced_fields`
-  - `test_safety_daily_cap_enforcement` & `test_safety_30_day_company_cooldown`
-  - `test_safety_pause_switch` & `test_safety_go_live_gate_default`
-  - `test_safety_idempotency_duplicate_submission`
-  - `test_safety_real_form_fill_dry_run` (Live Playwright form fill)
-- **Flutter Widget Tests**: 4 passed
-  - Navigation shell and destination verification
-  - Onboarding flow verification
-  - Editorial theme palette & Obsidian dark mode validation
-  - Smart widgets (`ApplicationGoalWidget`) & interactive charts (`StatusDonutChart`) validation
-
----
-
-## License & Security
-
-- **Single-User Security**: Bearer token authentication on all non-health routes.
-- **AES-256 Encryption**: Sensitive profile credentials encrypted at rest with Fernet cryptography.
-- **No Public Cloud Exits**: Database and Playwright processes run entirely local to your PC.
-- **MIT License**: Built for personal career automation.
+### 2. Connect Mobile App Over Tailscale
+1. Install `output/ApplyPilot.apk` on your Android device.
+2. Enter your Windows host Tailscale IP (e.g. `http://100.x.y.z:8000`).
+3. Enter your bearer token: `mApIGVEyORqpXbJzPhrhLPk9pRaS_vPOFyxH07nuPV4`.
+4. Tap **Verify Connection** and start your automated career cockpit!

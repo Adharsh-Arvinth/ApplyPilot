@@ -1,6 +1,29 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 
+class ApplyPilotColors {
+  static const Color aiViolet = Color(0xFF6A4C93);
+  static const Color successEmerald = Color(0xFF2D6A4F);
+  static const Color errorCoral = Color(0xFFE76F51);
+  static const Color discoveryBlue = Color(0xFF1D4E89);
+  static const Color pendingAmber = Color(0xFFD4A373);
+  static const Color interviewTeal = Color(0xFF0081A7);
+  static const Color lightPrimary = Color(0xFF1B4332);
+  static const Color darkPrimary = Color(0xFF40916C);
+  static const Color lightSurface = Color(0xFFFFFFFF);
+  static const Color darkSurface = Color(0xFF14251B);
+  static const Color lightIvory = Color(0xFFFAFAF7);
+  static const Color britishRacingGreen = Color(0xFF1B4332);
+  static const Color darkCard = Color(0xFF1A2F23);
+  static const Color brassAccent = Color(0xFFC5A880);
+  static const Color lightBorder = Color(0xFFE5E3DC);
+  static const Color darkBorder = Color(0xFF253F30);
+  static const Color lightTextPrimary = Color(0xFF14221A);
+  static const Color darkTextPrimary = Color(0xFFFAFAF7);
+  static const Color lightTextSecondary = Color(0xFF5C6B63);
+  static const Color darkTextSecondary = Color(0xFFA3B8AD);
+}
+
 class AppColors {
   // ApplyPilot Signature Editorial Palette: British Racing Green, Warm Ivory & Muted Brass
   static const Color warmIvory = Color(0xFFFAFAF7);
