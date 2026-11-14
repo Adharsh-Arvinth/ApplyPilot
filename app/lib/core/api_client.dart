@@ -61,11 +61,15 @@ class ApiClient {
 
   // 2. Profile
   Future<Map<String, dynamic>> getProfile() async {
-    final res = await http.get(Uri.parse("$_baseUrl/api/v1/profile"), headers: _headers());
-    if (res.statusCode == 200) {
-      return jsonDecode(res.body);
+    try {
+      final res = await http.get(Uri.parse("$_baseUrl/api/v1/profile"), headers: _headers()).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
+      }
+      return {};
+    } catch (_) {
+      return {};
     }
-    throw Exception("Failed to load profile: ${res.statusCode}");
   }
 
   Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async {
@@ -260,11 +264,13 @@ class ApiClient {
 
   // 6. Analytics
   Future<Map<String, dynamic>> getAnalytics() async {
-    final res = await http.get(Uri.parse("$_baseUrl/api/v1/analytics"), headers: _headers());
-    if (res.statusCode == 200) {
-      return jsonDecode(res.body);
-    }
-    throw Exception("Failed to load analytics: ${res.statusCode}");
+    try {
+      final res = await http.get(Uri.parse("$_baseUrl/api/v1/analytics"), headers: _headers()).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
+      }
+    } catch (_) {}
+    return {};
   }
 
   // 7. Needs You Inbox
@@ -318,14 +324,16 @@ class ApiClient {
 
   // 8. Stats & Logs
   Future<Map<String, dynamic>> getStats() async {
-    final res = await http.get(Uri.parse("$_baseUrl/api/v1/stats"), headers: _headers());
-    if (res.statusCode == 200) {
-      final data = jsonDecode(res.body) as Map<String, dynamic>;
-      final nyCount = (data["needs_you_count"] ?? 0) as int;
-      needsYouCountNotifier.value = nyCount;
-      automationStatusNotifier.value = data;
-      return data;
-    }
+    try {
+      final res = await http.get(Uri.parse("$_baseUrl/api/v1/stats"), headers: _headers()).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final nyCount = (data["needs_you_count"] ?? 0) as int;
+        needsYouCountNotifier.value = nyCount;
+        automationStatusNotifier.value = data;
+        return data;
+      }
+    } catch (_) {}
     return {
       "daily_applied": 0,
       "daily_cap": 100,
@@ -370,10 +378,12 @@ class ApiClient {
   }
 
   Future<List<dynamic>> getRunLogs() async {
-    final res = await http.get(Uri.parse("$_baseUrl/api/v1/logs"), headers: _headers());
-    if (res.statusCode == 200) {
-      return jsonDecode(res.body);
-    }
+    try {
+      final res = await http.get(Uri.parse("$_baseUrl/api/v1/logs"), headers: _headers()).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
+      }
+    } catch (_) {}
     return [];
   }
 

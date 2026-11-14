@@ -91,7 +91,7 @@ class _HomeScreenState extends State<HomeScreen> {
         analyticsFuture,
         profileFuture,
         logsFuture,
-      ]);
+      ]).timeout(const Duration(seconds: 6));
 
       if (mounted) {
         setState(() {

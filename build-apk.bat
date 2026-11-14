@@ -44,7 +44,7 @@ call flutter pub get
 
 echo.
 echo Building release APK...
-call flutter build apk --release --split-per-abi=false
+call flutter build apk --release
 
 if %ERRORLEVEL% EQU 0 (
     echo.
