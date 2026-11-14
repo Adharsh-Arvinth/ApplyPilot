@@ -623,6 +623,6 @@ def get_logs(limit: int = 50, db: Session = Depends(get_db)):
             "role": getattr(l, "role", "") or "",
             "outcome": getattr(l, "outcome", "neutral") or "neutral",
             "details": details,
-            "created_at": l.created_at.strftime("%H:%M:%S • %d %b")
+            "created_at": l.created_at.strftime("%H:%M:%S • %d %b") if hasattr(l.created_at, "strftime") else str(l.created_at or "")
         })
     return results
