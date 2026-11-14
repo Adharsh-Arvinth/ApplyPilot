@@ -27,6 +27,7 @@ class Profile(Base):
     target_roles_json = Column(Text, default='["Data Scientist", "ML Engineer", "Data Analyst", "Analytics Engineer", "Python Developer", "Backend Developer", "AI Engineer", "GenAI Engineer", "Computer Vision Engineer"]')
     locations_json = Column(Text, default='["Remote", "Bengaluru", "Chennai", "Hyderabad", "Pune", "Coimbatore", "Mumbai", "Delhi NCR"]')
     excluded_companies_json = Column(Text, default='[]')
+    widget_preferences_json = Column(Text, default='{}')
     
     min_salary_inr = Column(Integer, default=700000) # 7 LPA
     daily_cap = Column(Integer, default=100)

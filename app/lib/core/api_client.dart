@@ -321,4 +321,23 @@ class ApiClient {
     final res = await http.post(Uri.parse("$_baseUrl/api/v1/backup"), headers: _headers());
     return jsonDecode(res.body);
   }
+
+  Future<void> saveWidgetPreferences(Map<String, dynamic> prefsMap) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString("widget_preferences", jsonEncode(prefsMap));
+    try {
+      await updateProfile({"widget_preferences": prefsMap});
+    } catch (_) {}
+  }
+
+  Future<Map<String, dynamic>> loadWidgetPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    final localStr = prefs.getString("widget_preferences");
+    if (localStr != null) {
+      try {
+        return jsonDecode(localStr) as Map<String, dynamic>;
+      } catch (_) {}
+    }
+    return {};
+  }
 }

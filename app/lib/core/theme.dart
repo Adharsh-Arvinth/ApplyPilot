@@ -51,6 +51,51 @@ class AppColors {
   static const Color warningDark = Color(0xFFE9C46A);
   static const Color errorDark = Color(0xFFFF6B6B);
   static const Color blueDark = Color(0xFF64DFDF);
+
+  // Semantic Colorful Palette
+  // Emerald: Successful applications & positive progress
+  static const Color emeraldLight = Color(0xFF2D6A4F);
+  static const Color emeraldDark = Color(0xFF52B788);
+  // Blue: Job discovery & general information
+  static const Color semanticBlueLight = Color(0xFF1D4E89);
+  static const Color semanticBlueDark = Color(0xFF4895EF);
+  // Violet: AI operations & resume intelligence
+  static const Color violetLight = Color(0xFF6A4C93);
+  static const Color violetDark = Color(0xFF9D4EDD);
+  // Amber: Pending approvals & attention required
+  static const Color amberLight = Color(0xFFD4A373);
+  static const Color amberDark = Color(0xFFF4A261);
+  // Coral: Errors, failed applications & warnings
+  static const Color coralLight = Color(0xFFE76F51);
+  static const Color coralDark = Color(0xFFE63946);
+  // Teal: Interviews & career milestones
+  static const Color tealLight = Color(0xFF0081A7);
+  static const Color tealDark = Color(0xFF2A9D8F);
+
+  static Color getSemanticColor(String type, bool isDark) {
+    switch (type.toLowerCase()) {
+      case 'emerald':
+      case 'success':
+        return isDark ? emeraldDark : emeraldLight;
+      case 'blue':
+      case 'discovery':
+        return isDark ? semanticBlueDark : semanticBlueLight;
+      case 'violet':
+      case 'ai':
+        return isDark ? violetDark : violetLight;
+      case 'amber':
+      case 'pending':
+        return isDark ? amberDark : amberLight;
+      case 'coral':
+      case 'error':
+        return isDark ? coralDark : coralLight;
+      case 'teal':
+      case 'interview':
+        return isDark ? tealDark : tealLight;
+      default:
+        return isDark ? accentDark : racingGreen;
+    }
+  }
 }
 
 class AppSpacing {

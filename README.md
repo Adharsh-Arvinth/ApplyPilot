@@ -55,15 +55,56 @@ flowchart TD
 
 ---
 
-## Unslopped Editorial Design System
+## Unslopped Editorial Design System & Semantic Color Matrix
 
-ApplyPilot features a bespoke **unslopped** editorial aesthetic adhering to strict typography, color, and spacing guidelines:
+ApplyPilot features a bespoke **unslopped** editorial aesthetic with a consistent semantic color system:
 
 - **Primary Identity**: Warm Ivory (`#FAFAF7`), British Racing Green (`#1B4332`), Pure White surfaces (`#FFFFFF`), and Muted Brass accents (`#C5A880` / `#D4AF37`).
 - **Obsidian Dark Mode**: Deep Forest Slate (`#0D1912`, `#14251B`) with vibrant green glows (`#40916C`) and hairline border separation (`#253F30`).
+- **Semantic Color Matrix**:
+  - **Emerald** (`#2D6A4F` / `#52B788`): Successful applications & positive progress.
+  - **Blue** (`#1D4E89` / `#4895EF`): Job discovery & primary information.
+  - **Violet** (`#6A4C93` / `#9D4EDD`): AI operations & resume intelligence.
+  - **Amber** (`#D4A373` / `#F4A261`): Pending approvals & attention required.
+  - **Coral** (`#E76F51` / `#E63946`): Errors, failed applications & warnings.
+  - **Teal** (`#0081A7` / `#2A9D8F`): Interviews & career milestones.
 - **Strict 4-pt Spacing Grid**: `s2` (2dp), `s4` (4dp), `s6` (6dp), `s8` (8dp), `s12` (12dp), `s16` (16dp), `s20` (20dp), `s24` (24dp), `s32` (32dp).
 - **Typography**: Inter / Manrope hierarchy with strict tabular figures for metrics, financial values, and timestamps.
 - **Micro-Interactions**: Haptic touch feedback, zero decorative placeholder controls, and full accessibility compliance (48dp minimum touch targets).
+
+---
+
+## Smart Widgets System & Dashboard Personalization
+
+The Home Dashboard functions as an interactive, modular Career Command Center composed of 8 smart widgets:
+
+1. **Application Goal Widget**: Daily/weekly targets, animated circular completion meter, remaining applications countdown, and quick target adjustments.
+2. **Interview Countdown Widget**: Scheduled interview date and time, company & role details, countdown badge, and one-tap interview preparation sheet loaded with candidate proof points.
+3. **Top Job Match Widget**: Surfaces the single highest fit role (e.g. 94% fit), 3 key matching factors (Stack, Location, Level), and one-tap "Review Fit" and "Tailor & Queue" actions.
+4. **Needs Attention Widget**: High-priority alert banner grouping blocker questions, pending swipe approvals, failed tasks, and missing profile items with direct 1-tap resolution paths.
+5. **Career Streak Widget**: Tracks consecutive search activity days, weekly consistency dots (M-T-W-T-F-S-S), and career search milestone badges.
+6. **Backend Engine Health Widget**: Windows host status, Tailscale connection latency, automation queue status, and safe-mode indicator.
+7. **Application Funnel Widget**: Step-down pipeline tracking pass-through rates and drop-offs (`Discovered` &rarr; `Evaluated` &rarr; `Approved` &rarr; `Submitted` &rarr; `Interview` &rarr; `Offers`).
+8. **Quick Actions Widget**: One-tap action grid: Find Jobs, Tailor CV, Review Queue, Update Answer Bank, and Pause/Resume automation.
+
+### Dashboard Personalization & Customization
+- **Reorderable Widgets**: Drag-and-drop customization bottom sheet.
+- **Toggle Visibility**: Selectively hide or show any of the 8 widgets.
+- **Pin to Top**: Pin crucial widgets to float at the top of the command center.
+- **Density Control**: Switch between compact and expanded layout densities.
+- **State Persistence**: Dual local `SharedPreferences` caching and backend database profile synchronization (`widget_preferences_json`).
+
+---
+
+## 7 Interactive Charts (Analytics Dashboard)
+
+1. **Weekly & Monthly Application Bar Chart**: Toggle between 7-Day Velocity and 4-Week Volume with interactive tap tooltips highlighting peak volume days.
+2. **Conversion Funnel Pipeline Chart**: Visual step funnel displaying counts, pass-through percentages, and stage drop-offs.
+3. **Application Status Distribution Donut Chart**: Custom concentric arcs colored semantically with interactive segment tap inspection and legend.
+4. **Fit Score Histogram**: Distribution across 4 score brackets (`4.0-5.0` High Fit, `3.0-3.9` Target, `2.0-2.9` Borderline, `<2.0` Filtered).
+5. **Weekly Job-Search Activity Line Chart**: Smooth cubic bezier curve with area gradient fill and touch-tracking data dots.
+6. **Company-Wise Application Density**: Ranked horizontal progress bars with application counts and interview flags.
+7. **Resume Version Performance Comparison**: Compares master vs tailored resumes across ATS compatibility scores and interview conversion rates.
 
 ---
 
@@ -158,7 +199,7 @@ The compiled release APK is ready in `output/ApplyPilot.apk`:
 ```powershell
 adb install output/ApplyPilot.apk
 ```
-*SHA-256 Hash*: `117ECDCE1E8FC66C4AA3D754D9A3383C520BBE09FFD7C918B7CFCFC5EAD2861D` (51.1 MB).
+*SHA-256 Hash*: `2FF86D752FB538E9FE59FF622F21C6BA06446F1326D513DAF4A0274173AAF4EF` (51.6 MB).
 
 ---
 
@@ -175,7 +216,7 @@ cd app && flutter test
 ```
 
 ### Test Results
-- **Backend Tests**: 31 passed in 67.86s
+- **Backend Tests**: 31 passed in 67.55s
   - `test_sqlite_wal_mode` & `test_health_endpoint`
   - `test_auth_protection` & `test_encryption_at_rest`
   - `test_answer_bank_seeding_and_lookup` & `test_answer_bank_crud`
@@ -192,10 +233,11 @@ cd app && flutter test
   - `test_safety_pause_switch` & `test_safety_go_live_gate_default`
   - `test_safety_idempotency_duplicate_submission`
   - `test_safety_real_form_fill_dry_run` (Live Playwright form fill)
-- **Flutter Widget Tests**: 3 passed
+- **Flutter Widget Tests**: 4 passed
   - Navigation shell and destination verification
   - Onboarding flow verification
   - Editorial theme palette & Obsidian dark mode validation
+  - Smart widgets (`ApplicationGoalWidget`) & interactive charts (`StatusDonutChart`) validation
 
 ---
 

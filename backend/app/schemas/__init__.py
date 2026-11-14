@@ -18,6 +18,7 @@ class ProfileBase(BaseModel):
     target_roles: List[str]
     locations: List[str]
     excluded_companies: List[str] = []
+    widget_preferences: Dict[str, Any] = {}
     min_salary_inr: int
     daily_cap: int
     hourly_cap: int
@@ -45,6 +46,7 @@ class ProfileUpdate(BaseModel):
     target_roles: Optional[List[str]] = None
     locations: Optional[List[str]] = None
     excluded_companies: Optional[List[str]] = None
+    widget_preferences: Optional[Dict[str, Any]] = None
     min_salary_inr: Optional[int] = None
     daily_cap: Optional[int] = None
     hourly_cap: Optional[int] = None
@@ -241,6 +243,15 @@ class AnalyticsOut(BaseModel):
     source_breakdown: Dict[str, int]
     top_companies: List[Dict[str, Any]]
     avg_response_days: float
+    status_distribution: Dict[str, int] = {}
+    funnel: List[Dict[str, Any]] = []
+    activity_line_trend: List[Dict[str, Any]] = []
+    streak: Dict[str, Any] = {}
+    resume_performance: List[Dict[str, Any]] = []
+    top_matches: List[Dict[str, Any]] = []
+    upcoming_interview: Optional[Dict[str, Any]] = None
+    needs_attention: Dict[str, Any] = {}
+    goal: Dict[str, Any] = {}
 
 class TokenRotationOut(BaseModel):
     status: str

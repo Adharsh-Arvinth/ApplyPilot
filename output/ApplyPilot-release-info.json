@@ -1,35 +1,36 @@
 {
   "appName": "ApplyPilot",
-  "version": "1.2.0",
-  "buildNumber": 3,
+  "version": "1.3.0",
+  "buildNumber": 4,
   "package": "org.applypilot.applypilot",
-  "builtAt": "2026-11-14T08:50:42Z",
-  "sha256": "117ECDCE1E8FC66C4AA3D754D9A3383C520BBE09FFD7C918B7CFCFC5EAD2861D",
-  "sizeBytes": 53590498,
-  "backendCompatibility": ">=1.2.0",
-  "designSystem": "British Racing Green (#1B4332), Warm Ivory (#FAFAF7), Muted Brass (#C5A880), Obsidian Dark Mode (#0D1912), 4pt Spacing System",
-  "screens": [
-    "Home Dashboard (Career Command Center)",
-    "Discover Jobs (Fit Scoring & Filter Breakdown)",
-    "Needs You Inbox (Human-in-the-Loop Quick Answers)",
-    "Application Tracker (Kanban Board & List Lifecycle)",
-    "Analytics (Weekly Velocity & Match Distributions)",
-    "Answer Bank (Verified Facts & Source Evidence)",
-    "Resume Manager (Portfolio & Dynamic Tailoring)",
-    "Candidate Profile (Credentials, Roles & Exclusions)",
-    "Automation Control Center (Safety Rails & Live Stream)",
-    "Settings (Theme, Tailscale, Token Rotation & Backups)"
+  "builtAt": "2026-11-14T09:06:12Z",
+  "sha256": "2FF86D752FB538E9FE59FF622F21C6BA06446F1326D513DAF4A0274173AAF4EF",
+  "sizeBytes": 54099806,
+  "backendCompatibility": ">=1.3.0",
+  "designSystem": "British Racing Green (#1B4332), Warm Ivory (#FAFAF7), Muted Brass (#C5A880), Obsidian Dark Mode (#0D1912), Semantic Color Matrix (Emerald, Blue, Violet, Amber, Coral, Teal), 4pt Spacing System",
+  "smartWidgets": [
+    "Application Goal Widget (Daily & Weekly Targets, Circular Meter, Remaining Count)",
+    "Interview Countdown Widget (Upcoming Schedule, Countdown Badge, Proof Point Prep Sheet)",
+    "Top Job Match Widget (Highest Fit Role, 94% Match Badge, 3 Matching Factors, Quick Apply)",
+    "Needs Attention Widget (Pending Approvals, Blocker Questions, Failed Tasks, Profile Gaps)",
+    "Career Streak Widget (Consecutive Active Days, M-T-W-T-F-S-S Dot Tracker, Consistency Milestone)",
+    "Backend Engine Health Widget (Tailscale Ping Latency, Service Uptime, Safe Mode Status)",
+    "Application Funnel Widget (Discovered -> Evaluated -> Approved -> Submitted -> Interview -> Offer)",
+    "Quick Actions Widget (1-Tap Discovery, CV Tailoring, Queue Review, Answer Bank, Pause/Resume)"
   ],
-  "features": [
-    "10-Screen Unified Career Automation Architecture",
-    "Explainable 5-Factor Fit Scoring (Skills, Experience, Education, Location, Compensation)",
-    "End-to-End Application Lifecycle (Discovered -> Evaluated -> Approved -> Submitted -> Interview -> Offer/Rejected)",
-    "Kanban & List Views with notes, recruiter info, and submission evidence",
-    "Human-in-the-Loop Question Resolution & Answer Bank Auto-Sync",
-    "Tailored Resume Intelligence with ATS Match & Missing Qualification Alerts",
-    "Real Database Analytics (Velocity, Distributions, Top Companies, ATS Platforms)",
-    "Multi-Layered Safety: Dry-Run default, 30-day cooldown, 3-error circuit breaker, emergency pause",
-    "Single-Tap Bearer Token Rotation & Encrypted Storage",
-    "Private Mesh Tailscale VPN Connection (Zero Router Ports Exposed)"
+  "interactiveCharts": [
+    "7-Day & 4-Week Application Bar Chart (Interactive Tooltip, Velocity & Volume Toggle)",
+    "Conversion Funnel Pipeline Chart (Step Bars, Pass-Through % and Drop-Off Count)",
+    "Application Status Distribution Donut Chart (Concentric Arcs, Center Tap Legend)",
+    "Fit Score Histogram (4 Brackets: High Fit, Target, Borderline, Filtered)",
+    "Weekly Job-Search Activity Line Chart (Smooth Cubic Bezier Curve & Area Gradient Fill)",
+    "Company Application Density Chart (Ranked Horizontal Bars & Volume Metrics)",
+    "Resume Version Comparison Chart (Master vs Tailored ATS Scores & Interview Conversion)"
+  ],
+  "personalization": [
+    "Drag-and-Drop Reorderable Widget Customization Sheet",
+    "Toggle Visibility & Compact Density Modes",
+    "Pin Crucial Widgets to Top of Command Center",
+    "Dual Local SharedPreferences and Cloud Database Profile Sync"
   ]
 }

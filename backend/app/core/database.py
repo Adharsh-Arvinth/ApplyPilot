@@ -52,6 +52,9 @@ def migrate_db():
         if "excluded_companies_json" not in profile_cols:
             conn.execute(text("ALTER TABLE profiles ADD COLUMN excluded_companies_json TEXT DEFAULT '[]';"))
             conn.commit()
+        if "widget_preferences_json" not in profile_cols:
+            conn.execute(text("ALTER TABLE profiles ADD COLUMN widget_preferences_json TEXT DEFAULT '{}';"))
+            conn.commit()
 
         # 2. Migrate answer_bank
         bank_cols = get_existing_cols("answer_bank")

@@ -26,6 +26,10 @@ def _format_profile_out(p: Profile) -> dict:
         excluded = json.loads(p.excluded_companies_json) if p.excluded_companies_json else []
     except Exception:
         excluded = []
+    try:
+        widgets = json.loads(p.widget_preferences_json) if hasattr(p, "widget_preferences_json") and p.widget_preferences_json else {}
+    except Exception:
+        widgets = {}
 
     return {
         "id": p.id,
@@ -44,6 +48,7 @@ def _format_profile_out(p: Profile) -> dict:
         "target_roles": roles,
         "locations": locations,
         "excluded_companies": excluded,
+        "widget_preferences": widgets,
         "min_salary_inr": p.min_salary_inr,
         "daily_cap": p.daily_cap,
         "hourly_cap": p.hourly_cap,
@@ -77,6 +82,8 @@ def update_profile(update: ProfileUpdate, db: Session = Depends(get_db)):
             profile.locations_json = json.dumps(val)
         elif field == "excluded_companies":
             profile.excluded_companies_json = json.dumps(val)
+        elif field == "widget_preferences":
+            profile.widget_preferences_json = json.dumps(val)
         elif hasattr(profile, field):
             setattr(profile, field, val)
 

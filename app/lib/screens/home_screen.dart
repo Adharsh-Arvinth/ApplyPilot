@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
+import '../widgets/smart_widgets.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback onNavigateToDiscover;
@@ -38,11 +39,16 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<String, dynamic> _profile = {};
   List<dynamic> _logs = [];
 
+  DashboardPreferences _prefs = DashboardPreferences.defaults();
+  String _dateFilter = "Today"; // "Today", "This Week", "All Time"
+  DateTime _lastSyncTime = DateTime.now();
+
   @override
   void initState() {
     super.initState();
+    _loadPreferences();
     _fetchDashboardData();
-    _refreshTimer = Timer.periodic(const Duration(milliseconds: 3000), (_) {
+    _refreshTimer = Timer.periodic(const Duration(milliseconds: 3500), (_) {
       if (mounted) _fetchDashboardData(silent: true);
     });
   }
@@ -51,6 +57,17 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _refreshTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadPreferences() async {
+    try {
+      final saved = await _api.loadWidgetPreferences();
+      if (saved.isNotEmpty && mounted) {
+        setState(() {
+          _prefs = DashboardPreferences.fromJson(saved);
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _fetchDashboardData({bool silent = false}) async {
@@ -76,9 +93,16 @@ class _HomeScreenState extends State<HomeScreen> {
           _analytics = results[2] as Map<String, dynamic>;
           _profile = results[3] as Map<String, dynamic>;
           _logs = (results[4] as List<dynamic>).take(8).toList();
+          _lastSyncTime = DateTime.now();
           _error = null;
           _loading = false;
         });
+
+        // Also check if remote profile had widget preferences
+        final remoteWidgets = _profile["widget_preferences"];
+        if (remoteWidgets is Map<String, dynamic> && remoteWidgets.isNotEmpty) {
+          _prefs = DashboardPreferences.fromJson(remoteWidgets);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -113,6 +137,98 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _openCustomizer() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).brightness == Brightness.dark ? AppColors.surfaceDark : AppColors.surfaceLight,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.card)),
+      ),
+      builder: (context) {
+        return WidgetCustomizerSheet(
+          currentPrefs: _prefs,
+          onSave: (newPrefs) async {
+            setState(() => _prefs = newPrefs);
+            await _api.saveWidgetPreferences(newPrefs.toJson());
+          },
+        );
+      },
+    );
+  }
+
+  void _openInterviewPrepModal() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryTextColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
+    final secondaryTextColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final teal = AppColors.getSemanticColor("teal", isDark);
+
+    final interview = _analytics["upcoming_interview"] as Map<String, dynamic>?;
+    final company = interview?["company"] ?? "Interview Candidate";
+    final title = interview?["title"] ?? "Role";
+    final notes = interview?["notes"] ?? "Prepare system design & ML pipelines";
+    final recruiter = interview?["recruiter_info"] ?? "Talent Lead";
+    final proofs = (interview?["proof_points"] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.card)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(AppSpacing.s24),
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.psychology_outlined, color: teal, size: 22),
+                      const SizedBox(width: AppSpacing.s8),
+                      Text("Interview Preparation Sheet", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: primaryTextColor)),
+                    ],
+                  ),
+                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.of(context).pop()),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.s12),
+              Text(company, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: primaryTextColor)),
+              Text(title, style: TextStyle(fontSize: 13, color: secondaryTextColor)),
+              const Divider(height: 24),
+              Text("RECRUITER & SOURCING CONTEXT", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: secondaryTextColor)),
+              const SizedBox(height: 4),
+              Text(recruiter, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: primaryTextColor)),
+              const SizedBox(height: AppSpacing.s12),
+              Text("TECHNICAL FOCUS & TOPICS", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: secondaryTextColor)),
+              const SizedBox(height: 4),
+              Text(notes, style: TextStyle(fontSize: 12, color: primaryTextColor)),
+              const SizedBox(height: AppSpacing.s16),
+              Text("VERIFIED PROOF POINTS TO HIGHLIGHT", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: teal)),
+              const SizedBox(height: AppSpacing.s8),
+              ...proofs.map((p) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.check_circle, size: 14, color: teal),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(p, style: TextStyle(fontSize: 12, color: primaryTextColor))),
+                  ],
+                ),
+              )),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -122,20 +238,16 @@ class _HomeScreenState extends State<HomeScreen> {
     final cardBg = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
     final borderColor = isDark ? AppColors.borderHairlineDark : AppColors.borderHairlineLight;
     final accentGreen = isDark ? AppColors.accentDark : AppColors.racingGreen;
-    final brassColor = isDark ? AppColors.brassDark : AppColors.mutedBrass;
+    final emerald = AppColors.getSemanticColor("emerald", isDark);
 
     final isOnline = _health["status"] == "online" || _health["status"] == "healthy";
     final isPaused = _profile["is_paused"] ?? false;
-    final isLive = _profile["go_live"] ?? false;
 
-    final dailyApplied = _stats["daily_applied"] ?? 0;
-    final dailyCap = _stats["daily_cap"] ?? 100;
-    final pendingNeedsYou = _stats["needs_you_count"] ?? 0;
-    final queuedCount = _stats["queue_count"] ?? 0;
-    final interviewCount = _stats["interview_count"] ?? 0;
-    final totalTracked = _stats["total_tracked"] ?? 0;
-
-    final weeklyTrend = (_analytics["weekly_trend"] as List<dynamic>?) ?? [];
+    // Filter widgets by visibility and arrange by pinned then order
+    final visibleOrder = _prefs.order.where((k) => _prefs.visible.contains(k)).toList();
+    final pinnedList = visibleOrder.where((k) => _prefs.pinned.contains(k)).toList();
+    final unpinnedList = visibleOrder.where((k) => !_prefs.pinned.contains(k)).toList();
+    final finalWidgetOrder = [...pinnedList, ...unpinnedList];
 
     return Scaffold(
       appBar: AppBar(
@@ -171,6 +283,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.dashboard_customize_outlined, size: 22),
+            tooltip: "Customize Widgets",
+            onPressed: _openCustomizer,
+          ),
+          IconButton(
             icon: const Icon(Icons.analytics_outlined, size: 22),
             tooltip: "Analytics",
             onPressed: widget.onNavigateToAnalytics,
@@ -197,308 +314,63 @@ class _HomeScreenState extends State<HomeScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(AppSpacing.s16),
                 children: [
-                  // 1. Host Connection & Operational Pill
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12, vertical: AppSpacing.s8),
-                    decoration: BoxDecoration(
-                      color: cardBg,
-                      borderRadius: BorderRadius.circular(AppRadii.card),
-                      border: Border.all(color: borderColor),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: isOnline ? AppColors.successLight : AppColors.errorLight,
+                  // 1. Top Status & Personalization Header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isOnline ? emerald : AppColors.getSemanticColor("coral", isDark),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: AppSpacing.s8),
-                        Expanded(
-                          child: Text(
-                            isOnline
-                                ? "Host Operational • Windows Tailscale Engine (v${_health['version'] ?? '1.2.0'})"
-                                : "Host Disconnected • Tailscale Link Offline",
+                          const SizedBox(width: 6),
+                          Text(
+                            isOnline ? "Tailscale Connected" : "Host Offline",
                             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: primaryTextColor),
                           ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8, vertical: AppSpacing.s4),
-                          decoration: BoxDecoration(
-                            color: (isLive ? AppColors.warningLight : accentGreen).withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(AppRadii.pill),
-                          ),
-                          child: Text(
-                            isLive ? "LIVE SUBMISSIONS" : "DRY-RUN SAFE",
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: isLive ? AppColors.warningLight : accentGreen,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: AppSpacing.s16),
-
-                  // 2. Daily Application Target & Action Card
-                  Container(
-                    padding: const EdgeInsets.all(AppSpacing.s20),
-                    decoration: BoxDecoration(
-                      color: cardBg,
-                      borderRadius: BorderRadius.circular(AppRadii.card),
-                      border: Border.all(color: borderColor),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  "TODAY'S TARGET",
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 1.0,
-                                    color: secondaryTextColor,
-                                  ),
-                                ),
-                                const SizedBox(height: AppSpacing.s4),
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                                  textBaseline: TextBaseline.alphabetic,
-                                  children: [
-                                    Text(
-                                      "$dailyApplied",
-                                      style: TextStyle(
-                                        fontSize: 32,
-                                        fontWeight: FontWeight.w800,
-                                        color: primaryTextColor,
-                                      ),
-                                    ),
-                                    Text(
-                                      " / $dailyCap applications",
-                                      style: TextStyle(fontSize: 14, color: secondaryTextColor),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            // Quick Action: Apply Next in Queue
-                            ElevatedButton.icon(
-                              onPressed: isPaused || queuedCount == 0 ? null : _triggerApplyNext,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: accentGreen,
-                                foregroundColor: AppColors.pureWhite,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
-                                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16, vertical: AppSpacing.s12),
-                              ),
-                              icon: const Icon(Icons.bolt, size: 18),
-                              label: const Text("Apply Next", style: TextStyle(fontWeight: FontWeight.w700)),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.s16),
-                        // Linear Progress Meter
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(AppRadii.pill),
-                          child: LinearProgressIndicator(
-                            value: dailyCap > 0 ? (dailyApplied / dailyCap).clamp(0.0, 1.0) : 0.0,
-                            minHeight: 8,
-                            backgroundColor: borderColor,
-                            valueColor: AlwaysStoppedAnimation<Color>(accentGreen),
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.s12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              isPaused ? "Engine paused by user" : "$queuedCount jobs ready in approved queue",
-                              style: TextStyle(fontSize: 12, color: secondaryTextColor),
-                            ),
-                            GestureDetector(
-                              onTap: _togglePause,
-                              child: Text(
-                                isPaused ? "Resume Engine" : "Pause Queue",
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: isPaused ? AppColors.successLight : AppColors.errorLight,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: AppSpacing.s16),
-
-                  // 3. Command Metrics Grid
-                  Row(
-                    children: [
-                      // Pending Approvals / Needs You
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: widget.onNavigateToNeedsYou,
-                          child: Container(
-                            padding: const EdgeInsets.all(AppSpacing.s16),
-                            decoration: BoxDecoration(
-                              color: pendingNeedsYou > 0 ? brassColor.withOpacity(0.08) : cardBg,
-                              borderRadius: BorderRadius.circular(AppRadii.card),
-                              border: Border.all(
-                                color: pendingNeedsYou > 0 ? brassColor.withOpacity(0.5) : borderColor,
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Icon(Icons.help_outline, size: 20, color: brassColor),
-                                    if (pendingNeedsYou > 0)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: brassColor,
-                                          borderRadius: BorderRadius.circular(AppRadii.badge),
-                                        ),
-                                        child: Text(
-                                          "Action Required",
-                                          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.pureWhite),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                                const SizedBox(height: AppSpacing.s12),
-                                Text(
-                                  "$pendingNeedsYou",
-                                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: primaryTextColor),
-                                ),
-                                Text("Needs You Inbox", style: TextStyle(fontSize: 12, color: secondaryTextColor)),
-                              ],
-                            ),
-                          ),
-                        ),
+                        ],
                       ),
-                      const SizedBox(width: AppSpacing.s12),
-                      // Interviews
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: widget.onNavigateToTracker,
-                          child: Container(
-                            padding: const EdgeInsets.all(AppSpacing.s16),
-                            decoration: BoxDecoration(
-                              color: cardBg,
-                              borderRadius: BorderRadius.circular(AppRadii.card),
-                              border: Border.all(color: borderColor),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Icon(Icons.event_available_outlined, size: 20, color: accentGreen),
-                                const SizedBox(height: AppSpacing.s12),
-                                Text(
-                                  "$interviewCount",
-                                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: primaryTextColor),
-                                ),
-                                Text("Active Interviews", style: TextStyle(fontSize: 12, color: secondaryTextColor)),
-                              ],
-                            ),
-                          ),
-                        ),
+                      Row(
+                        children: [
+                          _buildDateFilterChip("Today", _dateFilter == "Today"),
+                          const SizedBox(width: 4),
+                          _buildDateFilterChip("Week", _dateFilter == "Week"),
+                          const SizedBox(width: 4),
+                          _buildDateFilterChip("All", _dateFilter == "All"),
+                        ],
                       ),
                     ],
                   ),
 
-                  const SizedBox(height: AppSpacing.s16),
+                  const SizedBox(height: AppSpacing.s12),
 
-                  // 4. Weekly Application Volume Trend
-                  Container(
-                    padding: const EdgeInsets.all(AppSpacing.s20),
-                    decoration: BoxDecoration(
-                      color: cardBg,
-                      borderRadius: BorderRadius.circular(AppRadii.card),
-                      border: Border.all(color: borderColor),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              "WEEKLY APPLICATION VOLUME",
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 1.0,
-                                color: secondaryTextColor,
-                              ),
+                  // 2. Render Ordered Smart Widgets
+                  ...finalWidgetOrder.map((key) {
+                    final isPinned = _prefs.pinned.contains(key);
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.s12),
+                      child: Stack(
+                        children: [
+                          _buildWidgetByKey(key, isDark, isPaused),
+                          if (isPinned)
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: Icon(Icons.push_pin, size: 12, color: emerald.withOpacity(0.6)),
                             ),
-                            TextButton(
-                              onPressed: widget.onNavigateToAnalytics,
-                              style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
-                              child: Text("Detailed Insights", style: TextStyle(fontSize: 12, color: accentGreen, fontWeight: FontWeight.bold)),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.s16),
-                        if (weeklyTrend.isEmpty)
-                          Center(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: AppSpacing.s16),
-                              child: Text("No application activity recorded this week yet.", style: TextStyle(fontSize: 12, color: secondaryTextColor)),
-                            ),
-                          )
-                        else
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: weeklyTrend.map<Widget>((item) {
-                              final count = (item["count"] ?? 0) as int;
-                              final maxCount = weeklyTrend.map((e) => (e["count"] ?? 0) as int).reduce((a, b) => a > b ? a : b);
-                              final heightPct = maxCount > 0 ? (count / maxCount).clamp(0.12, 1.0) : 0.12;
-                              return Column(
-                                children: [
-                                  Text("$count", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: count > 0 ? accentGreen : secondaryTextColor)),
-                                  const SizedBox(height: AppSpacing.s4),
-                                  Container(
-                                    width: 22,
-                                    height: 70 * heightPct,
-                                    decoration: BoxDecoration(
-                                      color: count > 0 ? accentGreen : borderColor,
-                                      borderRadius: BorderRadius.circular(AppRadii.badge),
-                                    ),
-                                  ),
-                                  const SizedBox(height: AppSpacing.s6),
-                                  Text(
-                                    item["day"] ?? "",
-                                    style: TextStyle(fontSize: 10, color: secondaryTextColor),
-                                  ),
-                                ],
-                              );
-                            }).toList(),
-                          ),
-                      ],
-                    ),
-                  ),
+                        ],
+                      ),
+                    );
+                  }),
 
                   const SizedBox(height: AppSpacing.s16),
 
-                  // 5. Recent Autonomous Execution Logs
+                  // 3. Live Execution Stream & Logs
                   Container(
                     padding: const EdgeInsets.all(AppSpacing.s16),
                     decoration: BoxDecoration(
@@ -513,61 +385,135 @@ class _HomeScreenState extends State<HomeScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              "ENGINE ACTIVITY STREAM",
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 1.0,
-                                color: secondaryTextColor,
-                              ),
+                              "LIVE OPERATION STREAM",
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: secondaryTextColor),
                             ),
-                            Icon(Icons.stream, size: 16, color: secondaryTextColor),
+                            Text(
+                              "Updated just now",
+                              style: TextStyle(fontSize: 10, color: secondaryTextColor),
+                            ),
                           ],
                         ),
-                        const SizedBox(height: AppSpacing.s12),
+                        const SizedBox(height: AppSpacing.s10),
                         if (_logs.isEmpty)
-                          Text("No logs recorded yet.", style: TextStyle(fontSize: 12, color: secondaryTextColor))
+                          Text("No execution events logged yet.", style: TextStyle(fontSize: 11, color: secondaryTextColor))
                         else
-                          ...(_logs.map<Widget>((log) {
-                            final lvl = (log["level"] ?? "info").toString().toLowerCase();
-                            final color = lvl == "error"
-                                ? AppColors.errorLight
-                                : (lvl == "warn" ? AppColors.warningLight : accentGreen);
+                          ..._logs.map((log) {
+                            final msg = log["message"] ?? "";
+                            final level = log["level"] ?? "info";
+                            final isErr = level == "error" || level == "critical";
+                            final color = isErr ? AppColors.getSemanticColor("coral", isDark) : secondaryTextColor;
+
                             return Padding(
-                              padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+                              padding: const EdgeInsets.only(bottom: AppSpacing.s6),
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Container(
-                                    margin: const EdgeInsets.only(top: 5),
-                                    width: 6,
-                                    height: 6,
-                                    decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-                                  ),
-                                  const SizedBox(width: AppSpacing.s8),
+                                  Text("›", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color)),
+                                  const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      log["message"] ?? "",
-                                      style: TextStyle(fontSize: 12, height: 1.3, color: primaryTextColor),
+                                      msg,
+                                      style: TextStyle(fontSize: 11, fontFamily: 'monospace', color: isErr ? color : primaryTextColor),
                                     ),
-                                  ),
-                                  const SizedBox(width: AppSpacing.s8),
-                                  Text(
-                                    log["created_at"] ?? "",
-                                    style: TextStyle(fontSize: 10, color: secondaryTextColor),
                                   ),
                                 ],
                               ),
                             );
-                          })),
+                          }),
                       ],
                     ),
                   ),
 
-                  const SizedBox(height: AppSpacing.s24),
+                  const SizedBox(height: AppSpacing.s32),
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildWidgetByKey(String key, bool isDark, bool isPaused) {
+    switch (key) {
+      case WidgetConfig.goal:
+        return ApplicationGoalWidget(
+          goalData: _analytics["goal"] ?? {},
+          isCompact: _prefs.isCompact,
+          onAdjustTarget: widget.onNavigateToControlCenter,
+        );
+      case WidgetConfig.interview:
+        return InterviewCountdownWidget(
+          interviewData: _analytics["upcoming_interview"],
+          isCompact: _prefs.isCompact,
+          onOpenPrep: _openInterviewPrepModal,
+        );
+      case WidgetConfig.match:
+        return JobMatchWidget(
+          matches: _analytics["top_matches"] ?? [],
+          isCompact: _prefs.isCompact,
+          onReviewMatch: (id) => widget.onNavigateToDiscover(),
+          onQuickApply: (id) => _triggerApplyNext(),
+        );
+      case WidgetConfig.attention:
+        return NeedsAttentionWidget(
+          attentionData: _analytics["needs_attention"] ?? {},
+          isCompact: _prefs.isCompact,
+          onResolveInbox: widget.onNavigateToNeedsYou,
+          onReviewApprovals: widget.onNavigateToTracker,
+        );
+      case WidgetConfig.streak:
+        return CareerStreakWidget(
+          streakData: _analytics["streak"] ?? {},
+          isCompact: _prefs.isCompact,
+        );
+      case WidgetConfig.health:
+        return BackendHealthWidget(
+          healthData: _health,
+          isCompact: _prefs.isCompact,
+          onPingTest: () => _fetchDashboardData(),
+        );
+      case WidgetConfig.funnel:
+        return ApplicationFunnelWidget(
+          funnelData: _analytics["funnel"] ?? [],
+          isCompact: _prefs.isCompact,
+        );
+      case WidgetConfig.quickActions:
+        return QuickActionsWidget(
+          isCompact: _prefs.isCompact,
+          onFindJobs: widget.onNavigateToDiscover,
+          onTailorResume: () => widget.onNavigateToDiscover(),
+          onReviewQueue: widget.onNavigateToTracker,
+          onUpdateAnswerBank: widget.onNavigateToSettings,
+          onToggleAutomation: _togglePause,
+          isPaused: isPaused,
+        );
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  Widget _buildDateFilterChip(String label, bool isSelected) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final emerald = AppColors.getSemanticColor("emerald", isDark);
+
+    return InkWell(
+      onTap: () => setState(() => _dateFilter = label),
+      borderRadius: BorderRadius.circular(AppRadii.control),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: isSelected ? emerald : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadii.control),
+          border: Border.all(color: isSelected ? emerald : Colors.grey.withOpacity(0.3)),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            color: isSelected ? Colors.white : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+          ),
+        ),
+      ),
     );
   }
 }
