@@ -1,6 +1,6 @@
 import datetime
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict
 
 class ProfileBase(BaseModel):
     full_name: str
@@ -17,6 +17,7 @@ class ProfileBase(BaseModel):
     preferred_work_mode: str
     target_roles: List[str]
     locations: List[str]
+    excluded_companies: List[str] = []
     min_salary_inr: int
     daily_cap: int
     hourly_cap: int
@@ -43,6 +44,7 @@ class ProfileUpdate(BaseModel):
     preferred_work_mode: Optional[str] = None
     target_roles: Optional[List[str]] = None
     locations: Optional[List[str]] = None
+    excluded_companies: Optional[List[str]] = None
     min_salary_inr: Optional[int] = None
     daily_cap: Optional[int] = None
     hourly_cap: Optional[int] = None
@@ -67,6 +69,10 @@ class AnswerBankBase(BaseModel):
     answer: str
     mode: str = "always_use"
     category: str = "general"
+    source: str = "candidate_profile"
+    is_verified: bool = True
+    supporting_evidence: str = ""
+    allow_reuse: bool = True
 
 class AnswerBankCreate(BaseModel):
     question_text: str
@@ -74,6 +80,10 @@ class AnswerBankCreate(BaseModel):
     answer: str
     mode: str = "always_use"
     category: str = "general"
+    source: str = "manual_entry"
+    is_verified: bool = True
+    supporting_evidence: str = ""
+    allow_reuse: bool = True
 
 class AnswerBankUpdate(BaseModel):
     question_text: Optional[str] = None
@@ -81,11 +91,59 @@ class AnswerBankUpdate(BaseModel):
     answer: Optional[str] = None
     mode: Optional[str] = None
     category: Optional[str] = None
+    source: Optional[str] = None
+    is_verified: Optional[bool] = None
+    supporting_evidence: Optional[str] = None
+    allow_reuse: Optional[bool] = None
 
 class AnswerBankOut(AnswerBankBase):
     id: int
     usage_count: int
     updated_at: datetime.datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ResumeVersionBase(BaseModel):
+    version_name: str
+    target_role: str = "General"
+    ats_score: float = 95.0
+    is_master: bool = False
+
+class ResumeVersionCreate(ResumeVersionBase):
+    content_html: str = ""
+    keyword_tags: List[str] = []
+
+class ResumeVersionOut(ResumeVersionBase):
+    id: int
+    pdf_path: str
+    keyword_tags: List[str] = []
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class ResumeTailorRequest(BaseModel):
+    job_id: Optional[int] = None
+    company: str
+    role: str
+    job_description: Optional[str] = ""
+    resume_version_id: Optional[int] = None
+
+
+class ApplicationOut(BaseModel):
+    id: int
+    job_id: int
+    resume_version_id: Optional[int] = None
+    resume_file: str
+    applied_at: datetime.datetime
+    submitted_at: datetime.datetime
+    form_screenshot: str
+    confirmation_screenshot: str
+    submission_evidence: Dict[str, Any] = {}
+    status: str
+    failure_reason: str
+    notes: str = ""
+    recruiter_info: str = ""
+    follow_up_date: Optional[datetime.datetime] = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -95,32 +153,37 @@ class JobBase(BaseModel):
     title: str
     url: str
     location: str = "India"
+    work_mode: str = "remote"
+    experience_required: str = "0-1 years"
     salary_raw: str = ""
     salary_numeric: int = 0
     score: float = 0.0
     score_reason: str = ""
+    skills_score: float = 0.0
+    experience_score: float = 0.0
+    education_score: float = 0.0
+    location_score: float = 0.0
+    compensation_score: float = 0.0
     status: str = "discovered"
+    notes: str = ""
+    recruiter_info: str = ""
 
 class JobCreate(JobBase):
     pass
 
-class ApplicationOut(BaseModel):
-    id: int
-    job_id: int
-    resume_file: str
-    submitted_at: datetime.datetime
-    form_screenshot: str
-    confirmation_screenshot: str
+class JobStatusUpdate(BaseModel):
     status: str
-    failure_reason: str
-    model_config = ConfigDict(from_attributes=True)
-
+    notes: Optional[str] = None
+    recruiter_info: Optional[str] = None
+    follow_up_date: Optional[datetime.datetime] = None
 
 class JobOut(JobBase):
     id: int
+    fit_breakdown: Dict[str, Any] = {}
     posted_at: datetime.datetime
     created_at: datetime.datetime
     updated_at: datetime.datetime
+    follow_up_date: Optional[datetime.datetime] = None
     applications: List[ApplicationOut] = []
     model_config = ConfigDict(from_attributes=True)
 
@@ -153,7 +216,7 @@ class HealthOut(BaseModel):
     last_seen: datetime.datetime
     queue_paused: bool
     go_live: bool
-    version: str = "1.0.0"
+    version: str = "1.1.0"
 
 class StatsOut(BaseModel):
     daily_applied: int
@@ -164,3 +227,22 @@ class StatsOut(BaseModel):
     interview_count: int
     queue_count: int
     total_tracked: int
+
+class AnalyticsOut(BaseModel):
+    total_tracked: int
+    total_applied: int
+    interviews_count: int
+    offers_count: int
+    rejections_count: int
+    conversion_rate_percent: float
+    weekly_trend: List[Dict[str, Any]]
+    monthly_trend: List[Dict[str, Any]]
+    match_score_distribution: Dict[str, int]
+    source_breakdown: Dict[str, int]
+    top_companies: List[Dict[str, Any]]
+    avg_response_days: float
+
+class TokenRotationOut(BaseModel):
+    status: str
+    new_token: str
+    message: str

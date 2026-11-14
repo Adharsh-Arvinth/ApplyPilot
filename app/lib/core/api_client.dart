@@ -9,7 +9,6 @@ class ApiClient {
   factory ApiClient() => _instance;
   ApiClient._internal();
 
-  // Defaults: Tailscale PC address or auto web origin
   String _baseUrl = "http://100.97.30.113:8000";
   String _token = "mApIGVEyORqpXbJzPhrhLPk9pRaS_vPOFyxH07nuPV4";
 
@@ -101,12 +100,26 @@ class ApiClient {
     return jsonDecode(res.body);
   }
 
+  Future<Map<String, dynamic>> rotateToken() async {
+    final res = await http.post(Uri.parse("$_baseUrl/api/v1/profile/rotate-token"), headers: _headers());
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      final newToken = data["new_token"];
+      if (newToken != null) {
+        await saveConnectionSettings(_baseUrl, newToken);
+      }
+      return data;
+    }
+    throw Exception("Token rotation failed: ${res.statusCode}");
+  }
+
   // 3. Answer Bank
-  Future<List<dynamic>> getAnswerBank({String? search, String? category}) async {
+  Future<List<dynamic>> getAnswerBank({String? search, String? category, bool? isVerified}) async {
     var uri = Uri.parse("$_baseUrl/api/v1/answer-bank");
     final params = <String, String>{};
     if (search != null && search.isNotEmpty) params['search'] = search;
     if (category != null && category.isNotEmpty) params['category'] = category;
+    if (isVerified != null) params['is_verified'] = isVerified.toString();
     if (params.isNotEmpty) uri = uri.replace(queryParameters: params);
 
     final res = await http.get(uri, headers: _headers());
@@ -147,12 +160,14 @@ class ApiClient {
     }
   }
 
-  // 4. Jobs & Applications
-  Future<List<dynamic>> getJobs({String? status, String? search}) async {
+  // 4. Jobs, Discovery & Kanban
+  Future<List<dynamic>> getJobs({String? status, String? search, String? workMode, double? minScore}) async {
     var uri = Uri.parse("$_baseUrl/api/v1/jobs");
     final params = <String, String>{};
     if (status != null && status.isNotEmpty) params['status'] = status;
     if (search != null && search.isNotEmpty) params['search'] = search;
+    if (workMode != null && workMode.isNotEmpty) params['work_mode'] = workMode;
+    if (minScore != null) params['min_score'] = minScore.toString();
     if (params.isNotEmpty) uri = uri.replace(queryParameters: params);
 
     final res = await http.get(uri, headers: _headers());
@@ -162,15 +177,93 @@ class ApiClient {
     return [];
   }
 
-  Future<void> swipeMaybeJob(int jobId, bool accept) async {
+  Future<Map<String, dynamic>> getKanbanJobs() async {
+    final res = await http.get(Uri.parse("$_baseUrl/api/v1/jobs/kanban"), headers: _headers());
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    return {};
+  }
+
+  Future<Map<String, dynamic>> updateJobStatus(int jobId, Map<String, dynamic> data) async {
+    final res = await http.put(
+      Uri.parse("$_baseUrl/api/v1/jobs/$jobId/status"),
+      headers: _headers(),
+      body: jsonEncode(data),
+    );
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    throw Exception("Failed to update status: ${res.statusCode}");
+  }
+
+  Future<void> swipeJob(int jobId, String action) async {
     await http.post(
       Uri.parse("$_baseUrl/api/v1/jobs/$jobId/swipe"),
       headers: _headers(),
-      body: jsonEncode({"action": accept ? "queue" : "dismiss"}),
+      body: jsonEncode({"action": action}),
     );
   }
 
-  // 5. Needs You Inbox
+  Future<Map<String, dynamic>> triggerDiscovery() async {
+    final res = await http.post(Uri.parse("$_baseUrl/api/v1/jobs/discover"), headers: _headers());
+    return jsonDecode(res.body);
+  }
+
+  Future<Map<String, dynamic>> triggerEvaluation() async {
+    final res = await http.post(Uri.parse("$_baseUrl/api/v1/jobs/evaluate"), headers: _headers());
+    return jsonDecode(res.body);
+  }
+
+  Future<Map<String, dynamic>> applyToJob(int jobId) async {
+    final res = await http.post(Uri.parse("$_baseUrl/api/v1/jobs/$jobId/apply"), headers: _headers());
+    return jsonDecode(res.body);
+  }
+
+  Future<Map<String, dynamic>> applyNext() async {
+    final res = await http.post(Uri.parse("$_baseUrl/api/v1/jobs/apply-next"), headers: _headers());
+    return jsonDecode(res.body);
+  }
+
+  // 5. Resume Intelligence
+  Future<List<dynamic>> getResumes() async {
+    final res = await http.get(Uri.parse("$_baseUrl/api/v1/resumes"), headers: _headers());
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    return [];
+  }
+
+  Future<Map<String, dynamic>> tailorResumeSimulation(Map<String, dynamic> data) async {
+    final res = await http.post(
+      Uri.parse("$_baseUrl/api/v1/resumes/tailor"),
+      headers: _headers(),
+      body: jsonEncode(data),
+    );
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    throw Exception("Failed to tailor resume: ${res.statusCode}");
+  }
+
+  Future<void> setMasterResume(int id) async {
+    await http.post(Uri.parse("$_baseUrl/api/v1/resumes/$id/set-master"), headers: _headers());
+  }
+
+  Future<void> deleteResume(int id) async {
+    await http.delete(Uri.parse("$_baseUrl/api/v1/resumes/$id"), headers: _headers());
+  }
+
+  // 6. Analytics
+  Future<Map<String, dynamic>> getAnalytics() async {
+    final res = await http.get(Uri.parse("$_baseUrl/api/v1/analytics"), headers: _headers());
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    throw Exception("Failed to load analytics: ${res.statusCode}");
+  }
+
+  // 7. Needs You Inbox
   Future<List<dynamic>> getNeedsYou() async {
     final res = await http.get(Uri.parse("$_baseUrl/api/v1/needs-you"), headers: _headers());
     if (res.statusCode == 200) {
@@ -179,14 +272,14 @@ class ApiClient {
     return [];
   }
 
-  Future<void> resolveNeedsYou(int id, String answer, {bool saveToBank = true}) async {
+  Future<void> resolveNeedsYou(int id, String answer, {bool saveToBank = true, String mode = "always_use"}) async {
     final res = await http.post(
       Uri.parse("$_baseUrl/api/v1/needs-you/$id/resolve"),
       headers: _headers(),
       body: jsonEncode({
         "answer": answer,
         "save_to_answer_bank": saveToBank,
-        "mode": "always_use"
+        "mode": mode
       }),
     );
     if (res.statusCode != 200) {
@@ -194,7 +287,11 @@ class ApiClient {
     }
   }
 
-  // 6. Stats & Logs
+  Future<void> dismissNeedsYou(int id) async {
+    await http.post(Uri.parse("$_baseUrl/api/v1/needs-you/$id/dismiss"), headers: _headers());
+  }
+
+  // 8. Stats & Logs
   Future<Map<String, dynamic>> getStats() async {
     final res = await http.get(Uri.parse("$_baseUrl/api/v1/stats"), headers: _headers());
     if (res.statusCode == 200) {
@@ -208,6 +305,7 @@ class ApiClient {
       "blocked_count": 0,
       "interview_count": 0,
       "queue_count": 0,
+      "total_tracked": 0,
     };
   }
 
@@ -217,5 +315,10 @@ class ApiClient {
       return jsonDecode(res.body);
     }
     return [];
+  }
+
+  Future<Map<String, dynamic>> triggerBackup() async {
+    final res = await http.post(Uri.parse("$_baseUrl/api/v1/backup"), headers: _headers());
+    return jsonDecode(res.body);
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
 
@@ -10,252 +11,280 @@ class AnswerBankScreen extends StatefulWidget {
 }
 
 class _AnswerBankScreenState extends State<AnswerBankScreen> {
-  final _api = ApiClient();
+  final ApiClient _api = ApiClient();
   bool _loading = true;
+  String _searchQuery = "";
+  String _selectedCategory = "all";
+  bool? _verifiedFilter;
   List<dynamic> _answers = [];
-  String _search = "";
-  String? _categoryFilter;
 
   final List<String> _categories = [
-    "All",
-    "personal",
-    "education",
-    "work_auth",
-    "preferences",
-    "technical",
-    "behavioral",
-    "custom"
+    "all", "personal", "education", "work_auth", "technical", "behavioral", "preferences", "custom"
   ];
 
   @override
   void initState() {
     super.initState();
-    _fetchAnswers();
+    _loadAnswers();
   }
 
-  Future<void> _fetchAnswers() async {
+  Future<void> _loadAnswers() async {
     setState(() => _loading = true);
     try {
-      final list = await _api.getAnswerBank(
-        search: _search,
-        category: _categoryFilter == "All" ? null : _categoryFilter,
+      final category = _selectedCategory == "all" ? null : _selectedCategory;
+      final answers = await _api.getAnswerBank(
+        search: _searchQuery.isEmpty ? null : _searchQuery,
+        category: category,
+        isVerified: _verifiedFilter,
       );
       if (mounted) {
         setState(() {
-          _answers = list;
+          _answers = answers;
           _loading = false;
         });
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  void _showAddEditModal({Map<String, dynamic>? existing}) {
-    final isEdit = existing != null;
-    final qCtrl = TextEditingController(text: existing?["question_text"] ?? "");
-    final aCtrl = TextEditingController(text: existing?["answer"] ?? "");
-    String mode = existing?["mode"] ?? "always_use";
-    String category = existing?["category"] ?? "general";
-
-    showDialog(
+  void _openEditModal({dynamic existing}) {
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setModalState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.card)),
-          title: Text(isEdit ? "Edit Answer" : "Add New Answer", style: const TextStyle(fontWeight: FontWeight.w500)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: qCtrl,
-                  decoration: const InputDecoration(labelText: "Question / Label", isDense: true),
-                ),
-                const SizedBox(height: AppSpacing.s12),
-                TextField(
-                  controller: aCtrl,
-                  maxLines: 3,
-                  decoration: const InputDecoration(labelText: "Your Answer", isDense: true),
-                ),
-                const SizedBox(height: AppSpacing.s16),
-                DropdownButtonFormField<String>(
-                  value: mode,
-                  decoration: const InputDecoration(labelText: "Reuse Mode", isDense: true),
-                  items: const [
-                    DropdownMenuItem(value: "always_use", child: Text("Always use automatically")),
-                    DropdownMenuItem(value: "ask_each_time", child: Text("Ask me each time")),
-                  ],
-                  onChanged: (v) => setModalState(() => mode = v!),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
-            FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: AppColors.accentLight),
-              onPressed: () async {
-                if (qCtrl.text.trim().isEmpty || aCtrl.text.trim().isEmpty) return;
-                Navigator.pop(ctx);
-                final payload = {
-                  "question_text": qCtrl.text.trim(),
-                  "answer": aCtrl.text.trim(),
-                  "mode": mode,
-                  "category": category,
-                  "field_type": "text"
-                };
-                if (isEdit) {
-                  await _api.updateAnswer(existing["id"], payload);
-                } else {
-                  await _api.createAnswer(payload);
-                }
-                _fetchAnswers();
-              },
-              child: const Text("Save"),
-            ),
-          ],
-        ),
-      ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _AnswerEditSheet(existing: existing, onSaved: _loadAnswers),
     );
   }
 
   Future<void> _deleteAnswer(int id) async {
-    await _api.deleteAnswer(id);
-    _fetchAnswers();
+    HapticFeedback.mediumImpact();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Delete Answer"),
+        content: const Text("Are you sure you want to remove this answer entry from your Answer Bank?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorLight),
+            child: const Text("Delete", style: TextStyle(color: AppColors.pureWhite)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await _api.deleteAnswer(id);
+        _loadAnswers();
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to delete: $e")));
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryTextColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
+    final secondaryTextColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final cardBg = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
+    final borderColor = isDark ? AppColors.borderHairlineDark : AppColors.borderHairlineLight;
+    final accentGreen = isDark ? AppColors.accentDark : AppColors.racingGreen;
+    final brassColor = isDark ? AppColors.brassDark : AppColors.mutedBrass;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Answer Bank", style: TextStyle(fontWeight: FontWeight.w500, fontSize: 18)),
+        title: Text(
+          "Answer Bank",
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: primaryTextColor),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add_rounded, size: 22),
-            onPressed: () => _showAddEditModal(),
+            icon: const Icon(Icons.add),
+            tooltip: "Add Entry",
+            onPressed: () => _openEditModal(),
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadAnswers,
           ),
         ],
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16, vertical: AppSpacing.s8),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: "Search question or answer...",
-                prefixIcon: const Icon(Icons.search, size: 18),
-                isDense: true,
-                filled: true,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.control),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              onChanged: (val) {
-                _search = val;
-                _fetchAnswers();
-              },
-            ),
-          ),
-          // Category selector chips
-          SizedBox(
-            height: 38,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16),
-              itemCount: _categories.length,
-              separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.s8),
-              itemBuilder: (ctx, i) {
-                final cat = _categories[i];
-                final selected = (_categoryFilter ?? "All") == cat;
-                return ChoiceChip(
-                  label: Text(cat, style: const TextStyle(fontSize: 12)),
-                  selected: selected,
-                  selectedColor: isDark ? AppColors.accentDark.withOpacity(0.2) : AppColors.accentLight.withOpacity(0.12),
-                  onSelected: (val) {
-                    setState(() => _categoryFilter = cat);
-                    _fetchAnswers();
+          // Search & Filter Bar
+          Container(
+            padding: const EdgeInsets.fromLTRB(AppSpacing.s16, 0, AppSpacing.s16, AppSpacing.s12),
+            child: Column(
+              children: [
+                TextField(
+                  onChanged: (val) {
+                    _searchQuery = val;
+                    _loadAnswers();
                   },
-                );
-              },
+                  decoration: InputDecoration(
+                    hintText: "Search questions, answers, or categories...",
+                    hintStyle: TextStyle(fontSize: 13, color: secondaryTextColor),
+                    prefixIcon: Icon(Icons.search, size: 20, color: secondaryTextColor),
+                    filled: true,
+                    fillColor: cardBg,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: AppSpacing.s12),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadii.control), borderSide: BorderSide(color: borderColor)),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.s8),
+                // Category Pills
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: _categories.map((cat) {
+                      final isSelected = _selectedCategory == cat;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: AppSpacing.s8),
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() => _selectedCategory = cat);
+                            _loadAnswers();
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12, vertical: AppSpacing.s6),
+                            decoration: BoxDecoration(
+                              color: isSelected ? accentGreen : Colors.transparent,
+                              borderRadius: BorderRadius.circular(AppRadii.pill),
+                              border: Border.all(color: isSelected ? accentGreen : AppColors.hairlineBorder),
+                            ),
+                            child: Text(
+                              cat.toUpperCase(),
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isSelected ? AppColors.pureWhite : secondaryTextColor),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: AppSpacing.s8),
+
+          // Answers List
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+                ? Center(child: CircularProgressIndicator(strokeWidth: 2, color: accentGreen))
                 : _answers.isEmpty
-                    ? Center(child: Text("No answers found.", style: theme.textTheme.bodyMedium))
+                    ? Center(child: Text("No entries found in Answer Bank.", style: TextStyle(color: secondaryTextColor)))
                     : ListView.builder(
                         padding: const EdgeInsets.all(AppSpacing.s16),
                         itemCount: _answers.length,
-                        itemBuilder: (ctx, i) {
-                          final item = _answers[i];
-                          final isAlways = item["mode"] == "always_use";
+                        itemBuilder: (context, idx) {
+                          final ans = _answers[idx];
+                          final id = ans["id"] as int;
+                          final isVerified = ans["is_verified"] == true;
+                          final evidence = ans["supporting_evidence"] ?? "";
+                          final source = ans["source"] ?? "candidate_profile";
+                          final allowReuse = ans["allow_reuse"] != false;
 
-                          return Card(
+                          return Container(
                             margin: const EdgeInsets.only(bottom: AppSpacing.s12),
+                            decoration: BoxDecoration(
+                              color: cardBg,
+                              borderRadius: BorderRadius.circular(AppRadii.card),
+                              border: Border.all(color: borderColor),
+                            ),
                             child: Padding(
                               padding: const EdgeInsets.all(AppSpacing.s16),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  // Header: Question + Verification Badge
                                   Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
                                       Expanded(
                                         child: Text(
-                                          item["question_text"] ?? "",
-                                          style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+                                          ans["question_text"] ?? "",
+                                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: primaryTextColor),
                                         ),
                                       ),
+                                      const SizedBox(width: AppSpacing.s8),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8, vertical: AppSpacing.s4),
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                         decoration: BoxDecoration(
-                                          color: isAlways
-                                              ? AppColors.accentLight.withOpacity(0.1)
-                                              : AppColors.warningLight.withOpacity(0.1),
+                                          color: (isVerified ? AppColors.successLight : AppColors.warningLight).withOpacity(0.12),
                                           borderRadius: BorderRadius.circular(AppRadii.badge),
+                                          border: Border.all(color: (isVerified ? AppColors.successLight : AppColors.warningLight).withOpacity(0.3)),
                                         ),
-                                        child: Text(
-                                          isAlways ? "Always Use" : "Ask Each Time",
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: isAlways ? AppColors.accentLight : AppColors.warningLight,
-                                          ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(isVerified ? Icons.verified : Icons.lightbulb_outline, size: 11, color: isVerified ? AppColors.successLight : AppColors.warningLight),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              isVerified ? "Verified Fact" : "AI Suggestion",
+                                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isVerified ? AppColors.successLight : AppColors.warningLight),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ],
                                   ),
                                   const SizedBox(height: AppSpacing.s8),
-                                  Text(
-                                    item["answer"] ?? "",
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+
+                                  // Answer Body
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(AppSpacing.s12),
+                                    decoration: BoxDecoration(
+                                      color: isDark ? AppColors.surfaceSubtleDark : AppColors.surfaceSubtleLight,
+                                      borderRadius: BorderRadius.circular(AppRadii.control),
+                                    ),
+                                    child: Text(
+                                      ans["answer"] ?? "",
+                                      style: TextStyle(fontSize: 13, height: 1.4, color: primaryTextColor),
                                     ),
                                   ),
-                                  const SizedBox(height: AppSpacing.s12),
+                                  const SizedBox(height: AppSpacing.s8),
+
+                                  // Evidence & Source
+                                  if (evidence.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+                                      child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Icon(Icons.shield_outlined, size: 13, color: secondaryTextColor),
+                                          const SizedBox(width: 4),
+                                          Expanded(
+                                            child: Text("Evidence: $evidence", style: TextStyle(fontSize: 11, color: secondaryTextColor)),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                  // Footer: Category, Reuse Permission, Edit/Delete
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
                                       Text(
-                                        "Used ${item["usage_count"] ?? 0} times • ${item["category"] ?? "general"}",
-                                        style: theme.textTheme.labelSmall?.copyWith(fontSize: 11),
+                                        "${ans['category'].toString().toUpperCase()} • ${allowReuse ? 'Auto-Reuse' : 'Ask Each Time'}",
+                                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: secondaryTextColor),
                                       ),
                                       Row(
                                         children: [
                                           IconButton(
                                             icon: const Icon(Icons.edit_outlined, size: 18),
-                                            onPressed: () => _showAddEditModal(existing: item),
+                                            tooltip: "Edit Answer",
+                                            onPressed: () => _openEditModal(existing: ans),
                                           ),
                                           IconButton(
-                                            icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.blockedLight),
-                                            onPressed: () => _deleteAnswer(item["id"]),
+                                            icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.errorLight),
+                                            tooltip: "Delete Answer",
+                                            onPressed: () => _deleteAnswer(id),
                                           ),
                                         ],
                                       ),
@@ -267,6 +296,162 @@ class _AnswerBankScreenState extends State<AnswerBankScreen> {
                           );
                         },
                       ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AnswerEditSheet extends StatefulWidget {
+  final dynamic existing;
+  final VoidCallback onSaved;
+
+  const _AnswerEditSheet({this.existing, required this.onSaved});
+
+  @override
+  State<_AnswerEditSheet> createState() => _AnswerEditSheetState();
+}
+
+class _AnswerEditSheetState extends State<_AnswerEditSheet> {
+  final ApiClient _api = ApiClient();
+  late TextEditingController _qController;
+  late TextEditingController _aController;
+  late TextEditingController _evidenceController;
+  late String _category;
+  late String _mode;
+  late bool _isVerified;
+  late bool _allowReuse;
+
+  @override
+  void initState() {
+    super.initState();
+    final ex = widget.existing;
+    _qController = TextEditingController(text: ex?["question_text"] ?? "");
+    _aController = TextEditingController(text: ex?["answer"] ?? "");
+    _evidenceController = TextEditingController(text: ex?["supporting_evidence"] ?? "");
+    _category = ex?["category"] ?? "general";
+    _mode = ex?["mode"] ?? "always_use";
+    _isVerified = ex?["is_verified"] ?? true;
+    _allowReuse = ex?["allow_reuse"] ?? true;
+  }
+
+  @override
+  void dispose() {
+    _qController.dispose();
+    _aController.dispose();
+    _evidenceController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final q = _qController.text.trim();
+    final a = _aController.text.trim();
+    if (q.isEmpty || a.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Question and answer are required.")));
+      return;
+    }
+
+    final data = {
+      "question_text": q,
+      "answer": a,
+      "category": _category,
+      "mode": _mode,
+      "field_type": "text",
+      "supporting_evidence": _evidenceController.text.trim(),
+      "is_verified": _isVerified,
+      "allow_reuse": _allowReuse,
+      "source": widget.existing?["source"] ?? "manual_entry",
+    };
+
+    try {
+      if (widget.existing != null) {
+        await _api.updateAnswer(widget.existing["id"], data);
+      } else {
+        await _api.createAnswer(data);
+      }
+      widget.onSaved();
+      Navigator.pop(context);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to save: $e")));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
+    final primaryTextColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
+    final secondaryTextColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final accentGreen = isDark ? AppColors.accentDark : AppColors.racingGreen;
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.8,
+      padding: const EdgeInsets.all(AppSpacing.s24),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.card)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                widget.existing != null ? "Edit Answer Bank Entry" : "New Candidate Fact",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: primaryTextColor),
+              ),
+              IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s16),
+          Expanded(
+            child: ListView(
+              children: [
+                Text("QUESTION OR FIELD LABEL", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: secondaryTextColor)),
+                const SizedBox(height: 6),
+                TextField(controller: _qController, decoration: const InputDecoration(hintText: "e.g. Years of Python experience")),
+                const SizedBox(height: AppSpacing.s16),
+
+                Text("ANSWER", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: secondaryTextColor)),
+                const SizedBox(height: 6),
+                TextField(controller: _aController, maxLines: 3, decoration: const InputDecoration(hintText: "e.g. 2+ years through academic R&D")),
+                const SizedBox(height: AppSpacing.s16),
+
+                Text("SUPPORTING EVIDENCE / CITATION", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: secondaryTextColor)),
+                const SizedBox(height: 6),
+                TextField(controller: _evidenceController, decoration: const InputDecoration(hintText: "e.g. Published patent #202441058291")),
+                const SizedBox(height: AppSpacing.s16),
+
+                Row(
+                  children: [
+                    Checkbox(value: _isVerified, activeColor: accentGreen, onChanged: (v) => setState(() => _isVerified = v ?? true)),
+                    Text("Verified Fact (High confidence truth)", style: TextStyle(fontSize: 12, color: primaryTextColor)),
+                  ],
+                ),
+                Row(
+                  children: [
+                    Checkbox(value: _allowReuse, activeColor: accentGreen, onChanged: (v) => setState(() => _allowReuse = v ?? true)),
+                    Text("Allow Automatic Reuse in ATS forms", style: TextStyle(fontSize: 12, color: primaryTextColor)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _save,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: accentGreen,
+                foregroundColor: AppColors.pureWhite,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12),
+              ),
+              child: const Text("Save Entry", style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
           ),
         ],
       ),

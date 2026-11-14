@@ -1,357 +1,290 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
 import '../main.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+  final VoidCallback? onNavigateToProfile;
+  final VoidCallback? onNavigateToResumes;
+  final VoidCallback? onNavigateToControlCenter;
+
+  const SettingsScreen({
+    super.key,
+    this.onNavigateToProfile,
+    this.onNavigateToResumes,
+    this.onNavigateToControlCenter,
+  });
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final _api = ApiClient();
-  final _urlCtrl = TextEditingController();
-  final _tokenCtrl = TextEditingController();
-  String _pingResult = "";
+  final ApiClient _api = ApiClient();
+  final TextEditingController _urlController = TextEditingController();
+  final TextEditingController _tokenController = TextEditingController();
   bool _testing = false;
-  bool _goLive = false;
+  String? _testResult;
 
   @override
   void initState() {
     super.initState();
-    _urlCtrl.text = _api.baseUrl;
-    _tokenCtrl.text = _api.token;
-    _loadProfileState();
-  }
-
-  Future<void> _loadProfileState() async {
-    try {
-      final p = await _api.getProfile();
-      if (mounted) {
-        setState(() {
-          _goLive = p["go_live"] ?? false;
-        });
-      }
-    } catch (_) {}
+    _urlController.text = _api.baseUrl;
+    _tokenController.text = _api.token;
   }
 
   @override
   void dispose() {
-    _urlCtrl.dispose();
-    _tokenCtrl.dispose();
+    _urlController.dispose();
+    _tokenController.dispose();
     super.dispose();
   }
 
-  Future<void> _testConnection() async {
+  Future<void> _testAndSaveConnection() async {
+    HapticFeedback.mediumImpact();
     setState(() {
       _testing = true;
-      _pingResult = "Pinging Windows host...";
+      _testResult = null;
     });
-    await _api.saveConnectionSettings(_urlCtrl.text, _tokenCtrl.text);
+
+    await _api.saveConnectionSettings(_urlController.text, _tokenController.text);
     final health = await _api.checkHealth();
-    if (mounted) {
-      setState(() {
-        _testing = false;
-        if (health["status"] == "online") {
-          _pingResult = "Connected! Windows PC online (${health["database"]}). Uptime: ${health["uptime_seconds"]}s";
-        } else {
-          _pingResult = "Connection failed: ${health["error"] ?? "Cannot reach server"}";
-        }
-      });
+    setState(() {
+      _testing = false;
+      if (health["status"] == "online" || health["status"] == "healthy") {
+        _testResult = "Connection Verified: Host Operational (v${health['version'] ?? '1.2.0'})";
+      } else {
+        _testResult = "Connection Failed: ${health['error'] ?? 'Unreachable host'}";
+      }
+    });
+  }
+
+  Future<void> _triggerBackup() async {
+    HapticFeedback.lightImpact();
+    try {
+      final res = await _api.triggerBackup();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Backup created at: ${res['backup_path'] ?? 'backups/'}")),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Backup failed: $e")));
     }
   }
 
-  Future<void> _toggleGoLive() async {
-    final resp = await _api.toggleGoLive();
-    if (mounted) {
-      setState(() => _goLive = resp["go_live"] ?? false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: _goLive ? AppColors.iosRed : AppColors.iosGreen,
-          content: Text(_goLive ? "WARNING: Go-Live Mode ENABLED. Live submissions active." : "Safety ON: Running in Dry-Run Preview Mode."),
+  Future<void> _rotateToken() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Rotate Security Bearer Token"),
+        content: const Text(
+          "Rotating the token generates a fresh cryptographically random token on the PC host "
+          "and updates this mobile device automatically.",
         ),
-      );
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Rotate Token")),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        final res = await _api.rotateToken();
+        _tokenController.text = _api.token;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res["message"])));
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Rotation failed: $e")));
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryTextColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
+    final secondaryTextColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final cardBg = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
+    final borderColor = isDark ? AppColors.borderHairlineDark : AppColors.borderHairlineLight;
+    final accentGreen = isDark ? AppColors.accentDark : AppColors.racingGreen;
+    final brassColor = isDark ? AppColors.brassDark : AppColors.mutedBrass;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Settings & Connection", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20)),
+        title: Text(
+          "Settings & Connectivity",
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: primaryTextColor),
+        ),
       ),
       body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20, vertical: AppSpacing.s16),
+        padding: const EdgeInsets.all(AppSpacing.s16),
         children: [
-          // 1. APPEARANCE / DARK MODE
-          _buildSectionHeader("APPEARANCE & THEME", isDark),
-          const SizedBox(height: 8),
-          ValueListenableBuilder<ThemeMode>(
-            valueListenable: themeModeNotifier,
-            builder: (ctx, currentMode, _) {
-              return Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.s16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: const [
-                              Icon(Icons.dark_mode_outlined, color: AppColors.appleCrimson, size: 20),
-                              SizedBox(width: 8),
-                              Text("Interface Theme", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                            ],
-                          ),
-                          Text(
-                            currentMode == ThemeMode.dark
-                                ? "Dark (OLED)"
-                                : currentMode == ThemeMode.light
-                                    ? "Light"
-                                    : "System",
-                            style: const TextStyle(color: AppColors.appleCrimson, fontWeight: FontWeight.bold, fontSize: 13),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          _buildThemeOption(
-                            label: "System",
-                            icon: Icons.brightness_auto,
-                            isSelected: currentMode == ThemeMode.system,
-                            onTap: () => setThemeMode(ThemeMode.system),
-                            isDark: isDark,
-                          ),
-                          const SizedBox(width: 8),
-                          _buildThemeOption(
-                            label: "Dark",
-                            icon: Icons.dark_mode,
-                            isSelected: currentMode == ThemeMode.dark,
-                            onTap: () => setThemeMode(ThemeMode.dark),
-                            isDark: isDark,
-                          ),
-                          const SizedBox(width: 8),
-                          _buildThemeOption(
-                            label: "Light",
-                            icon: Icons.light_mode,
-                            isSelected: currentMode == ThemeMode.light,
-                            onTap: () => setThemeMode(ThemeMode.light),
-                            isDark: isDark,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-
-          const SizedBox(height: AppSpacing.s24),
-
-          // 2. SAFETY SWITCH (GO LIVE)
-          _buildSectionHeader("APPLICATION SAFETY RAILS", isDark),
-          const SizedBox(height: 8),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.s16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text("Go-Live Live Submissions", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                            const SizedBox(height: 4),
-                            Text(
-                              _goLive
-                                  ? "ACTIVE: Submitting live applications directly to ATS portals."
-                                  : "DRY-RUN: Filling forms, testing validations and capturing proof screenshots without final submission.",
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: _goLive ? AppColors.iosRed : AppColors.iosGreen,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Switch.adaptive(
-                        value: _goLive,
-                        activeColor: AppColors.iosRed,
-                        onChanged: (_) => _toggleGoLive(),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+          // 1. Appearance / Theme
+          _buildSectionHeader("APPEARANCE & THEME", secondaryTextColor),
+          const SizedBox(height: AppSpacing.s8),
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.s16),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(AppRadii.card),
+              border: Border.all(color: borderColor),
             ),
-          ),
-
-          const SizedBox(height: AppSpacing.s24),
-
-          // 3. PC SERVER CONNECTION
-          _buildSectionHeader("TAILSCALE PRIVATE CONNECTION", isDark),
-          const SizedBox(height: 8),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.s16),
-              child: Column(
-                children: [
-                  TextField(
-                    controller: _urlCtrl,
-                    decoration: const InputDecoration(
-                      labelText: "Tailscale PC Server URL",
-                      hintText: "http://100.97.30.113:8000",
-                      isDense: true,
+            child: ValueListenableBuilder<ThemeMode>(
+              valueListenable: themeModeNotifier,
+              builder: (context, currentMode, _) {
+                return Column(
+                  children: [
+                    RadioListTile<ThemeMode>(
+                      title: const Text("Warm Ivory (Light Editorial)"),
+                      subtitle: const Text("Ivory #FAFAF7, British Racing Green & Muted Brass"),
+                      value: ThemeMode.light,
+                      groupValue: currentMode,
+                      activeColor: accentGreen,
+                      onChanged: (mode) => setThemeMode(mode!),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _tokenCtrl,
-                    decoration: const InputDecoration(
-                      labelText: "Bearer Auth Token",
-                      isDense: true,
+                    RadioListTile<ThemeMode>(
+                      title: const Text("Deep Forest Obsidian (Dark Editorial)"),
+                      subtitle: const Text("Deep Forest Slate & Emerald Racing Green"),
+                      value: ThemeMode.dark,
+                      groupValue: currentMode,
+                      activeColor: accentGreen,
+                      onChanged: (mode) => setThemeMode(mode!),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: AppColors.appleCrimson),
-                        ),
-                        icon: _testing
-                            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.appleCrimson))
-                            : const Icon(Icons.wifi_tethering, size: 16, color: AppColors.appleCrimson),
-                        label: const Text("Test Ping", style: TextStyle(color: AppColors.appleCrimson)),
-                        onPressed: _testing ? null : _testConnection,
-                      ),
-                      FilledButton(
-                        style: FilledButton.styleFrom(backgroundColor: AppColors.appleCrimson),
-                        onPressed: () async {
-                          await _api.saveConnectionSettings(_urlCtrl.text, _tokenCtrl.text);
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                backgroundColor: AppColors.iosGreen,
-                                content: Text("Connection settings saved."),
-                              ),
-                            );
-                          }
-                        },
-                        child: const Text("Save"),
-                      ),
-                    ],
-                  ),
-                  if (_pingResult.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      _pingResult,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: _pingResult.startsWith("Connected") ? AppColors.iosGreen : AppColors.iosRed,
-                        fontWeight: FontWeight.w500,
-                      ),
+                    RadioListTile<ThemeMode>(
+                      title: const Text("System Default"),
+                      value: ThemeMode.system,
+                      groupValue: currentMode,
+                      activeColor: accentGreen,
+                      onChanged: (mode) => setThemeMode(mode!),
                     ),
                   ],
-                ],
-              ),
+                );
+              },
             ),
           ),
 
-          const SizedBox(height: AppSpacing.s24),
+          const SizedBox(height: AppSpacing.s20),
 
-          // 4. SYSTEM & RELIABILITY
-          _buildSectionHeader("SYSTEM RELIABILITY & STORAGE", isDark),
-          const SizedBox(height: 8),
-          Card(
+          // 2. Tailscale PC Host Connection
+          _buildSectionHeader("TAILSCALE PC HOST CONNECTION", secondaryTextColor),
+          const SizedBox(height: AppSpacing.s8),
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.s16),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(AppRadii.card),
+              border: Border.all(color: borderColor),
+            ),
             child: Column(
-              children: const [
-                ListTile(
-                  leading: Icon(Icons.schedule, color: AppColors.appleCrimson),
-                  title: Text("Nightly Database Backup"),
-                  subtitle: Text("Daily at 03:00 IST to local backups/ folder with atomic hash"),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: _urlController,
+                  decoration: const InputDecoration(labelText: "Tailscale PC Server URL", hintText: "http://100.x.y.z:8000"),
                 ),
-                Divider(height: 1),
-                ListTile(
-                  leading: Icon(Icons.shield_outlined, color: AppColors.iosGreen),
-                  title: Text("Safety Circuit Breaker"),
-                  subtitle: Text("Auto-stops on 3 consecutive CAPTCHAs or rapid failure bursts"),
+                const SizedBox(height: AppSpacing.s12),
+                TextField(
+                  controller: _tokenController,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: "Bearer Auth Token"),
+                ),
+                const SizedBox(height: AppSpacing.s16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _testing ? null : _testAndSaveConnection,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: accentGreen,
+                          foregroundColor: AppColors.pureWhite,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
+                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12),
+                        ),
+                        icon: _testing
+                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.pureWhite))
+                            : const Icon(Icons.check_circle_outline, size: 18),
+                        label: const Text("Verify Connection"),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.s8),
+                    OutlinedButton(
+                      onPressed: _rotateToken,
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
+                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12, horizontal: AppSpacing.s12),
+                      ),
+                      child: const Text("Rotate Token"),
+                    ),
+                  ],
+                ),
+                if (_testResult != null) ...[
+                  const SizedBox(height: AppSpacing.s12),
+                  Text(
+                    _testResult!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: _testResult!.startsWith("Connection Verified") ? AppColors.successLight : AppColors.errorLight,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.s20),
+
+          // 3. Database & Backups
+          _buildSectionHeader("DATA PRESERVATION & BACKUPS", secondaryTextColor),
+          const SizedBox(height: AppSpacing.s8),
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.s16),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(AppRadii.card),
+              border: Border.all(color: borderColor),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("Nightly Backups & Integrity", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: primaryTextColor)),
+                const SizedBox(height: 4),
+                Text("Database snapshots are stored in /backups with timestamped tar archives.", style: TextStyle(fontSize: 11, color: secondaryTextColor)),
+                const SizedBox(height: AppSpacing.s12),
+                OutlinedButton.icon(
+                  onPressed: _triggerBackup,
+                  style: OutlinedButton.styleFrom(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
+                  ),
+                  icon: const Icon(Icons.backup_outlined, size: 16),
+                  label: const Text("Trigger Immediate Nightly Backup"),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: AppSpacing.s32),
+
+          const SizedBox(height: AppSpacing.s20),
+
+          // 4. About & Version
+          Center(
+            child: Column(
+              children: [
+                Text("ApplyPilot • Autonomous Career Cockpit v1.2.0", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: secondaryTextColor)),
+                const SizedBox(height: 2),
+                Text("FastAPI + Playwright on Windows Host ↔ Flutter on Android", style: TextStyle(fontSize: 10, color: secondaryTextColor)),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s24),
         ],
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title, bool isDark) {
+  Widget _buildSectionHeader(String title, Color color) {
     return Text(
       title,
-      style: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.bold,
-        letterSpacing: 1.1,
-        color: isDark ? const Color(0xFF8E8E93) : const Color(0xFF636366),
-      ),
-    );
-  }
-
-  Widget _buildThemeOption({
-    required String label,
-    required IconData icon,
-    required bool isSelected,
-    required VoidCallback onTap,
-    required bool isDark,
-  }) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? AppColors.appleCrimson.withOpacity(0.18)
-                : (isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E5EA)),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: isSelected ? AppColors.appleCrimson : Colors.transparent,
-              width: 1.2,
-            ),
-          ),
-          child: Column(
-            children: [
-              Icon(icon, size: 20, color: isSelected ? AppColors.appleCrimson : null),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  color: isSelected ? AppColors.appleCrimson : null,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: color),
     );
   }
 }

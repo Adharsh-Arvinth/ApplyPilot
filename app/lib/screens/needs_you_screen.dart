@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
 
@@ -10,74 +11,80 @@ class NeedsYouScreen extends StatefulWidget {
 }
 
 class _NeedsYouScreenState extends State<NeedsYouScreen> {
-  final _api = ApiClient();
+  final ApiClient _api = ApiClient();
   bool _loading = true;
   List<dynamic> _items = [];
   final Map<int, TextEditingController> _controllers = {};
   final Map<int, bool> _saveToBank = {};
-
-  // Quick-answer chips strictly grounded in candidate's verified proof points
-  final List<String> _proofPointChips = [
-    "Yes, authorized to work in India with no sponsorship needed.",
-    "MTech Integrated CSE (Data Science), VIT Vellore (CGPA 7.62/10).",
-    "Inventor of 2 published patents (Driver Accident Predictor & Doppler Session Guard).",
-    "Built Agentic Code Intelligence benchmarked at 25.59% NDCG@10 on MTEB.",
-    "AWS Certified Solutions Architect with Python/PyTorch/FastAPI experience.",
-    "Immediate / Negotiable for academic schedule.",
-    "Expected CTC: ₹7,00,000 per year minimum, negotiable."
-  ];
+  final Map<int, String> _modes = {};
 
   @override
   void initState() {
     super.initState();
-    _fetchItems();
+    _loadNeedsYou();
   }
 
   @override
   void dispose() {
-    for (var c in _controllers.values) {
+    for (final c in _controllers.values) {
       c.dispose();
     }
     super.dispose();
   }
 
-  Future<void> _fetchItems() async {
+  Future<void> _loadNeedsYou() async {
     setState(() => _loading = true);
     try {
       final items = await _api.getNeedsYou();
       if (mounted) {
         setState(() {
           _items = items;
-          for (var item in items) {
-            final id = item["id"] as int;
-            if (!_controllers.containsKey(id)) {
-              _controllers[id] = TextEditingController(text: item["suggested_answer"] ?? "");
-              _saveToBank[id] = true;
-            }
-          }
           _loading = false;
         });
+        for (final item in items) {
+          final id = item["id"] as int;
+          if (!_controllers.containsKey(id)) {
+            _controllers[id] = TextEditingController(text: item["suggested_answer"] ?? item["answer"] ?? "");
+            _saveToBank[id] = true;
+            _modes[id] = "always_use";
+          }
+        }
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   Future<void> _resolveItem(int id) async {
-    final text = _controllers[id]?.text.trim() ?? "";
-    if (text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please provide an answer.")));
+    HapticFeedback.mediumImpact();
+    final answerText = _controllers[id]?.text.trim() ?? "";
+    if (answerText.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please provide an answer before submitting.")));
       return;
     }
 
     try {
-      await _api.resolveNeedsYou(id, text, saveToBank: _saveToBank[id] ?? true);
+      await _api.resolveNeedsYou(
+        id,
+        answerText,
+        saveToBank: _saveToBank[id] ?? true,
+        mode: _modes[id] ?? "always_use",
+      );
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Answer saved! Application resumed automatically.")),
       );
-      _fetchItems();
+      _loadNeedsYou();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to resolve: $e")));
+    }
+  }
+
+  Future<void> _dismissItem(int id) async {
+    HapticFeedback.lightImpact();
+    try {
+      await _api.dismissNeedsYou(id);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Question dismissed.")));
+      _loadNeedsYou();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
     }
@@ -85,18 +92,29 @@ class _NeedsYouScreenState extends State<NeedsYouScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryTextColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
+    final secondaryTextColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final cardBg = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
+    final borderColor = isDark ? AppColors.borderHairlineDark : AppColors.borderHairlineLight;
+    final accentGreen = isDark ? AppColors.accentDark : AppColors.racingGreen;
+    final brassColor = isDark ? AppColors.brassDark : AppColors.mutedBrass;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Needs You", style: TextStyle(fontWeight: FontWeight.w500, fontSize: 18)),
+        title: Text(
+          "Needs You Inbox",
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: primaryTextColor),
+        ),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh, size: 20), onPressed: _fetchItems),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadNeedsYou,
+          ),
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+          ? Center(child: CircularProgressIndicator(strokeWidth: 2, color: accentGreen))
           : _items.isEmpty
               ? Center(
                   child: Padding(
@@ -104,183 +122,212 @@ class _NeedsYouScreenState extends State<NeedsYouScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.done_all_rounded,
-                          size: 40,
-                          color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.s20),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: accentGreen.withOpacity(0.08),
+                          ),
+                          child: Icon(Icons.done_all, size: 48, color: accentGreen),
                         ),
-                        const SizedBox(height: AppSpacing.s16),
-                        Text("Inbox Clear", style: theme.textTheme.titleMedium),
+                        const SizedBox(height: AppSpacing.s20),
+                        Text(
+                          "All Caught Up",
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: primaryTextColor),
+                        ),
                         const SizedBox(height: AppSpacing.s8),
                         Text(
-                          "All eligible applications have been answered from the Answer Bank. No human intervention needed.",
+                          "The auto-apply engine has all the candidate intelligence it needs. Any new custom form questions will arrive here for your 1-tap review.",
                           textAlign: TextAlign.center,
-                          style: theme.textTheme.bodyMedium,
+                          style: TextStyle(fontSize: 13, height: 1.4, color: secondaryTextColor),
                         ),
                       ],
                     ),
                   ),
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.all(AppSpacing.s20),
+                  padding: const EdgeInsets.all(AppSpacing.s16),
                   itemCount: _items.length,
-                  itemBuilder: (ctx, i) {
-                    final item = _items[i];
+                  itemBuilder: (context, idx) {
+                    final item = _items[idx];
                     final id = item["id"] as int;
-                    final controller = _controllers[id]!;
+                    final controller = _controllers[id];
                     final options = (item["options"] as List<dynamic>?) ?? [];
 
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: AppSpacing.s20),
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.s20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Company & Role badge
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: AppSpacing.s16),
+                      decoration: BoxDecoration(
+                        color: cardBg,
+                        borderRadius: BorderRadius.circular(AppRadii.card),
+                        border: Border.all(color: brassColor.withOpacity(0.4)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Header: Company + Role Badge
+                          Container(
+                            padding: const EdgeInsets.all(AppSpacing.s16),
+                            decoration: BoxDecoration(
+                              color: brassColor.withOpacity(0.08),
+                              borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.card)),
+                            ),
+                            child: Row(
                               children: [
-                                Text(
-                                  item["company"] ?? "",
-                                  style: theme.textTheme.titleLarge?.copyWith(fontSize: 16),
+                                Icon(Icons.assignment_late_outlined, size: 18, color: brassColor),
+                                const SizedBox(width: AppSpacing.s8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item["company"] ?? "Unknown Company",
+                                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: primaryTextColor),
+                                      ),
+                                      Text(
+                                        item["role"] ?? "Target Position",
+                                        style: TextStyle(fontSize: 11, color: secondaryTextColor),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.s8,
-                                    vertical: AppSpacing.s4,
-                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8, vertical: AppSpacing.s4),
                                   decoration: BoxDecoration(
-                                    color: AppColors.warningLight.withOpacity(0.12),
+                                    color: cardBg,
                                     borderRadius: BorderRadius.circular(AppRadii.badge),
+                                    border: Border.all(color: borderColor),
                                   ),
                                   child: Text(
-                                    "Awaiting Input",
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w500,
-                                      color: isDark ? AppColors.warningDark : AppColors.warningLight,
+                                    (item["field_type"] ?? "text").toString().toUpperCase(),
+                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: secondaryTextColor),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          Padding(
+                            padding: const EdgeInsets.all(AppSpacing.s16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "QUESTION FROM ATS FORM",
+                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.8, color: secondaryTextColor),
+                                ),
+                                const SizedBox(height: AppSpacing.s6),
+                                Text(
+                                  item["question_text"] ?? "",
+                                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: primaryTextColor),
+                                ),
+                                const SizedBox(height: AppSpacing.s16),
+
+                                // If dropdown options exist, display quick chips
+                                if (options.isNotEmpty) ...[
+                                  Text(
+                                    "SELECT OPTION",
+                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: secondaryTextColor),
+                                  ),
+                                  const SizedBox(height: AppSpacing.s6),
+                                  Wrap(
+                                    spacing: AppSpacing.s8,
+                                    runSpacing: AppSpacing.s6,
+                                    children: options.map<Widget>((opt) {
+                                      final optStr = opt.toString();
+                                      final isSelected = controller?.text == optStr;
+                                      return ChoiceChip(
+                                        label: Text(optStr, style: TextStyle(fontSize: 12, color: isSelected ? AppColors.pureWhite : primaryTextColor)),
+                                        selected: isSelected,
+                                        selectedColor: accentGreen,
+                                        backgroundColor: cardBg,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
+                                        onSelected: (val) {
+                                          if (val) {
+                                            setState(() => controller?.text = optStr);
+                                          }
+                                        },
+                                      );
+                                    }).toList(),
+                                  ),
+                                  const SizedBox(height: AppSpacing.s12),
+                                ],
+
+                                Text(
+                                  "YOUR ANSWER",
+                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: secondaryTextColor),
+                                ),
+                                const SizedBox(height: AppSpacing.s6),
+                                TextField(
+                                  controller: controller,
+                                  maxLines: (item["field_type"] == "textarea") ? 4 : 1,
+                                  decoration: InputDecoration(
+                                    filled: true,
+                                    fillColor: isDark ? AppColors.surfaceSubtleDark : AppColors.surfaceSubtleLight,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(AppRadii.control),
+                                      borderSide: BorderSide(color: borderColor),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(AppRadii.control),
+                                      borderSide: BorderSide(color: borderColor),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(AppRadii.control),
+                                      borderSide: BorderSide(color: accentGreen, width: 1.5),
                                     ),
                                   ),
                                 ),
+                                const SizedBox(height: AppSpacing.s12),
+
+                                // Answer Bank Memory Options
+                                Row(
+                                  children: [
+                                    Checkbox(
+                                      value: _saveToBank[id] ?? true,
+                                      activeColor: accentGreen,
+                                      onChanged: (val) => setState(() => _saveToBank[id] = val ?? true),
+                                    ),
+                                    Expanded(
+                                      child: Text(
+                                        "Save to Answer Bank (never ask again)",
+                                        style: TextStyle(fontSize: 12, color: primaryTextColor),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ],
                             ),
-                            const SizedBox(height: AppSpacing.s4),
-                            Text(
-                              item["role"] ?? "",
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                              ),
+                          ),
+
+                          // Action Buttons
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16, vertical: AppSpacing.s12),
+                            decoration: BoxDecoration(
+                              border: Border(top: BorderSide(color: borderColor)),
                             ),
-                            const SizedBox(height: AppSpacing.s16),
-                            const Divider(height: 1),
-                            const SizedBox(height: AppSpacing.s16),
-
-                            // Question
-                            Text("Question:", style: theme.textTheme.labelSmall),
-                            const SizedBox(height: AppSpacing.s4),
-                            Text(
-                              item["question_text"] ?? "",
-                              style: theme.textTheme.titleMedium?.copyWith(fontSize: 14, height: 1.4),
-                            ),
-                            const SizedBox(height: AppSpacing.s16),
-
-                            // Option Chips if multiple choice
-                            if (options.isNotEmpty) ...[
-                              Text("Options from form:", style: theme.textTheme.labelSmall),
-                              const SizedBox(height: AppSpacing.s8),
-                              Wrap(
-                                spacing: AppSpacing.s8,
-                                runSpacing: AppSpacing.s8,
-                                children: options.map((opt) {
-                                  return ActionChip(
-                                    label: Text(opt.toString()),
-                                    onPressed: () {
-                                      setState(() {
-                                        controller.text = opt.toString();
-                                      });
-                                    },
-                                  );
-                                }).toList(),
-                              ),
-                              const SizedBox(height: AppSpacing.s16),
-                            ],
-
-                            // Proof Point Quick-fill Chips
-                            Text("Quick Answer from Verified Facts:", style: theme.textTheme.labelSmall),
-                            const SizedBox(height: AppSpacing.s8),
-                            Wrap(
-                              spacing: AppSpacing.s8,
-                              runSpacing: AppSpacing.s8,
-                              children: _proofPointChips.take(4).map((chipText) {
-                                return ActionChip(
-                                  label: Text(
-                                    chipText.length > 36 ? "${chipText.substring(0, 36)}..." : chipText,
-                                    style: const TextStyle(fontSize: 11),
-                                  ),
-                                  onPressed: () {
-                                    setState(() {
-                                      controller.text = chipText;
-                                    });
-                                  },
-                                );
-                              }).toList(),
-                            ),
-                            const SizedBox(height: AppSpacing.s16),
-
-                            // Input Box
-                            TextField(
-                              controller: controller,
-                              maxLines: 3,
-                              decoration: InputDecoration(
-                                hintText: "Type answer here...",
-                                filled: true,
-                                fillColor: isDark ? AppColors.surfaceSubtleDark : AppColors.surfaceSubtleLight,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(AppRadii.control),
-                                  borderSide: BorderSide(
-                                    color: isDark ? AppColors.borderHairlineDark : AppColors.borderHairlineLight,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: AppSpacing.s12),
-
-                            // Save to Answer Bank Checkbox
-                            Row(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
                               children: [
-                                Checkbox(
-                                  value: _saveToBank[id] ?? true,
-                                  onChanged: (v) => setState(() => _saveToBank[id] = v ?? true),
+                                TextButton(
+                                  onPressed: () => _dismissItem(id),
+                                  child: Text("Dismiss", style: TextStyle(color: secondaryTextColor)),
                                 ),
-                                Text(
-                                  "Remember in Answer Bank (never ask again)",
-                                  style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13),
+                                const SizedBox(width: AppSpacing.s8),
+                                ElevatedButton.icon(
+                                  onPressed: () => _resolveItem(id),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: accentGreen,
+                                    foregroundColor: AppColors.pureWhite,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
+                                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s16, vertical: AppSpacing.s10),
+                                  ),
+                                  icon: const Icon(Icons.send, size: 16),
+                                  label: const Text("Submit & Auto-Resume", style: TextStyle(fontWeight: FontWeight.bold)),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: AppSpacing.s12),
-
-                            // Action Button
-                            SizedBox(
-                              width: double.infinity,
-                              child: FilledButton(
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: AppColors.accentLight,
-                                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(AppRadii.control),
-                                  ),
-                                ),
-                                onPressed: () => _resolveItem(id),
-                                child: const Text(
-                                  "Save & Auto-Resume",
-                                  style: TextStyle(fontWeight: FontWeight.w500),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     );
                   },

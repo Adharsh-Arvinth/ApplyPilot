@@ -1,5 +1,6 @@
 import io
 import json
+import secrets
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pypdf import PdfReader
@@ -8,19 +9,23 @@ from backend.app.core.config import settings
 from backend.app.core.database import get_db
 from backend.app.core.security import verify_token
 from backend.app.models import Profile, RunLog
-from backend.app.schemas import ProfileOut, ProfileUpdate
+from backend.app.schemas import ProfileOut, ProfileUpdate, TokenRotationOut
 
 router = APIRouter(prefix="/profile", tags=["Profile"], dependencies=[Depends(verify_token)])
 
 def _format_profile_out(p: Profile) -> dict:
     try:
-        roles = json.loads(p.target_roles_json)
+        roles = json.loads(p.target_roles_json) if p.target_roles_json else []
     except Exception:
         roles = []
     try:
-        locations = json.loads(p.locations_json)
+        locations = json.loads(p.locations_json) if p.locations_json else []
     except Exception:
         locations = []
+    try:
+        excluded = json.loads(p.excluded_companies_json) if p.excluded_companies_json else []
+    except Exception:
+        excluded = []
 
     return {
         "id": p.id,
@@ -38,6 +43,7 @@ def _format_profile_out(p: Profile) -> dict:
         "preferred_work_mode": p.preferred_work_mode,
         "target_roles": roles,
         "locations": locations,
+        "excluded_companies": excluded,
         "min_salary_inr": p.min_salary_inr,
         "daily_cap": p.daily_cap,
         "hourly_cap": p.hourly_cap,
@@ -69,6 +75,8 @@ def update_profile(update: ProfileUpdate, db: Session = Depends(get_db)):
             profile.target_roles_json = json.dumps(val)
         elif field == "locations":
             profile.locations_json = json.dumps(val)
+        elif field == "excluded_companies":
+            profile.excluded_companies_json = json.dumps(val)
         elif hasattr(profile, field):
             setattr(profile, field, val)
 
@@ -93,6 +101,48 @@ def toggle_go_live(db: Session = Depends(get_db)):
     profile.go_live = not profile.go_live
     db.commit()
     return {"go_live": profile.go_live, "mode": "LIVE" if profile.go_live else "DRY_RUN"}
+
+@router.post("/rotate-token", response_model=TokenRotationOut, summary="Rotate Security Bearer Token")
+def rotate_token(db: Session = Depends(get_db)):
+    new_token = secrets.token_urlsafe(32)
+    settings.APPLYPILOT_TOKEN = new_token
+    
+    # Save to .env if present
+    env_file = settings.BASE_DIR / ".env"
+    try:
+        lines = []
+        if env_file.exists():
+            with open(env_file, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+        
+        token_written = False
+        new_lines = []
+        for line in lines:
+            if line.startswith("APPLYPILOT_TOKEN="):
+                new_lines.append(f"APPLYPILOT_TOKEN={new_token}\n")
+                token_written = True
+            else:
+                new_lines.append(line)
+        if not token_written:
+            new_lines.append(f"APPLYPILOT_TOKEN={new_token}\n")
+
+        with open(env_file, "w", encoding="utf-8") as f:
+            f.writelines(new_lines)
+    except Exception:
+        pass
+
+    db.add(RunLog(
+        event_type="security",
+        message="API Bearer Token rotated successfully.",
+        level="info"
+    ))
+    db.commit()
+
+    return {
+        "status": "success",
+        "new_token": new_token,
+        "message": "Token rotated successfully. Update your mobile cockpit settings with this new token."
+    }
 
 @router.post("/resume", summary="Upload and parse Master Resume PDF")
 async def upload_resume(file: UploadFile = File(...), db: Session = Depends(get_db)):

@@ -23,9 +23,10 @@ class Profile(Base):
     relocation_preference = Column(String(64), default="Yes")
     preferred_work_mode = Column(String(64), default="Remote / Hybrid / Onsite")
     
-    # Target roles & locations (JSON stringified)
+    # Target roles, locations & excluded companies (JSON stringified)
     target_roles_json = Column(Text, default='["Data Scientist", "ML Engineer", "Data Analyst", "Analytics Engineer", "Python Developer", "Backend Developer", "AI Engineer", "GenAI Engineer", "Computer Vision Engineer"]')
     locations_json = Column(Text, default='["Remote", "Bengaluru", "Chennai", "Hyderabad", "Pune", "Coimbatore", "Mumbai", "Delhi NCR"]')
+    excluded_companies_json = Column(Text, default='[]')
     
     min_salary_inr = Column(Integer, default=700000) # 7 LPA
     daily_cap = Column(Integer, default=100)
@@ -58,7 +59,31 @@ class AnswerBank(Base):
     mode = Column(String(32), default="always_use") # always_use, ask_each_time
     category = Column(String(64), default="general") # personal, education, work_auth, technical, behavioral, custom
     usage_count = Column(Integer, default=0)
+    
+    # Candidate Intelligence enhancements
+    source = Column(String(64), default="candidate_profile") # candidate_profile, verified_patent, resume_pdf, manual_entry, ai_suggestion
+    is_verified = Column(Boolean, default=True) # True = human/system verified, False = AI suggested
+    supporting_evidence = Column(Text, default="")
+    allow_reuse = Column(Boolean, default=True)
+    
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class ResumeVersion(Base):
+    __tablename__ = "resume_versions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    version_name = Column(String(128), nullable=False) # e.g. "Master ATS Resume", "Data Science & ML Focus", "AI Systems Focus"
+    target_role = Column(String(128), default="General")
+    content_html = Column(Text, default="")
+    pdf_path = Column(String(256), default="")
+    keyword_tags_json = Column(Text, default="[]")
+    ats_score = Column(Float, default=95.0)
+    is_master = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+    applications = relationship("Application", back_populates="resume_version")
 
 
 class Job(Base):
@@ -70,17 +95,32 @@ class Job(Base):
     title = Column(String(256), nullable=False)
     url = Column(String(512), unique=True, index=True, nullable=False)
     location = Column(String(128), default="India")
+    work_mode = Column(String(32), default="remote") # remote, hybrid, onsite
+    experience_required = Column(String(64), default="0-1 years")
     salary_raw = Column(String(128), default="")
     salary_numeric = Column(Integer, default=0)
     posted_at = Column(DateTime, default=utcnow)
     
-    score = Column(Float, default=0.0) # 1.0 to 5.0
+    score = Column(Float, default=0.0) # 1.0 to 5.0 (Composite Fit)
     score_reason = Column(Text, default="")
     
-    # Status progression:
-    # DISCOVERED -> SCORED -> QUEUED / MAYBE -> APPLYING -> APPLIED / NEEDS_INPUT / BLOCKED / REJECTED / INTERVIEW
+    # Explainable Fit Scoring breakdown (0.0 to 100.0 or 1.0 to 5.0)
+    skills_score = Column(Float, default=0.0)
+    experience_score = Column(Float, default=0.0)
+    education_score = Column(Float, default=0.0)
+    location_score = Column(Float, default=0.0)
+    compensation_score = Column(Float, default=0.0)
+    fit_breakdown_json = Column(Text, default="{}")
+    
+    # Complete Application Lifecycle Progression:
+    # DISCOVERED -> EVALUATED -> APPROVED (QUEUED) -> PREPARING -> AWAITING_REVIEW -> SUBMITTED -> INTERVIEW -> OFFER / REJECTED / WITHDRAWN / BLOCKED
     status = Column(String(32), index=True, default="discovered")
     skip_reason = Column(Text, default="")
+    
+    # Tracking & CRM fields
+    notes = Column(Text, default="")
+    recruiter_info = Column(String(256), default="")
+    follow_up_date = Column(DateTime, nullable=True)
     
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
@@ -94,14 +134,23 @@ class Application(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     job_id = Column(Integer, ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True)
+    resume_version_id = Column(Integer, ForeignKey("resume_versions.id", ondelete="SET NULL"), nullable=True)
     resume_file = Column(String(256), default="")
+    
+    applied_at = Column(DateTime, default=utcnow)
     submitted_at = Column(DateTime, default=utcnow)
     form_screenshot = Column(String(256), default="")
     confirmation_screenshot = Column(String(256), default="")
-    status = Column(String(32), default="dry_run") # dry_run, submitted, failed
+    submission_evidence_json = Column(Text, default="{}") # Contains response code, form field dump, hash
+    
+    status = Column(String(32), default="dry_run") # dry_run, submitted, failed, interview, offer
     failure_reason = Column(Text, default="")
+    notes = Column(Text, default="")
+    recruiter_info = Column(String(256), default="")
+    follow_up_date = Column(DateTime, nullable=True)
     
     job = relationship("Job", back_populates="applications")
+    resume_version = relationship("ResumeVersion", back_populates="applications")
 
 
 class NeedsInput(Base):

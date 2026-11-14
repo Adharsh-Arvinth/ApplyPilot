@@ -1,127 +1,207 @@
-# ApplyPilot
+# ApplyPilot — Autonomous Career Command Center & Application Cockpit
 
-**ApplyPilot** is an autonomous, candidate-first job application cockpit for Android with an always-on Windows PC backend. It automates high-volume discovery, fit scoring, resume tailoring, and form filling while pulling you in *only* when a form needs information it doesn't have. Whatever you answer is remembered and reused automatically from then on.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688.svg?logo=fastapi)](https://fastapi.tiangolo.com)
+[![Flutter](https://img.shields.io/badge/Frontend-Flutter%203.x-02569B.svg?logo=flutter)](https://flutter.dev)
+[![Playwright](https://img.shields.io/badge/Automation-Playwright-2EAD33.svg?logo=playwright)](https://playwright.dev)
+[![Tailscale](https://img.shields.io/badge/Network-Tailscale%20Mesh%20VPN-4F46E5.svg?logo=tailscale)](https://tailscale.com)
+[![Tests: 31 passed](https://img.shields.io/badge/Tests-31%20Passed-brightgreen.svg)]()
 
----
-
-## Key Features
-
-- **Mobile Cockpit (Android Flutter App)**:
-  - Designed under Damir Sokolovsky's **[unslop](https://github.com/heydamir/unslop)** principles (warm ivory `#FAFAF7`, British racing green `#1B4332`, 4-pt grid, tabular figures, no gradients/emojis/colored shadows).
-  - Real-time Progress Gauge (daily applied vs cap), stat cards (Applied, Needs You, Interviews), and live execution logs.
-  - **Needs You Inbox**: Focus cards with quick-answer chips derived strictly from your verified facts. One tap answers the form, saves the answer to the Answer Bank forever, and immediately auto-resumes the application.
-  - **Jobs & Maybe Swipe Tab**: Direct swipe deck for borderline matches (score 3.0–3.9).
-  - **Assist Mode**: Pre-filled answer sheets and tailored CVs for non-ATS boards (LinkedIn Easy Apply, Naukri) with a one-tap "Mark as applied" button.
-- **24/7 Always-On Windows Backend (FastAPI + Playwright)**:
-  - Runs locally on your Windows PC via Windows Service / Task Scheduler (`install-service.bat`).
-  - Zero router ports exposed: connects securely to your phone from anywhere via **Tailscale private mesh VPN**.
-  - Single-user Bearer token authentication + AES-256 Fernet encryption for sensitive profile data at rest.
-  - Automated nightly backup of SQLite database and Answer Bank to `backups/`.
-- **Strict Safety Rails**:
-  - **Dry-Run by Default**: Form filling and full-page screenshots are captured, but **zero applications are submitted** until you explicitly switch "Go Live" on the phone app.
-  - **Zero Fabrication**: AI resume tailoring and answer generation strictly use only your verified proof points (VIT Vellore MTech 7.62 CGPA, 2 published patents, Agentic Code Intelligence benchmark, AWS Solutions Architect certification).
-  - **Deduplication Cooldown**: Automatically blocks re-applying to the same company within 30 days.
-  - **Safety Circuit Breaker**: Automatically pauses the queue if 3 consecutive CAPTCHA challenges or execution errors occur.
+**ApplyPilot** is an autonomous, candidate-first job application cockpit designed for Android with an always-on Windows PC backend. It automates high-volume job discovery, explainable 5-factor fit scoring, dynamic resume tailoring, and ATS form filling, while escalating to you **only** when an application genuinely requires human input. Every answer you provide is permanently remembered in the Answer Bank and reused for future forms.
 
 ---
 
-## Quickstart
+## System Architecture
+
+```mermaid
+flowchart TD
+    subgraph MobileCockpit ["Android Mobile Cockpit (Flutter 3.x Material 3)"]
+        Dashboard["1. Home Dashboard"]
+        Discover["2. Discover Jobs"]
+        Inbox["3. Needs You Inbox"]
+        Tracker["4. Application Tracker"]
+        Analytics["5. Analytics Dashboard"]
+        AnswerBank["6. Answer Bank"]
+        ResumeMgr["7. Resume Manager"]
+        ProfileScreen["8. Candidate Profile"]
+        AutomationHub["9. Automation Control"]
+        SettingsScreen["10. Settings & Security"]
+    end
+
+    subgraph SecureNetwork ["Encrypted Private Mesh Network (Tailscale)"]
+        VPN["WireGuard-Encrypted Mesh VPN (Zero Open Router Ports)"]
+    end
+
+    subgraph WindowsHost ["24/7 Always-On Windows PC Backend"]
+        FastAPI["FastAPI 0.115 Async REST Engine (0.0.0.0:8000)"]
+        SQLite["SQLite WAL Mode with Zero-Downtime Auto-Migration"]
+        AuthModule["Bearer Token Auth & AES-256 Fernet Encryption"]
+        ScoringEngine["Explainable 5-Factor Fit Scoring"]
+        TailorEngine["Keyword-Coverage Resume Tailoring (HTML / PDF)"]
+        PlaywrightEngine["Playwright Headless Automation (Greenhouse, Lever, Ashby, Workable)"]
+        SafetyGate["Safety Rails: Dry-Run, 30-Day Cooldown, Circuit Breaker"]
+        BackupService["Automated Nightly Timestamped DB Backups"]
+    end
+
+    MobileCockpit <-->|Private Tailscale IP:8000| VPN
+    VPN <-->|Bearer Token Auth| FastAPI
+    FastAPI --> SQLite
+    FastAPI --> ScoringEngine
+    FastAPI --> TailorEngine
+    FastAPI --> PlaywrightEngine
+    PlaywrightEngine --> SafetyGate
+    SQLite --> BackupService
+```
+
+---
+
+## Unslopped Editorial Design System
+
+ApplyPilot features a bespoke **unslopped** editorial aesthetic adhering to strict typography, color, and spacing guidelines:
+
+- **Primary Identity**: Warm Ivory (`#FAFAF7`), British Racing Green (`#1B4332`), Pure White surfaces (`#FFFFFF`), and Muted Brass accents (`#C5A880` / `#D4AF37`).
+- **Obsidian Dark Mode**: Deep Forest Slate (`#0D1912`, `#14251B`) with vibrant green glows (`#40916C`) and hairline border separation (`#253F30`).
+- **Strict 4-pt Spacing Grid**: `s2` (2dp), `s4` (4dp), `s6` (6dp), `s8` (8dp), `s12` (12dp), `s16` (16dp), `s20` (20dp), `s24` (24dp), `s32` (32dp).
+- **Typography**: Inter / Manrope hierarchy with strict tabular figures for metrics, financial values, and timestamps.
+- **Micro-Interactions**: Haptic touch feedback, zero decorative placeholder controls, and full accessibility compliance (48dp minimum touch targets).
+
+---
+
+## 10 Dedicated Screens & Workflows
+
+| # | Screen | Description |
+|---|---|---|
+| **1** | **Home Dashboard** | Career Command Center displaying today's progress vs target, active interviews, Needs You alerts, 7-day velocity chart, and live execution stream. |
+| **2** | **Discover Jobs** | Job stream with explainable fit scores, remote/hybrid filters, company exclusion shortcuts, and one-tap resume tailor previews. |
+| **3** | **Needs You Inbox** | Human-in-the-loop review queue for blocker questions. Quick-answer chips, custom editor, and automatic Answer Bank synchronization with auto-resume. |
+| **4** | **Application Tracker** | Dual-view Kanban and List tracker across the 7-stage lifecycle (`Discovered` &rarr; `Evaluated` &rarr; `Approved` &rarr; `Submitted` &rarr; `Interview` &rarr; `Offer` / `Rejected`). Includes recruiter info, notes editor, and submission proof. |
+| **5** | **Analytics Dashboard** | Real database metrics: 7-day velocity, monthly application volume, fit-score distribution histogram, ATS platform breakdown, and top companies. |
+| **6** | **Answer Bank** | Candidate knowledge base distinguishing verified facts from AI suggestions, complete with source citations, proof points, reuse toggles, and CRUD controls. |
+| **7** | **Resume Manager** | Resume portfolio with ATS compatibility scoring, live keyword-coverage simulation, missing qualification alerts, and master PDF export. |
+| **8** | **Candidate Profile** | Live candidate identity, education, CGPA, target roles, preferred locations, excluded companies manager, and PyPDF resume parsing. |
+| **9** | **Automation Control** | Operational cockpit featuring Dry-Run vs Live switch with double confirmation modal, emergency pause switch, daily/hourly caps, and real-time execution logs. |
+| **10** | **Settings & Security** | Light/Dark theme toggle, Tailscale connection ping test, single-tap Bearer token rotation, nightly backup trigger, and database export. |
+
+---
+
+## Multi-Layer Safety Architecture
+
+ApplyPilot is designed from the ground up to prevent spamming, duplicate submissions, account blacklisting, and hallucination:
+
+1. **Dry-Run by Default**:
+   - `profile.go_live` is initialized to `False`. The engine fills forms, uploads resumes, captures full-page confirmation screenshots, but **never clicks the final Submit button** without explicit user confirmation.
+2. **Zero-Hallucination Bounded Intelligence**:
+   - Every tailored resume and generated form answer is derived strictly from verified credentials in the database (e.g. VIT Vellore Integrated MTech CSE Data Science, 2 published patents, Agentic Code Intelligence benchmark, AWS Solutions Architect certification).
+   - The engine never invents projects, GPAs, degrees, or employers.
+3. **30-Day Per-Company Cooldown**:
+   - The database enforces a strict 30-day deduplication window. Even across different job listings or job boards, ApplyPilot will never apply to the same company twice within a month.
+4. **Safety Circuit Breakers**:
+   - The automation queue automatically trips and enters an emergency pause if 3 consecutive failures, network drops, or CAPTCHA roadblocks occur.
+5. **No CAPTCHA Bypassing**:
+   - ApplyPilot never solves or automates CAPTCHA or bot challenges. Any challenge detected immediately halts the worker and escalates the application to the **Needs You Inbox** or Assist Mode.
+6. **Configurable Daily & Hourly Caps**:
+   - Hard rate-limiting caps ensure that candidate profiles stay within normal human browsing patterns (e.g., 20–50 applications/day).
+
+---
+
+## ATS Engine & Automation Support
+
+| ATS Platform | Mode | Form Filling | File Upload | Confirmation Proof |
+|---|---|---|---|---|
+| **Greenhouse** | Full Auto / Dry-Run | Text, dropdowns, radio, checkboxes | Tailored PDF Upload | Full-page Screenshot |
+| **Lever** | Full Auto / Dry-Run | Structured form fields & custom questions | Tailored PDF Upload | Full-page Screenshot |
+| **Ashby** | Full Auto / Dry-Run | Dynamic multi-step reactive forms | Tailored PDF Upload | Full-page Screenshot |
+| **Workable** | Full Auto / Dry-Run | Sectioned application questionnaires | Tailored PDF Upload | Full-page Screenshot |
+| **LinkedIn / Naukri** | Assist Mode | Pre-filled clipboard sheets & tailored CV | One-tap browser launch | Manual verification |
+
+---
+
+## Backend API Specification
+
+The FastAPI backend exposes 7 modular routers under `/api/v1`:
+
+- **`/health`**: Server uptime, WAL mode integrity, connection status, pause state, and Go-Live gate status.
+- **`/profile`**: Candidate profile management, target role/location management, excluded company lists, PDF master resume uploads, and Bearer token rotation (`POST /profile/rotate-token`).
+- **`/answer-bank`**: Question-answer bank CRUD with verification flags, source evidence tags, and category indexing.
+- **`/jobs`**: Ingestion, discovery triggers, explainable fit scoring (`POST /jobs/evaluate`), Kanban lifecycle board (`GET /jobs/kanban`), lifecycle status updates (`PUT /jobs/{id}/status`), notes/recruiter info updates, and PDF tailoring triggers.
+- **`/needs-you`**: Blocker inbox management, quick-answer chip generation, and auto-resume execution.
+- **`/resumes`**: Master resume version management, tailoring simulation with keyword coverage analysis, and ATS scoring.
+- **`/analytics`**: Real-time aggregated database statistics, application velocity, match distribution, and platform breakdowns.
+
+---
+
+## Quickstart & Installation
 
 ### 1. Configure Windows Always-On Power Settings
-Double-click:
+Run from an elevated command prompt or double click:
 ```cmd
 configure-power.bat
 ```
-*Configures Windows to never sleep or hibernate while plugged in, even when closing laptop lid.*
+*Configures Windows to keep network and CPU active while plugged in, even when the laptop lid is closed.*
 
-### 2. Start the Backend Host
-Double-click:
+### 2. Start the Windows Backend Host
 ```cmd
 start-backend.bat
 ```
-*Starts the FastAPI server on `0.0.0.0:8000`. To register it as an automatic Windows boot service, run `install-service.bat` as Administrator.*
+*Launches Uvicorn on `0.0.0.0:8000`. To register it as an automatic Windows boot service with auto-recovery, run `install-service.bat` as Administrator.*
 
-### 3. Connect from Android Phone via Tailscale
-1. Install Tailscale on Windows and on your Android phone ([Guide](docs/TAILSCALE_SETUP.md)).
-2. In the ApplyPilot Android App settings, enter your PC's Tailscale address:
-   - Server URL: `http://100.x.y.z:8000` (Replace with your PC's Tailscale IP)
-   - Bearer Token: `mApIGVEyORqpXbJzPhrhLPk9pRaS_vPOFyxH07nuPV4` (Found in `backend/.env`)
-3. Tap **Test Ping** — you will see `Connected! PC Active`.
+### 3. Connect from Android via Tailscale
+1. Install [Tailscale](https://tailscale.com) on your Windows PC and your Android phone.
+2. Sign in to both devices with the same account.
+3. In ApplyPilot Android App &rarr; **Settings** &rarr; enter:
+   - **PC Server URL**: `http://100.x.y.z:8000` (Your PC's Tailscale IP)
+   - **Bearer Auth Token**: Found in `backend/.env` or generated via the app.
+4. Tap **Test Ping** &rarr; verify `Connected! PC Active`.
+
+### 4. Sideload the Android Release APK
+The compiled release APK is ready in `output/ApplyPilot.apk`:
+```powershell
+adb install output/ApplyPilot.apk
+```
+*SHA-256 Hash*: `117ECDCE1E8FC66C4AA3D754D9A3383C520BBE09FFD7C918B7CFCFC5EAD2861D` (51.1 MB).
 
 ---
 
-## Project Structure
+## Verification & Test Suite
 
-```
-├── app/                  # Flutter Android Mobile Application (Material 3, Unslopped)
-│   ├── lib/
-│   │   ├── core/         # Theme, Design Tokens, API Client
-│   │   ├── screens/      # Home, Needs You, Jobs, Answer Bank, Profile, Settings
-│   │   └── main.dart     # Navigation Shell & Lifecycle
-│   ├── android/          # Native Android Manifest & Gradle Build Config
-│   └── pubspec.yaml
-├── backend/              # Always-On Windows FastAPI Backend
-│   ├── app/
-│   │   ├── api/          # Endpoints: Auth, Profile, Answer Bank, Jobs, Needs You
-│   │   ├── core/         # SQLite WAL Engine, Config, AES-256 Security
-│   │   ├── models/       # SQLAlchemy 2.0 ORM Models
-│   │   ├── scrapers/     # ATS Discovery (Greenhouse, Lever, Ashby, Workable)
-│   │   ├── services/     # Apply Engine, Scoring, Resume Tailoring, Backup, FCM
-│   │   └── main.py       # FastAPI Entrypoint & Static File Server
-│   ├── tests/            # Test Suites (Phase 1, 3, 4, 5, 6, and 50-Job Stress Test)
-│   ├── requirements.txt
-│   └── .env              # Generated credentials & operational settings
-├── docs/                 # Documentation
-│   ├── BUILD_LOG.md      # Phase-by-phase execution and verification log
-│   ├── DESIGN_SYSTEM.md  # Unslopped editorial design specification
-│   ├── TAILSCALE_SETUP.md# Phone-to-PC private VPN setup guide
-│   └── WINDOWS_SETUP.md  # 24/7 reliability and crash recovery guide
-├── output/               # Generated Artifacts
-│   ├── screenshots/      # Form fill and confirmation audit screenshots
-│   └── resumes/          # 1-page tailored ATS resumes (HTML & PDF)
-├── backups/              # Automated nightly timestamped zip backups
-├── configure-power.bat   # 1-click Windows 24/7 power settings
-├── install-service.bat   # 1-click Windows Task Scheduler / Service installer
-├── start-backend.bat     # 1-click manual host launcher
-├── backup-now.bat        # 1-click manual backup trigger
-└── build-apk.bat         # Standalone Flutter release APK build script
+The entire platform is backed by comprehensive automated test coverage:
+
+```bash
+# Run backend pytest test suite
+pytest backend/tests/ -v
+
+# Run Flutter widget test suite
+cd app && flutter test
 ```
 
----
-
-## Things Only You Can Do
-
-To complete your personalized deployment, complete these five items:
-
-1. **Tailscale Login on PC and Android**:
-   - Install Tailscale on your Windows PC and sign in: `tailscale ip -4`
-   - Install Tailscale on your Android phone and sign in with the same account.
-   - Enter your PC's `100.x.y.z` address into the app's settings.
-2. **Anthropic Claude API Key (Optional for LLM Fit Scoring)**:
-   - Add your Anthropic API key to `backend/.env`:
-     ```env
-     CLAUDE_API_KEY=sk-ant-api03-...
-     ```
-   - *Note*: ApplyPilot already runs with a deterministic domain heuristic scoring engine out-of-the-box if left blank.
-3. **Firebase Cloud Messaging Service Account (For Mobile Push Notifications)**:
-   - Create a free Firebase project at [console.firebase.google.com](https://console.firebase.google.com).
-   - Download your `serviceAccountKey.json` and set its path in `backend/.env`:
-     ```env
-     FIREBASE_CREDENTIALS_PATH=C:\Users\adhar\Desktop\job\backend\serviceAccountKey.json
-     ```
-4. **Confirm Candidate Profile URLs & Dates**:
-   - Check `backend/.env` or the **Profile** screen in the app to confirm your preferred graduation date (`May 2027`) and LinkedIn URL.
-5. **Install ApplyPilot on Android**:
-   - Run `build-apk.bat` (if Flutter SDK is installed) or copy the `app/` folder to build `ApplyPilot.apk`.
-   - On Android: enable "Install unknown apps" in Settings > Security, transfer the APK, and tap Install.
+### Test Results
+- **Backend Tests**: 31 passed in 67.86s
+  - `test_sqlite_wal_mode` & `test_health_endpoint`
+  - `test_auth_protection` & `test_encryption_at_rest`
+  - `test_answer_bank_seeding_and_lookup` & `test_answer_bank_crud`
+  - `test_phase3_discovery_20_jobs` & `test_phase3_deduplication`
+  - `test_phase3_scoring_pipeline` & `test_phase3_resume_tailoring` & `test_phase3_maybe_swipe`
+  - `test_phase4_dry_run_application` & `test_phase4_30_day_cooldown` & `test_phase4_daily_cap_enforcement`
+  - `test_phase5_needs_you_flow_and_auto_resume` & `test_phase5_dismiss_needs_you`
+  - `test_phase6_assist_mode_draft_and_manual_apply` & `test_phase6_circuit_breaker` & `test_phase6_backup_service`
+  - `test_phase7_50_jobs_end_to_end_simulation` (50-job stress test)
+  - `test_analytics_endpoint` & `test_resume_versions_and_tailoring`
+  - `test_job_lifecycle_and_kanban` & `test_explainable_scoring_and_company_exclusion`
+  - `test_answer_bank_enhanced_fields`
+  - `test_safety_daily_cap_enforcement` & `test_safety_30_day_company_cooldown`
+  - `test_safety_pause_switch` & `test_safety_go_live_gate_default`
+  - `test_safety_idempotency_duplicate_submission`
+  - `test_safety_real_form_fill_dry_run` (Live Playwright form fill)
+- **Flutter Widget Tests**: 3 passed
+  - Navigation shell and destination verification
+  - Onboarding flow verification
+  - Editorial theme palette & Obsidian dark mode validation
 
 ---
 
-## Known Limitations
+## License & Security
 
-- **Account-Gated Portals (Workday, Oracle Taleo, SuccessFactors)**:
-  - Workday and SuccessFactors require mandatory candidate account registration, multi-step email OTP verification, or password resets per employer. These cannot be fully autonomous without storing credentials per company. ApplyPilot routes these to **Assist Mode** with pre-filled answers and tailored resumes so you can complete them in 1 tap.
-- **Interactive Cloudflare Turnstile / Canvas Bot Games**:
-  - Complex bot challenges (e.g. dragging puzzle sliders, canvas captchas) are purposefully not bypassed to protect your IP from blacklisting. When encountered, ApplyPilot marks the job as `BLOCKED` with an explanatory note.
-- **Unpaid / "Pay-to-Apply" Postings**:
-  - The engine strictly skips any posting charging application fees or listing compensation under ₹7 LPA.
+- **Single-User Security**: Bearer token authentication on all non-health routes.
+- **AES-256 Encryption**: Sensitive profile credentials encrypted at rest with Fernet cryptography.
+- **No Public Cloud Exits**: Database and Playwright processes run entirely local to your PC.
+- **MIT License**: Built for personal career automation.

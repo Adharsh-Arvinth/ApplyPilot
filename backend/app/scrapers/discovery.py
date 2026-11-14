@@ -286,10 +286,26 @@ class JobDiscoveryService:
         ]
 
     @staticmethod
+    def classify_work_mode(title: str, location: str) -> str:
+        combined = f"{title} {location}".lower()
+        if "remote" in combined or "anywhere" in combined or "wfh" in combined:
+            return "remote"
+        if "hybrid" in combined:
+            return "hybrid"
+        return "onsite"
+
+    @staticmethod
     async def run_discovery(db: Session) -> int:
         """Run discovery across boards and ingest eligible candidates."""
         profile = db.query(Profile).first()
         min_salary = profile.min_salary_inr if profile else 700000
+
+        excluded_companies = []
+        if profile and profile.excluded_companies_json:
+            try:
+                excluded_companies = [c.lower().strip() for c in json.loads(profile.excluded_companies_json)]
+            except Exception:
+                pass
 
         # 1. Fetch live jobs from top Greenhouse and Lever public boards
         live_jobs = []
@@ -323,16 +339,40 @@ class JobDiscoveryService:
             if existing:
                 continue
 
+            company_name = raw_job["company"]
+            work_mode = JobDiscoveryService.classify_work_mode(raw_job["title"], raw_job["location"])
+
+            # Check company exclusion list
+            if any(ex in company_name.lower() for ex in excluded_companies if ex):
+                job = Job(
+                    source=raw_job["source"],
+                    company=company_name,
+                    title=raw_job["title"],
+                    url=url,
+                    location=raw_job["location"],
+                    work_mode=work_mode,
+                    salary_raw=raw_job.get("salary_raw", ""),
+                    salary_numeric=raw_job.get("salary_numeric", 0),
+                    score=1.0,
+                    score_reason=f"Company '{company_name}' is in your excluded companies list.",
+                    status="blocked",
+                    skip_reason="Excluded Company"
+                )
+                db.add(job)
+                new_count += 1
+                continue
+
             # Check salary filter (skip < ₹7 LPA if salary is explicitly given)
             salary_num = raw_job.get("salary_numeric", 0)
             if 0 < salary_num < min_salary:
                 # Log as blocked
                 job = Job(
                     source=raw_job["source"],
-                    company=raw_job["company"],
+                    company=company_name,
                     title=raw_job["title"],
                     url=url,
                     location=raw_job["location"],
+                    work_mode=work_mode,
                     salary_raw=raw_job.get("salary_raw", ""),
                     salary_numeric=salary_num,
                     score=1.8,
@@ -346,10 +386,11 @@ class JobDiscoveryService:
 
             job = Job(
                 source=raw_job["source"],
-                company=raw_job["company"],
+                company=company_name,
                 title=raw_job["title"],
                 url=url,
                 location=raw_job["location"],
+                work_mode=work_mode,
                 salary_raw=raw_job.get("salary_raw", ""),
                 salary_numeric=salary_num,
                 status="discovered"

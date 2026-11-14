@@ -6,13 +6,16 @@ from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from backend.app.core.config import settings
-from backend.app.core.database import engine, Base, SessionLocal
+from backend.app.core.database import engine, Base, SessionLocal, migrate_db
+import backend.app.models  # Ensure all models are registered with Base.metadata
 from backend.app.services.answer_service import AnswerService
 from backend.app.api.health import router as health_router
 from backend.app.api.answer_bank import router as answer_bank_router
 from backend.app.api.profile import router as profile_router
 from backend.app.api.jobs import router as jobs_router
 from backend.app.api.needs_you import router as needs_you_router
+from backend.app.api.resumes import router as resumes_router
+from backend.app.api.analytics import router as analytics_router
 
 # Configure logging
 logging.basicConfig(
@@ -23,9 +26,9 @@ logger = logging.getLogger("applypilot")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: initialize database schema & seeds
-    logger.info("Initializing ApplyPilot database schemas...")
-    Base.metadata.create_all(bind=engine)
+    # Startup: zero-downtime schema migrations & initial seeds
+    logger.info("Initializing ApplyPilot database schemas & running migrations...")
+    migrate_db()
     
     db = SessionLocal()
     try:
@@ -39,8 +42,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="ApplyPilot Backend API",
-    description="Autonomous job application agent backend running on user's always-on Windows PC",
-    version="1.1.0",
+    description="Autonomous career intelligence & job application agent backend running on user's always-on Windows PC",
+    version="1.2.0",
     lifespan=lifespan
 )
 
@@ -67,6 +70,8 @@ app.include_router(profile_router, prefix="/api/v1")
 app.include_router(answer_bank_router, prefix="/api/v1")
 app.include_router(jobs_router, prefix="/api/v1")
 app.include_router(needs_you_router, prefix="/api/v1")
+app.include_router(resumes_router, prefix="/api/v1")
+app.include_router(analytics_router, prefix="/api/v1")
 
 @app.get("/")
 def root():

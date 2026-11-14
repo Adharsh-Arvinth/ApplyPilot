@@ -2,51 +2,60 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Apple Music Signature Vibrant Palette
-  static const Color appleMusicRose = Color(0xFFFA243C);
-  static const Color appleCrimson = Color(0xFFFA243C);
-  static const Color appleMusicPink = Color(0xFFFC3C44);
-  static const Color appleMusicGradientEnd = Color(0xFFFF2D55);
-  static const Color iosGreen = Color(0xFF30D158);
-  static const Color iosRed = Color(0xFFFF453A);
-  static const Color iosOrange = Color(0xFFFF9F0A);
-  static const Color iosBlue = Color(0xFF0A84FF);
-  static const Color iosPurple = Color(0xFFBF5AF2);
+  // ApplyPilot Signature Editorial Palette: British Racing Green, Warm Ivory & Muted Brass
+  static const Color warmIvory = Color(0xFFFAFAF7);
+  static const Color pureWhite = Color(0xFFFFFFFF);
+  static const Color racingGreen = Color(0xFF1B4332);
+  static const Color racingGreenLight = Color(0xFF2D6A4F);
+  static const Color racingGreenVibrant = Color(0xFF40916C);
+  static const Color racingGreenSubtle = Color(0xFFD8F3DC);
+  static const Color mutedBrass = Color(0xFFC5A880);
+  static const Color mutedBrassWarm = Color(0xFFB59A57);
+  static const Color brassGlow = Color(0xFFD4AF37);
 
-  // Light Theme Palette (Clean Apple Music / iOS Grouped)
-  static const Color canvasLight = Color(0xFFF2F2F7);
+  // Status & Utility Colors
+  static const Color forestInk = Color(0xFF14221A);
+  static const Color charcoal = Color(0xFF2B3A32);
+  static const Color mutedGray = Color(0xFF5C6B63);
+  static const Color subtleGray = Color(0xFF88968F);
+  static const Color hairlineBorder = Color(0xFFE5E3DC);
+
+  // Light Theme Palette (Warm Ivory & British Racing Green Editorial)
+  static const Color canvasLight = Color(0xFFFAFAF7);
   static const Color surfaceLight = Color(0xFFFFFFFF);
-  static const Color surfaceSubtleLight = Color(0xFFE5E5EA);
-  static const Color borderHairlineLight = Color(0xFFD1D1D6);
-  static const Color textPrimaryLight = Color(0xFF000000);
-  static const Color textSecondaryLight = Color(0xFF6C6C70);
-  static const Color textMutedLight = Color(0xFF8E8E93);
-  static const Color accentLight = Color(0xFFFA243C);
+  static const Color surfaceSubtleLight = Color(0xFFF2F1EC);
+  static const Color borderHairlineLight = Color(0xFFE5E3DC);
+  static const Color textPrimaryLight = Color(0xFF14221A);
+  static const Color textSecondaryLight = Color(0xFF5C6B63);
+  static const Color textMutedLight = Color(0xFF88968F);
+  static const Color accentLight = Color(0xFF1B4332);
   static const Color accentOnAccentLight = Color(0xFFFFFFFF);
-  static const Color successLight = Color(0xFF34C759);
-  static const Color warningLight = Color(0xFFFF9500);
-  static const Color blockedLight = Color(0xFFFF3B30);
-  static const Color purpleLight = Color(0xFFAF52DE);
-  static const Color blueLight = Color(0xFF007AFF);
+  static const Color brassLight = Color(0xFFC5A880);
+  static const Color successLight = Color(0xFF2D6A4F);
+  static const Color warningLight = Color(0xFFD4A373);
+  static const Color errorLight = Color(0xFFBA1A1A);
+  static const Color blueLight = Color(0xFF1D4E89);
 
-  // Dark Theme Palette (Pure OLED Black & Apple Music Glass)
-  static const Color canvasDark = Color(0xFF000000);
-  static const Color surfaceDark = Color(0xFF1C1C1E);
-  static const Color surfaceSubtleDark = Color(0xFF2C2C2E);
-  static const Color borderHairlineDark = Color(0xFF38383A);
-  static const Color textPrimaryDark = Color(0xFFFFFFFF);
-  static const Color textSecondaryDark = Color(0xFF8E8E93);
-  static const Color textMutedDark = Color(0xFF636366);
-  static const Color accentDark = Color(0xFFFA243C);
+  // Dark Theme Palette (Deep Forest Slate / Obsidian & Racing Green Glow)
+  static const Color canvasDark = Color(0xFF0D1912);
+  static const Color surfaceDark = Color(0xFF14251B);
+  static const Color surfaceSubtleDark = Color(0xFF1A2F23);
+  static const Color borderHairlineDark = Color(0xFF253F30);
+  static const Color textPrimaryDark = Color(0xFFFAFAF7);
+  static const Color textSecondaryDark = Color(0xFFA3B8AD);
+  static const Color textMutedDark = Color(0xFF6C8074);
+  static const Color accentDark = Color(0xFF40916C);
   static const Color accentOnAccentDark = Color(0xFFFFFFFF);
-  static const Color successDark = Color(0xFF30D158);
-  static const Color warningDark = Color(0xFFFF9F0A);
-  static const Color blockedDark = Color(0xFFFF453A);
-  static const Color purpleDark = Color(0xFFBF5AF2);
-  static const Color blueDark = Color(0xFF0A84FF);
+  static const Color brassDark = Color(0xFFD4AF37);
+  static const Color successDark = Color(0xFF52B788);
+  static const Color warningDark = Color(0xFFE9C46A);
+  static const Color errorDark = Color(0xFFFF6B6B);
+  static const Color blueDark = Color(0xFF64DFDF);
 }
 
 class AppSpacing {
+  // Strict 4-pt Spacing System with half-step micro-paddings
+  static const double s2 = 2.0;
   static const double s4 = 4.0;
   static const double s6 = 6.0;
   static const double s8 = 8.0;
@@ -55,15 +64,17 @@ class AppSpacing {
   static const double s16 = 16.0;
   static const double s20 = 20.0;
   static const double s24 = 24.0;
+  static const double s28 = 28.0;
   static const double s32 = 32.0;
   static const double s40 = 40.0;
+  static const double s48 = 48.0;
 }
 
 class AppRadii {
-  static const double card = 18.0;
-  static const double control = 12.0;
+  static const double card = 16.0;
+  static const double control = 10.0;
   static const double badge = 6.0;
-  static const double pill = 100.0;
+  static const double pill = 999.0;
 }
 
 class AppTheme {
@@ -76,35 +87,36 @@ class AppTheme {
         surface: AppColors.surfaceLight,
         primary: AppColors.accentLight,
         onPrimary: AppColors.accentOnAccentLight,
-        error: AppColors.blockedLight,
+        secondary: AppColors.brassLight,
+        error: AppColors.errorLight,
       ),
       fontFamily: 'Inter',
       appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.surfaceLight,
+        backgroundColor: AppColors.canvasLight,
         foregroundColor: AppColors.textPrimaryLight,
         elevation: 0,
         centerTitle: false,
       ),
       textTheme: const TextTheme(
         displayLarge: TextStyle(
-          fontSize: 34,
+          fontSize: 32,
           fontWeight: FontWeight.w700,
           color: AppColors.textPrimaryLight,
-          letterSpacing: -0.8,
+          letterSpacing: -0.6,
           fontFeatures: [FontFeature.tabularFigures()],
         ),
         displayMedium: TextStyle(
           fontSize: 24,
           fontWeight: FontWeight.w700,
           color: AppColors.textPrimaryLight,
-          letterSpacing: -0.5,
+          letterSpacing: -0.4,
           fontFeatures: [FontFeature.tabularFigures()],
         ),
         titleLarge: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimaryLight,
-          letterSpacing: -0.3,
+          letterSpacing: -0.2,
         ),
         titleMedium: TextStyle(
           fontSize: 16,
@@ -115,17 +127,17 @@ class AppTheme {
           fontSize: 15,
           fontWeight: FontWeight.w400,
           color: AppColors.textPrimaryLight,
-          height: 1.45,
+          height: 1.4,
         ),
         bodyMedium: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w400,
           color: AppColors.textSecondaryLight,
-          height: 1.4,
+          height: 1.35,
         ),
-        labelSmall: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
+        bodySmall: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w400,
           color: AppColors.textMutedLight,
           fontFeatures: [FontFeature.tabularFigures()],
         ),
@@ -135,12 +147,33 @@ class AppTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadii.card),
-          side: const BorderSide(color: AppColors.borderHairlineLight, width: 0.8),
+          side: const BorderSide(color: AppColors.borderHairlineLight, width: 1.0),
         ),
+        margin: EdgeInsets.zero,
       ),
-      dividerTheme: const DividerThemeData(
-        color: AppColors.borderHairlineLight,
-        thickness: 0.8,
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: AppColors.surfaceLight,
+        indicatorColor: AppColors.racingGreenSubtle,
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const IconThemeData(color: AppColors.accentLight);
+          }
+          return const IconThemeData(color: AppColors.textMutedLight);
+        }),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppColors.accentLight,
+            );
+          }
+          return const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textMutedLight,
+          );
+        }),
       ),
     );
   }
@@ -154,7 +187,8 @@ class AppTheme {
         surface: AppColors.surfaceDark,
         primary: AppColors.accentDark,
         onPrimary: AppColors.accentOnAccentDark,
-        error: AppColors.blockedDark,
+        secondary: AppColors.brassDark,
+        error: AppColors.errorDark,
       ),
       fontFamily: 'Inter',
       appBarTheme: const AppBarTheme(
@@ -165,24 +199,24 @@ class AppTheme {
       ),
       textTheme: const TextTheme(
         displayLarge: TextStyle(
-          fontSize: 34,
+          fontSize: 32,
           fontWeight: FontWeight.w700,
           color: AppColors.textPrimaryDark,
-          letterSpacing: -0.8,
+          letterSpacing: -0.6,
           fontFeatures: [FontFeature.tabularFigures()],
         ),
         displayMedium: TextStyle(
           fontSize: 24,
           fontWeight: FontWeight.w700,
           color: AppColors.textPrimaryDark,
-          letterSpacing: -0.5,
+          letterSpacing: -0.4,
           fontFeatures: [FontFeature.tabularFigures()],
         ),
         titleLarge: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimaryDark,
-          letterSpacing: -0.3,
+          letterSpacing: -0.2,
         ),
         titleMedium: TextStyle(
           fontSize: 16,
@@ -193,17 +227,17 @@ class AppTheme {
           fontSize: 15,
           fontWeight: FontWeight.w400,
           color: AppColors.textPrimaryDark,
-          height: 1.45,
+          height: 1.4,
         ),
         bodyMedium: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w400,
           color: AppColors.textSecondaryDark,
-          height: 1.4,
+          height: 1.35,
         ),
-        labelSmall: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
+        bodySmall: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w400,
           color: AppColors.textMutedDark,
           fontFeatures: [FontFeature.tabularFigures()],
         ),
@@ -213,12 +247,33 @@ class AppTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadii.card),
-          side: const BorderSide(color: AppColors.borderHairlineDark, width: 0.8),
+          side: const BorderSide(color: AppColors.borderHairlineDark, width: 1.0),
         ),
+        margin: EdgeInsets.zero,
       ),
-      dividerTheme: const DividerThemeData(
-        color: AppColors.borderHairlineDark,
-        thickness: 0.8,
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: AppColors.surfaceDark,
+        indicatorColor: AppColors.surfaceSubtleDark,
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const IconThemeData(color: AppColors.accentDark);
+          }
+          return const IconThemeData(color: AppColors.textMutedDark);
+        }),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppColors.accentDark,
+            );
+          }
+          return const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textMutedDark,
+          );
+        }),
       ),
     );
   }

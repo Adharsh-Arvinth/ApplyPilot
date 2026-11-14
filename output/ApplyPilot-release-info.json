@@ -1,19 +1,35 @@
 {
   "appName": "ApplyPilot",
-  "version": "1.1.0",
-  "buildNumber": 2,
+  "version": "1.2.0",
+  "buildNumber": 3,
   "package": "org.applypilot.applypilot",
-  "builtAt": "2026-11-14T08:14:00Z",
-  "sha256": "D4E1C1E225719E8518D8FAD2CC844188FE6FDF08291633A6A1B78BDDCA271814",
-  "backendCompatibility": ">=1.1.0",
-  "theme": "Apple Music Signature (OLED Black, #FA243C Crimson, Frosted Glass & Hairline Dividers)",
+  "builtAt": "2026-11-14T08:50:42Z",
+  "sha256": "117ECDCE1E8FC66C4AA3D754D9A3383C520BBE09FFD7C918B7CFCFC5EAD2861D",
+  "sizeBytes": 53590498,
+  "backendCompatibility": ">=1.2.0",
+  "designSystem": "British Racing Green (#1B4332), Warm Ivory (#FAFAF7), Muted Brass (#C5A880), Obsidian Dark Mode (#0D1912), 4pt Spacing System",
+  "screens": [
+    "Home Dashboard (Career Command Center)",
+    "Discover Jobs (Fit Scoring & Filter Breakdown)",
+    "Needs You Inbox (Human-in-the-Loop Quick Answers)",
+    "Application Tracker (Kanban Board & List Lifecycle)",
+    "Analytics (Weekly Velocity & Match Distributions)",
+    "Answer Bank (Verified Facts & Source Evidence)",
+    "Resume Manager (Portfolio & Dynamic Tailoring)",
+    "Candidate Profile (Credentials, Roles & Exclusions)",
+    "Automation Control Center (Safety Rails & Live Stream)",
+    "Settings (Theme, Tailscale, Token Rotation & Backups)"
+  ],
   "features": [
-    "Application Proof: Full confirmation screenshots, timestamps, tailored resume link",
-    "Profile & Resume Upload: Dynamic PDF master resume upload and PyPDF extraction",
-    "Live Category Breakdown: Applied, Needs You, Queue, Maybe, Blocked, Interviews",
-    "Real-Time Engine Sync: 1.5-second live auto-refresh without loading stutter",
-    "Dark Mode Switcher: OLED Pure Black, Light, and System modes with persistent toggle",
-    "One-click Auto-Apply Cockpit over Tailscale VPN",
-    "Strict Dry-Run Default Safety Gate with Go-Live switch"
+    "10-Screen Unified Career Automation Architecture",
+    "Explainable 5-Factor Fit Scoring (Skills, Experience, Education, Location, Compensation)",
+    "End-to-End Application Lifecycle (Discovered -> Evaluated -> Approved -> Submitted -> Interview -> Offer/Rejected)",
+    "Kanban & List Views with notes, recruiter info, and submission evidence",
+    "Human-in-the-Loop Question Resolution & Answer Bank Auto-Sync",
+    "Tailored Resume Intelligence with ATS Match & Missing Qualification Alerts",
+    "Real Database Analytics (Velocity, Distributions, Top Companies, ATS Platforms)",
+    "Multi-Layered Safety: Dry-Run default, 30-day cooldown, 3-error circuit breaker, emergency pause",
+    "Single-Tap Bearer Token Rotation & Encrypted Storage",
+    "Private Mesh Tailscale VPN Connection (Zero Router Ports Exposed)"
   ]
 }

@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
@@ -11,86 +13,114 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final _api = ApiClient();
+  final ApiClient _api = ApiClient();
   bool _loading = true;
   bool _saving = false;
-  bool _uploadingResume = false;
-  String _resumeUploadStatus = "Adharsh_Arvinth_Master_Resume.pdf";
+  bool _uploading = false;
 
-  final _nameCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
-  final _phoneCtrl = TextEditingController();
-  final _linkedinCtrl = TextEditingController();
-  final _githubCtrl = TextEditingController();
-  final _educationCtrl = TextEditingController();
-  final _cgpaCtrl = TextEditingController();
-  final _gradDateCtrl = TextEditingController();
-  final _noticePeriodCtrl = TextEditingController();
-  final _workAuthCtrl = TextEditingController();
-  final _relocationCtrl = TextEditingController();
-  final _workModeCtrl = TextEditingController();
-  final _salaryCtrl = TextEditingController();
-  final _dailyCapCtrl = TextEditingController();
-  final _rolesCtrl = TextEditingController();
-  final _locationsCtrl = TextEditingController();
-  final _proofPointsCtrl = TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _linkedinController = TextEditingController();
+  final TextEditingController _githubController = TextEditingController();
+  final TextEditingController _educationController = TextEditingController();
+  final TextEditingController _cgpaController = TextEditingController();
+  final TextEditingController _gradController = TextEditingController();
+  final TextEditingController _noticeController = TextEditingController();
+  final TextEditingController _workAuthController = TextEditingController();
+  final TextEditingController _salaryController = TextEditingController();
+  final TextEditingController _proofPointsController = TextEditingController();
+
+  List<String> _targetRoles = [];
+  List<String> _locations = [];
+  List<String> _excludedCompanies = [];
+
+  final TextEditingController _newRoleController = TextEditingController();
+  final TextEditingController _newLocController = TextEditingController();
+  final TextEditingController _newExcludedController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _fetchProfile();
+    _loadProfile();
   }
 
   @override
   void dispose() {
-    _nameCtrl.dispose();
-    _emailCtrl.dispose();
-    _phoneCtrl.dispose();
-    _linkedinCtrl.dispose();
-    _githubCtrl.dispose();
-    _educationCtrl.dispose();
-    _cgpaCtrl.dispose();
-    _gradDateCtrl.dispose();
-    _noticePeriodCtrl.dispose();
-    _workAuthCtrl.dispose();
-    _relocationCtrl.dispose();
-    _workModeCtrl.dispose();
-    _salaryCtrl.dispose();
-    _dailyCapCtrl.dispose();
-    _rolesCtrl.dispose();
-    _locationsCtrl.dispose();
-    _proofPointsCtrl.dispose();
+    _nameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _linkedinController.dispose();
+    _githubController.dispose();
+    _educationController.dispose();
+    _cgpaController.dispose();
+    _gradController.dispose();
+    _noticeController.dispose();
+    _workAuthController.dispose();
+    _salaryController.dispose();
+    _proofPointsController.dispose();
+    _newRoleController.dispose();
+    _newLocController.dispose();
+    _newExcludedController.dispose();
     super.dispose();
   }
 
-  Future<void> _fetchProfile() async {
+  Future<void> _loadProfile() async {
     setState(() => _loading = true);
     try {
       final p = await _api.getProfile();
       if (mounted) {
         setState(() {
-          _nameCtrl.text = p["full_name"] ?? "";
-          _emailCtrl.text = p["email"] ?? "";
-          _phoneCtrl.text = p["phone"] ?? "";
-          _linkedinCtrl.text = p["linkedin"] ?? "";
-          _githubCtrl.text = p["github"] ?? "";
-          _educationCtrl.text = p["education"] ?? "";
-          _cgpaCtrl.text = p["cgpa"] ?? "";
-          _gradDateCtrl.text = p["graduation_date"] ?? "";
-          _noticePeriodCtrl.text = p["notice_period"] ?? "";
-          _workAuthCtrl.text = p["work_authorization"] ?? "";
-          _relocationCtrl.text = p["relocation_preference"] ?? "";
-          _workModeCtrl.text = p["preferred_work_mode"] ?? "";
-          _salaryCtrl.text = (p["min_salary_inr"] ?? 700000).toString();
-          _dailyCapCtrl.text = (p["daily_cap"] ?? 100).toString();
-          _rolesCtrl.text = ((p["target_roles"] as List<dynamic>?) ?? []).join(", ");
-          _locationsCtrl.text = ((p["locations"] as List<dynamic>?) ?? []).join(", ");
-          _proofPointsCtrl.text = p["proof_points_text"] ?? "";
+          _nameController.text = p["full_name"] ?? "";
+          _emailController.text = p["email"] ?? "";
+          _phoneController.text = p["phone"] ?? "";
+          _linkedinController.text = p["linkedin"] ?? "";
+          _githubController.text = p["github"] ?? "";
+          _educationController.text = p["education"] ?? "";
+          _cgpaController.text = p["cgpa"] ?? "";
+          _gradController.text = p["graduation_date"] ?? "";
+          _noticeController.text = p["notice_period"] ?? "";
+          _workAuthController.text = p["work_authorization"] ?? "";
+          _salaryController.text = (p["min_salary_inr"] ?? 700000).toString();
+          _proofPointsController.text = p["proof_points_text"] ?? "";
+
+          _targetRoles = List<String>.from(p["target_roles"] ?? []);
+          _locations = List<String>.from(p["locations"] ?? []);
+          _excludedCompanies = List<String>.from(p["excluded_companies"] ?? []);
           _loading = false;
         });
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _saveProfile() async {
+    HapticFeedback.mediumImpact();
+    setState(() => _saving = true);
+    try {
+      await _api.updateProfile({
+        "full_name": _nameController.text.trim(),
+        "email": _emailController.text.trim(),
+        "phone": _phoneController.text.trim(),
+        "linkedin": _linkedinController.text.trim(),
+        "github": _githubController.text.trim(),
+        "education": _educationController.text.trim(),
+        "cgpa": _cgpaController.text.trim(),
+        "graduation_date": _gradController.text.trim(),
+        "notice_period": _noticeController.text.trim(),
+        "work_authorization": _workAuthController.text.trim(),
+        "min_salary_inr": int.tryParse(_salaryController.text.trim()) ?? 700000,
+        "proof_points_text": _proofPointsController.text.trim(),
+        "target_roles": _targetRoles,
+        "locations": _locations,
+        "excluded_companies": _excludedCompanies,
+      });
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Candidate Profile saved successfully.")));
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Save failed: $e")));
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -98,375 +128,298 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final files = await FilePicker.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf'],
+        allowedExtensions: ['pdf', 'txt'],
       );
 
-      if (files.isEmpty) return;
-      final file = files.first;
-
-      final bytes = await file.readAsBytes();
-      if (bytes.isEmpty) {
-        if (mounted) {
+      if (files != null && files.isNotEmpty) {
+        final file = files.first;
+        final bytes = await file.readAsBytes();
+        if (bytes.isNotEmpty) {
+          setState(() => _uploading = true);
+          final res = await _api.uploadResume(bytes, file.name);
+          setState(() => _uploading = false);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Selected resume file is empty.")),
+            SnackBar(content: Text("Resume uploaded! Extracted: ${res['message']}")),
           );
+          _loadProfile();
         }
-        return;
-      }
-
-      setState(() => _uploadingResume = true);
-      final resp = await _api.uploadResume(bytes, file.name);
-
-      if (mounted) {
-        setState(() {
-          _resumeUploadStatus = "${file.name} (Parsed & Active)";
-          _uploadingResume = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppColors.iosGreen,
-            content: Text(resp["summary"] ?? "Master resume uploaded and parsed successfully!"),
-          ),
-        );
-        _fetchProfile();
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _uploadingResume = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppColors.iosRed,
-            content: Text("Resume upload failed: $e"),
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _saveProfile() async {
-    setState(() => _saving = true);
-    final roles = _rolesCtrl.text
-        .split(",")
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
-
-    final locations = _locationsCtrl.text
-        .split(",")
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
-
-    final payload = {
-      "full_name": _nameCtrl.text.trim(),
-      "email": _emailCtrl.text.trim(),
-      "phone": _phoneCtrl.text.trim(),
-      "linkedin": _linkedinCtrl.text.trim(),
-      "github": _githubCtrl.text.trim(),
-      "education": _educationCtrl.text.trim(),
-      "cgpa": _cgpaCtrl.text.trim(),
-      "graduation_date": _gradDateCtrl.text.trim(),
-      "notice_period": _noticePeriodCtrl.text.trim(),
-      "work_authorization": _workAuthCtrl.text.trim(),
-      "relocation_preference": _relocationCtrl.text.trim(),
-      "preferred_work_mode": _workModeCtrl.text.trim(),
-      "min_salary_inr": int.tryParse(_salaryCtrl.text.trim()) ?? 700000,
-      "daily_cap": int.tryParse(_dailyCapCtrl.text.trim()) ?? 100,
-      "target_roles": roles,
-      "locations": locations,
-      "proof_points_text": _proofPointsCtrl.text.trim(),
-    };
-
-    try {
-      await _api.updateProfile(payload);
-      if (mounted) {
-        setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            backgroundColor: AppColors.iosGreen,
-            content: Text("Profile and application rules saved successfully!"),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(backgroundColor: AppColors.iosRed, content: Text("Save failed: $e")),
-        );
-      }
+      setState(() => _uploading = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Upload error: $e")));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryTextColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
+    final secondaryTextColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final cardBg = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
+    final borderColor = isDark ? AppColors.borderHairlineDark : AppColors.borderHairlineLight;
+    final accentGreen = isDark ? AppColors.accentDark : AppColors.racingGreen;
+    final brassColor = isDark ? AppColors.brassDark : AppColors.mutedBrass;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Profile & Verification", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20)),
+        title: Text(
+          "Candidate Profile",
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: primaryTextColor),
+        ),
         actions: [
-          _saving
-              ? const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.appleCrimson)),
-                )
-              : TextButton(
-                  onPressed: _saveProfile,
-                  child: const Text("Save", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.appleCrimson)),
-                ),
+          IconButton(
+            icon: _saving ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.check),
+            tooltip: "Save Profile",
+            onPressed: _saving ? null : _saveProfile,
+          ),
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.appleCrimson))
+          ? Center(child: CircularProgressIndicator(strokeWidth: 2, color: accentGreen))
           : ListView(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20, vertical: AppSpacing.s16),
+              padding: const EdgeInsets.all(AppSpacing.s16),
               children: [
-                // 1. MASTER RESUME UPLOAD CARD
+                // 1. Master Resume Upload Card
                 Container(
                   padding: const EdgeInsets.all(AppSpacing.s20),
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7),
+                    color: cardBg,
                     borderRadius: BorderRadius.circular(AppRadii.card),
-                    border: Border.all(
-                      color: AppColors.appleCrimson.withOpacity(0.35),
-                      width: 1.0,
-                    ),
+                    border: Border.all(color: borderColor),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: const [
-                              Icon(Icons.upload_file, color: AppColors.appleCrimson, size: 22),
-                              SizedBox(width: 8),
-                              Text("Master Resume", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-                            ],
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: AppColors.iosGreen.withOpacity(0.18),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text("ACTIVE", style: TextStyle(color: AppColors.iosGreen, fontWeight: FontWeight.bold, fontSize: 11)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        "Upload or update your master PDF resume anytime. ApplyPilot parses it with PyPDF and extracts candidate facts for 1-click auto-tailoring.",
-                        style: TextStyle(fontSize: 13, color: isDark ? const Color(0xFF8E8E93) : const Color(0xFF636366), height: 1.4),
-                      ),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          const Icon(Icons.picture_as_pdf, color: AppColors.appleCrimson, size: 18),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              _resumeUploadStatus,
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: AppColors.appleCrimson),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
-                          ),
-                          icon: _uploadingResume
-                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.appleCrimson))
-                              : const Icon(Icons.cloud_upload_outlined, color: AppColors.appleCrimson, size: 18),
-                          label: Text(
-                            _uploadingResume ? "Parsing Master Resume..." : "Upload New Resume (PDF)",
-                            style: const TextStyle(color: AppColors.appleCrimson, fontWeight: FontWeight.bold),
-                          ),
-                          onPressed: _uploadingResume ? null : _pickAndUploadResume,
+                      Container(
+                        padding: const EdgeInsets.all(AppSpacing.s12),
+                        decoration: BoxDecoration(
+                          color: accentGreen.withOpacity(0.1),
+                          shape: BoxShape.circle,
                         ),
+                        child: Icon(Icons.upload_file_outlined, color: accentGreen, size: 28),
+                      ),
+                      const SizedBox(width: AppSpacing.s16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("Master Resume Document", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: primaryTextColor)),
+                            const SizedBox(height: 2),
+                            Text("Upload your latest PDF resume. PyPDF extracts facts automatically.", style: TextStyle(fontSize: 11, color: secondaryTextColor)),
+                          ],
+                        ),
+                      ),
+                      ElevatedButton(
+                        onPressed: _uploading ? null : _pickAndUploadResume,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: accentGreen,
+                          foregroundColor: AppColors.pureWhite,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
+                        ),
+                        child: _uploading
+                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.pureWhite))
+                            : const Text("Upload PDF", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                       ),
                     ],
                   ),
                 ),
 
-                const SizedBox(height: AppSpacing.s24),
+                const SizedBox(height: AppSpacing.s16),
 
-                // 2. CONTACT & IDENTIFIERS
-                _buildSectionHeader("PERSONAL & IDENTITY", isDark),
-                const SizedBox(height: 8),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.s16),
-                    child: Column(
-                      children: [
-                        _buildTextField(_nameCtrl, "Full Name"),
-                        const SizedBox(height: 12),
-                        _buildTextField(_emailCtrl, "Email Address", keyboardType: TextInputType.emailAddress),
-                        const SizedBox(height: 12),
-                        _buildTextField(_phoneCtrl, "Phone Number", keyboardType: TextInputType.phone),
-                        const SizedBox(height: 12),
-                        _buildTextField(_linkedinCtrl, "LinkedIn URL", hint: "https://linkedin.com/in/..."),
-                        const SizedBox(height: 12),
-                        _buildTextField(_githubCtrl, "GitHub URL", hint: "https://github.com/..."),
-                      ],
-                    ),
+                // 2. Personal Information
+                _buildSectionHeader("PERSONAL & CONTACT DETAILS", secondaryTextColor),
+                const SizedBox(height: AppSpacing.s8),
+                _buildCard(cardBg, borderColor, [
+                  _buildTextField("Full Name", _nameController),
+                  const SizedBox(height: AppSpacing.s12),
+                  _buildTextField("Primary Email", _emailController),
+                  const SizedBox(height: AppSpacing.s12),
+                  _buildTextField("Mobile Number", _phoneController),
+                  const SizedBox(height: AppSpacing.s12),
+                  _buildTextField("LinkedIn Profile URL", _linkedinController),
+                  const SizedBox(height: AppSpacing.s12),
+                  _buildTextField("GitHub Profile URL", _githubController),
+                ]),
+
+                const SizedBox(height: AppSpacing.s16),
+
+                // 3. Education & Credentials
+                _buildSectionHeader("ACADEMIC & WORK AUTHORIZATION", secondaryTextColor),
+                const SizedBox(height: AppSpacing.s8),
+                _buildCard(cardBg, borderColor, [
+                  _buildTextField("Highest Degree & Discipline", _educationController),
+                  const SizedBox(height: AppSpacing.s12),
+                  Row(
+                    children: [
+                      Expanded(child: _buildTextField("CGPA / GPA", _cgpaController)),
+                      const SizedBox(width: AppSpacing.s12),
+                      Expanded(child: _buildTextField("Graduation Date", _gradController)),
+                    ],
                   ),
-                ),
+                  const SizedBox(height: AppSpacing.s12),
+                  _buildTextField("Notice Period / Availability", _noticeController),
+                  const SizedBox(height: AppSpacing.s12),
+                  _buildTextField("Work Authorization", _workAuthController),
+                  const SizedBox(height: AppSpacing.s12),
+                  _buildTextField("Minimum Salary Expectation (INR)", _salaryController, keyboardType: TextInputType.number),
+                ]),
 
-                const SizedBox(height: AppSpacing.s24),
+                const SizedBox(height: AppSpacing.s16),
 
-                // 3. TARGET ROLES & CRITERIA
-                _buildSectionHeader("TARGET CRITERIA & SALARY", isDark),
-                const SizedBox(height: 8),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.s16),
-                    child: Column(
-                      children: [
-                        _buildTextField(
-                          _rolesCtrl,
-                          "Target Roles (Comma-separated)",
-                          helper: "e.g. Data Scientist, ML Engineer, AI/GenAI Engineer",
-                        ),
-                        const SizedBox(height: 12),
-                        _buildTextField(
-                          _locationsCtrl,
-                          "Permitted Locations (Comma-separated)",
-                          helper: "India only: Remote-India, Bengaluru, Chennai, Hyderabad, Pune",
-                        ),
-                        const SizedBox(height: 12),
-                        _buildTextField(
-                          _salaryCtrl,
-                          "Minimum Salary (₹ INR / Year)",
-                          keyboardType: TextInputType.number,
-                          helper: "Skip postings offering under ₹7 LPA",
-                        ),
-                        const SizedBox(height: 12),
-                        _buildTextField(
-                          _dailyCapCtrl,
-                          "Daily Application Cap",
-                          keyboardType: TextInputType.number,
-                          helper: "Configurable target (default: 100 applications/day)",
-                        ),
-                      ],
-                    ),
+                // 4. Target Roles & Locations
+                _buildSectionHeader("CAREER CRITERIA & TARGET ROLES", secondaryTextColor),
+                const SizedBox(height: AppSpacing.s8),
+                _buildCard(cardBg, borderColor, [
+                  Text("Target Roles", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primaryTextColor)),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: _targetRoles.map((r) => Chip(
+                      label: Text(r, style: const TextStyle(fontSize: 11)),
+                      onDeleted: () => setState(() => _targetRoles.remove(r)),
+                      visualDensity: VisualDensity.compact,
+                    )).toList(),
                   ),
-                ),
-
-                const SizedBox(height: AppSpacing.s24),
-
-                // 4. EDUCATION & WORK AUTH
-                _buildSectionHeader("EDUCATION & AVAILABILITY", isDark),
-                const SizedBox(height: 8),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.s16),
-                    child: Column(
-                      children: [
-                        _buildTextField(_educationCtrl, "Education Program", helper: "MTech Integrated CSE (Data Science), VIT Vellore"),
-                        const SizedBox(height: 12),
-                        _buildTextField(_cgpaCtrl, "CGPA", helper: "7.62 / 10"),
-                        const SizedBox(height: 12),
-                        _buildTextField(_gradDateCtrl, "Graduation Date", helper: "e.g. June 2027"),
-                        const SizedBox(height: 12),
-                        _buildTextField(_noticePeriodCtrl, "Notice Period", helper: "Immediate / Available from Month-Year"),
-                        const SizedBox(height: 12),
-                        _buildTextField(_workAuthCtrl, "Work Authorization", helper: "Indian Citizen, No Sponsorship Needed"),
-                        const SizedBox(height: 12),
-                        _buildTextField(_relocationCtrl, "Willingness to Relocate", helper: "Yes / No / Hybrid"),
-                        const SizedBox(height: 12),
-                        _buildTextField(_workModeCtrl, "Preferred Work Mode", helper: "Remote / Hybrid / Onsite"),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: AppSpacing.s24),
-
-                // 5. IMMUTABLE PROOF POINTS (EDITABLE AS NEEDED)
-                _buildSectionHeader("VERIFIED PROOF POINTS & PATENTS", isDark),
-                const SizedBox(height: 4),
-                Text(
-                  "These verified facts form the strict truth source for all AI tailoring. Update any patents, metrics, or certifications whenever you wish.",
-                  style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF8E8E93) : const Color(0xFF636366)),
-                ),
-                const SizedBox(height: 8),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.s16),
-                    child: TextField(
-                      controller: _proofPointsCtrl,
-                      maxLines: 8,
-                      style: const TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.45),
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        hintText: "Enter bullet points of patents, projects, and certifications...",
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(child: TextField(controller: _newRoleController, decoration: const InputDecoration(hintText: "Add role (e.g. AI Engineer)"))),
+                      IconButton(
+                        icon: const Icon(Icons.add_circle, color: AppColors.racingGreen),
+                        onPressed: () {
+                          if (_newRoleController.text.trim().isNotEmpty) {
+                            setState(() {
+                              _targetRoles.add(_newRoleController.text.trim());
+                              _newRoleController.clear();
+                            });
+                          }
+                        },
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.s16),
+
+                  Text("Target Locations", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primaryTextColor)),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: _locations.map((l) => Chip(
+                      label: Text(l, style: const TextStyle(fontSize: 11)),
+                      onDeleted: () => setState(() => _locations.remove(l)),
+                      visualDensity: VisualDensity.compact,
+                    )).toList(),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(child: TextField(controller: _newLocController, decoration: const InputDecoration(hintText: "Add location (e.g. Bangalore)"))),
+                      IconButton(
+                        icon: const Icon(Icons.add_circle, color: AppColors.racingGreen),
+                        onPressed: () {
+                          if (_newLocController.text.trim().isNotEmpty) {
+                            setState(() {
+                              _locations.add(_newLocController.text.trim());
+                              _newLocController.clear();
+                            });
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.s16),
+
+                  Text("Excluded Companies", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primaryTextColor)),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: _excludedCompanies.map((c) => Chip(
+                      label: Text(c, style: const TextStyle(fontSize: 11, color: AppColors.errorLight)),
+                      backgroundColor: AppColors.errorLight.withOpacity(0.08),
+                      onDeleted: () => setState(() => _excludedCompanies.remove(c)),
+                      visualDensity: VisualDensity.compact,
+                    )).toList(),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(child: TextField(controller: _newExcludedController, decoration: const InputDecoration(hintText: "Add company to blacklist..."))),
+                      IconButton(
+                        icon: const Icon(Icons.add_circle, color: AppColors.errorLight),
+                        onPressed: () {
+                          if (_newExcludedController.text.trim().isNotEmpty) {
+                            setState(() {
+                              _excludedCompanies.add(_newExcludedController.text.trim());
+                              _newExcludedController.clear();
+                            });
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ]),
+
+                const SizedBox(height: AppSpacing.s16),
+
+                // 5. Immutable Verified Proof Points
+                _buildSectionHeader("VERIFIED PROOF POINTS & PATENTS", secondaryTextColor),
+                const SizedBox(height: AppSpacing.s8),
+                _buildCard(cardBg, borderColor, [
+                  Text("Ground Truth Facts (Zero Fabrication Source)", style: TextStyle(fontSize: 11, color: secondaryTextColor)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _proofPointsController,
+                    maxLines: 5,
+                    decoration: const InputDecoration(
+                      hintText: "List published patents, benchmarked research implementations, and verified certifications...",
                     ),
                   ),
-                ),
+                ]),
 
-                const SizedBox(height: 28),
-
-                // Save button banner
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.appleCrimson,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
-                    ),
-                    onPressed: _saving ? null : _saveProfile,
-                    child: _saving
-                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : const Text("Save All Profile Changes", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: AppSpacing.s24),
+                ElevatedButton(
+                  onPressed: _saving ? null : _saveProfile,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accentGreen,
+                    foregroundColor: AppColors.pureWhite,
+                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.s16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
                   ),
+                  child: const Text("Save Complete Profile", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                 ),
-                const SizedBox(height: AppSpacing.s32),
+                const SizedBox(height: AppSpacing.s24),
               ],
             ),
     );
   }
 
-  Widget _buildSectionHeader(String title, bool isDark) {
+  Widget _buildSectionHeader(String title, Color color) {
     return Text(
       title,
-      style: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.bold,
-        letterSpacing: 1.1,
-        color: isDark ? const Color(0xFF8E8E93) : const Color(0xFF636366),
-      ),
+      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: color),
     );
   }
 
-  Widget _buildTextField(
-    TextEditingController controller,
-    String label, {
-    String? hint,
-    String? helper,
-    TextInputType? keyboardType,
-  }) {
+  Widget _buildCard(Color cardBg, Color borderColor, List<Widget> children) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.s16),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
+    );
+  }
+
+  Widget _buildTextField(String label, TextEditingController controller, {TextInputType keyboardType = TextInputType.text}) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
       decoration: InputDecoration(
         labelText: label,
-        hintText: hint,
-        helperText: helper,
-        helperMaxLines: 2,
-        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       ),
     );
   }

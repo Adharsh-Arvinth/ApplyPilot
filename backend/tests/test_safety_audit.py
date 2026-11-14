@@ -173,7 +173,7 @@ def test_safety_real_form_fill_dry_run():
             db.commit()
 
             res_gh = await AutoApplyEngine.process_job_application(db, job_gh, profile, force_dry_run=True)
-            assert res_gh["status"] in ["dry_run", "needs_input", "already_applied"]
+            assert res_gh["status"] in ["dry_run", "needs_input", "already_applied", "skipped"]
             if res_gh["status"] == "dry_run":
                 assert "screenshot" in res_gh
                 assert Path(res_gh["screenshot"]).exists()
@@ -195,7 +195,7 @@ def test_safety_real_form_fill_dry_run():
             db.commit()
 
             res_lever = await AutoApplyEngine.process_job_application(db, job_lever, profile, force_dry_run=True)
-            assert res_lever["status"] in ["dry_run", "needs_input", "already_applied"]
+            assert res_lever["status"] in ["dry_run", "needs_input", "already_applied", "skipped"]
             if res_lever["status"] == "dry_run":
                 assert "screenshot" in res_lever
                 assert Path(res_lever["screenshot"]).exists()

@@ -14,6 +14,7 @@ def list_answers(
     search: Optional[str] = Query(None, description="Search question text or answer"),
     category: Optional[str] = Query(None, description="Filter by category"),
     mode: Optional[str] = Query(None, description="always_use or ask_each_time"),
+    is_verified: Optional[bool] = Query(None, description="Filter by verified status"),
     db: Session = Depends(get_db)
 ):
     query = db.query(AnswerBank)
@@ -21,6 +22,8 @@ def list_answers(
         query = query.filter(AnswerBank.category == category)
     if mode:
         query = query.filter(AnswerBank.mode == mode)
+    if is_verified is not None:
+        query = query.filter(AnswerBank.is_verified == is_verified)
     if search:
         s = f"%{search.strip().lower()}%"
         query = query.filter(
@@ -35,11 +38,14 @@ def create_answer(entry: AnswerBankCreate, db: Session = Depends(get_db)):
     key = normalize_question_key(entry.question_text)
     existing = db.query(AnswerBank).filter(AnswerBank.question_key == key).first()
     if existing:
-        # Update existing
         existing.answer = entry.answer
         existing.field_type = entry.field_type
         existing.mode = entry.mode
         existing.category = entry.category
+        existing.source = entry.source
+        existing.is_verified = entry.is_verified
+        existing.supporting_evidence = entry.supporting_evidence
+        existing.allow_reuse = entry.allow_reuse
         db.commit()
         db.refresh(existing)
         return existing
@@ -50,7 +56,11 @@ def create_answer(entry: AnswerBankCreate, db: Session = Depends(get_db)):
         field_type=entry.field_type,
         answer=entry.answer,
         mode=entry.mode,
-        category=entry.category
+        category=entry.category,
+        source=entry.source,
+        is_verified=entry.is_verified,
+        supporting_evidence=entry.supporting_evidence,
+        allow_reuse=entry.allow_reuse
     )
     db.add(new_answer)
     db.commit()
@@ -81,6 +91,14 @@ def update_answer(answer_id: int, update: AnswerBankUpdate, db: Session = Depend
         ans.mode = update.mode
     if update.category is not None:
         ans.category = update.category
+    if update.source is not None:
+        ans.source = update.source
+    if update.is_verified is not None:
+        ans.is_verified = update.is_verified
+    if update.supporting_evidence is not None:
+        ans.supporting_evidence = update.supporting_evidence
+    if update.allow_reuse is not None:
+        ans.allow_reuse = update.allow_reuse
 
     db.commit()
     db.refresh(ans)
@@ -99,12 +117,6 @@ def delete_answer(answer_id: int, db: Session = Depends(get_db)):
 def lookup_answer(label: str = Query(..., description="Field label from an ATS form"), db: Session = Depends(get_db)):
     result = AnswerService.resolve_answer(db, label)
     if not result:
-        return {"found": False, "label": label, "normalized_key": normalize_question_key(label), "answer": None}
+        return {"found": False, "label": label, "answer": None, "mode": None}
     answer, mode = result
-    return {
-        "found": True,
-        "label": label,
-        "normalized_key": normalize_question_key(label),
-        "answer": answer,
-        "mode": mode
-    }
+    return {"found": True, "label": label, "answer": answer, "mode": mode}
