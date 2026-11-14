@@ -155,10 +155,17 @@ def test_phase7_50_jobs_end_to_end_simulation():
             pdf_path = resume_info["pdf_path"]
             assert Path(pdf_path).exists()
 
+            clean_comp = "".join(c for c in job.company if c.isalnum() or c in (' ', '_')).rstrip().replace(' ', '_')
+            clean_role = "".join(c for c in job.title if c.isalnum() or c in (' ', '_')).rstrip().replace(' ', '_')
+            shot = next((settings.OUTPUT_DIR / "screenshots").glob(f"{clean_comp}_{clean_role}*.png"), None)
+            shot_path = str(shot) if shot else ""
+
             # Record simulated dry-run application
             app_rec = Application(
                 job_id=job.id,
                 resume_file=str(pdf_path),
+                form_screenshot=shot_path,
+                confirmation_screenshot=shot_path,
                 submitted_at=datetime.datetime.now(datetime.timezone.utc),
                 status="dry_run",
                 failure_reason=""

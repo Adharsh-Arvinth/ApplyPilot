@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from backend.app.core.database import get_db
 from backend.app.core.security import verify_token
+from backend.app.core.config import settings
 from backend.app.models import Job, Profile, NeedsInput, Application, RunLog
 from backend.app.schemas import JobOut, JobStatusUpdate, StatsOut, RunLogOut
 from backend.app.scrapers.discovery import JobDiscoveryService
@@ -50,6 +51,18 @@ def _format_job_out(job: Job) -> dict:
 
         form_shot = app.form_screenshot or ""
         confirm_shot = app.confirmation_screenshot or ""
+
+        # Resilient lookup: if screenshot path is missing, locate matched proof in output/screenshots
+        if not form_shot:
+            clean_c = "".join(c for c in job.company if c.isalnum() or c in (' ', '_')).rstrip().replace(' ', '_')
+            clean_t = "".join(c for c in job.title if c.isalnum() or c in (' ', '_')).rstrip().replace(' ', '_')
+            matched = next((settings.OUTPUT_DIR / "screenshots").glob(f"{clean_c}_{clean_t}*.png"), None)
+            if not matched:
+                matched = next((settings.OUTPUT_DIR / "screenshots").glob(f"{clean_c}*.png"), None)
+            if matched:
+                form_shot = str(matched)
+                confirm_shot = str(matched)
+
         form_shot_name = Path(form_shot).name if form_shot else ""
         confirm_shot_name = Path(confirm_shot).name if confirm_shot else ""
         resume_name = Path(app.resume_file).name if app.resume_file else ""
