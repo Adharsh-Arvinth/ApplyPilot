@@ -414,60 +414,57 @@ Respond in strict JSON with composite score and explainable sub-scores:
         title = (job.title or "").lower()
         company = (job.company or "").lower()
         loc = (job.location or "").lower()
-        
-        score = 3.2
-        reason = "Relevant technical role matching engineering background."
-        skills_score = 75.0
-        skills_reason = "General data and software engineering overlap"
-        experience_score = 85.0
-        exp_reason = "Suitable for early career / graduate"
-        education_score = 92.0
-        edu_reason = "VIT Vellore Integrated MTech CSE (Data Science) accredited credential"
-        location_score = 80.0
-        loc_reason = f"Location {job.location or 'India'}"
-        compensation_score = 85.0
-        comp_reason = "Compensation competitive or standard bracket"
-        role_relevance_score = 75.0
+        exp_req = (job.experience_required or "").lower()
 
-        # Tier 1 Target Roles (4.2 - 4.8)
-        if any(k in title for k in ["agentic", "code intelligence", "genai", "ai researcher", "machine learning intern", "associate data scientist"]):
-            score = 4.7
-            reason = "Exceptional alignment with candidate's patent R&D, neural architectures, and AWS AI background."
-            skills_score = 98.0
-            skills_reason = "Direct match for neural architectures and code intelligence benchmark"
-            experience_score = 95.0
-            role_relevance_score = 98.0
+        # 1. Role relevance factor
+        if any(k in title for k in ["agentic", "code intelligence", "genai", "ai researcher", "machine learning intern"]):
+            role_relevance_score = 94.0
+            role_label = "Tier 1 AI / Machine Learning focus"
         elif any(k in title for k in ["data scientist", "ml engineer", "machine learning", "ai engineer", "computer vision"]):
-            score = 4.3
-            reason = f"Direct match for primary North Star role in {job.location or 'target region'}."
-            skills_score = 92.0
-            skills_reason = "Strong overlap with PyTorch, Scikit-learn, and patent ML systems"
-            experience_score = 90.0
-            role_relevance_score = 95.0
-        elif any(k in title for k in ["solution consultant", "ai solution", "graduate engineer trainee", "associate ml engineer"]):
-            score = 4.1
-            reason = "Strong match for entry-level / associate enterprise AI consulting program."
-            skills_score = 88.0
-            skills_reason = "AWS certification and applied AI system design overlap"
-            experience_score = 92.0
             role_relevance_score = 90.0
-        elif any(k in title for k in ["data analyst", "analytics engineer", "analytics", "python developer", "backend developer"]):
-            score = 3.6
-            reason = "Secondary target role with strong Python, SQL, and data pipeline overlap."
-            skills_score = 78.0
-            skills_reason = "Python, SQL, and backend pipeline alignment"
-            experience_score = 85.0
+            role_label = "Core Data Science / ML Engineering"
+        elif any(k in title for k in ["solution consultant", "ai solution", "graduate engineer", "associate data scientist"]):
+            role_relevance_score = 86.0
+            role_label = "Associate / Graduate Engineering"
+        elif any(k in title for k in ["data analyst", "analytics engineer", "analytics", "python developer"]):
             role_relevance_score = 82.0
-        elif any(k in title for k in ["intermediate data engineer", "systems engineer"]) or eligibility.status == "potentially_eligible":
-            score = 3.4
-            reason = "Borderline stretch role (1-2 years preferred), suitable for Maybe swipe review."
-            skills_score = 72.0
-            skills_reason = "Data engineering and systems overlap"
-            experience_score = 70.0
-            exp_reason = "Intermediate role requiring 1-2 years experience"
+            role_label = "Analytics & Python Engineering"
+        elif any(k in title for k in ["backend software engineer", "software engineer", "backend developer"]):
+            role_relevance_score = 78.0
+            role_label = "Backend & Systems Development"
+        else:
             role_relevance_score = 70.0
+            role_label = "General Technical Engineering"
 
-        # Location factors
+        # 2. Dynamic Skills Alignment
+        core_skills = ["python", "pytorch", "machine learning", "data science", "sql", "fastapi", "docker", "deep learning", "algorithms", "analytics", "ai", "nlp", "computer vision"]
+        matched_skills = [s for s in core_skills if s in title]
+        if matched_skills:
+            skills_score = min(96.0, 78.0 + len(matched_skills) * 8.0)
+            skills_reason = f"Direct alignment on {', '.join(matched_skills[:3])}"
+        else:
+            skills_score = 75.0
+            skills_reason = "Foundational data science and computer engineering background"
+
+        # 3. Experience suitability
+        if any(k in title for k in ["intern", "graduate", "trainee"]) or any(k in exp_req for k in ["0-1", "fresher", "intern"]):
+            experience_score = 96.0
+            exp_reason = "Entry-level / early career qualification matched"
+        elif any(k in title for k in ["associate", "junior"]) or "1-2" in exp_req:
+            experience_score = 86.0
+            exp_reason = "Early professional role suitable for 0-1 year candidate"
+        elif "2-3" in exp_req:
+            experience_score = 72.0
+            exp_reason = "Stretch requirement (2-3 years preferred)"
+        else:
+            experience_score = 80.0
+            exp_reason = "Standard professional qualification profile"
+
+        # 4. Education accredited alignment
+        education_score = 92.0
+        edu_reason = f"Candidate credential: {profile.education if profile and profile.education else 'MTech CSE (Data Science)'}"
+
+        # 5. Location factors
         target_locations = []
         try:
             if profile and profile.locations_json:
@@ -476,20 +473,35 @@ Respond in strict JSON with composite score and explainable sub-scores:
             pass
 
         if "remote" in loc or "anywhere" in loc:
-            location_score = 95.0
+            location_score = 96.0
             loc_reason = "Fully remote role matches preferred work mode"
         elif any(tl in loc for tl in target_locations):
             location_score = 90.0
-            loc_reason = f"Matches preferred location ({job.location})"
+            loc_reason = f"Matches preferred target region ({job.location})"
         elif "india" in loc:
-            location_score = 85.0
-            loc_reason = "Domestic role with work authorization in India"
+            location_score = 84.0
+            loc_reason = f"Domestic India role ({job.location})"
         else:
-            location_score = 60.0
-            loc_reason = f"Outside primary regions ({job.location})"
+            location_score = 62.0
+            loc_reason = f"Outside primary regions ({job.location or 'Global'})"
+
+        compensation_score = 85.0
+        comp_reason = "Compensation competitive or standard bracket"
+
+        # Weighted composite score on 1.0 to 5.0 scale
+        weighted = (skills_score * 0.35 + experience_score * 0.25 + education_score * 0.15 + location_score * 0.15 + role_relevance_score * 0.10)
+        final_score = round(weighted / 20.0, 1)
+
+        # Ensure secondary & borderline roles reside in the 3.2 - 3.8 range for review
+        if any(k in title for k in ["data analyst", "analytics engineer", "python developer", "backend developer", "software developer", "software engineer"]) and not any(k in title for k in ["agentic", "genai", "intern", "machine learning", "data scientist", "ai"]):
+            final_score = min(3.8, max(3.4, final_score))
+        if eligibility.status in ["potentially_eligible", "needs_verification"] or job.is_assist_only:
+            final_score = min(3.8, max(3.2, final_score))
+
+        reason = f"{role_label} with {skills_reason} in {job.location or 'target region'}."
 
         return HeuristicResult({
-            "score": round(score, 1),
+            "score": final_score,
             "reason": reason,
             "eligibility_status": eligibility.status,
             "blocked_category": eligibility.blocked_category,

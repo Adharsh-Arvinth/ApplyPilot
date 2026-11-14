@@ -159,6 +159,10 @@ def migrate_db():
             ("missing_qualifications_json", "TEXT DEFAULT '[]'"),
             ("company_logo_url", "VARCHAR(512) DEFAULT ''"),
             ("is_saved", "BOOLEAN DEFAULT 0"),
+            ("evidence_level", "INTEGER DEFAULT 1"),
+            ("confirmation_number", "VARCHAR(128) DEFAULT ''"),
+            ("confirmation_text", "TEXT DEFAULT ''"),
+            ("evidence_notes", "TEXT DEFAULT ''"),
         ]
         for col_name, col_def in app_additions:
             if col_name not in app_cols:

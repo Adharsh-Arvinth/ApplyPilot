@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
+import '../core/apple_music_theme.dart';
 import '../core/hallmark_tokens.dart';
 
 class WidgetConfig {
@@ -297,26 +298,46 @@ class InterviewCountdownWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
-    final borderColor = isDark ? AppColors.borderHairlineDark : AppColors.borderHairlineLight;
-    final primaryTextColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
-    final secondaryTextColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
-    final teal = AppColors.getSemanticColor("teal", isDark);
+    final cardBg = isDark ? AppleMusicTheme.surface : AppColors.surfaceLight;
+    final borderColor = isDark ? AppleMusicTheme.hairline : AppColors.borderHairlineLight;
+    final primaryTextColor = isDark ? AppleMusicTheme.textPrimary : AppColors.textPrimaryLight;
+    final secondaryTextColor = isDark ? AppleMusicTheme.textSecondary : AppColors.textSecondaryLight;
+    final teal = AppleMusicTheme.blue;
 
     if (interviewData == null) {
       return Container(
         padding: const EdgeInsets.all(AppSpacing.s16),
         decoration: BoxDecoration(
           color: cardBg,
-          borderRadius: BorderRadius.circular(AppRadii.card),
+          borderRadius: BorderRadius.circular(AppleMusicTheme.radiusCard),
           border: Border.all(color: borderColor),
         ),
         child: Row(
           children: [
-            Icon(Icons.event_available_outlined, size: 20, color: teal),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppleMusicTheme.blueSubtle,
+                borderRadius: BorderRadius.circular(AppleMusicTheme.radiusControl),
+              ),
+              child: const Icon(Icons.event_available_outlined, size: 18, color: AppleMusicTheme.blue),
+            ),
             const SizedBox(width: AppSpacing.s12),
             Expanded(
-              child: Text("No upcoming interviews scheduled yet.", style: TextStyle(fontSize: 12, color: secondaryTextColor)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "No upcoming interviews scheduled",
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: primaryTextColor),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    "Autonomous pipeline actively scouting & tailoring applications",
+                    style: TextStyle(fontSize: 11, color: secondaryTextColor),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

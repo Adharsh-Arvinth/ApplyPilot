@@ -81,6 +81,10 @@ def _format_job_out(job: Job) -> dict:
             "confirmation_screenshot_url": f"/output/screenshots/{confirm_shot_name}" if confirm_shot_name else "",
             "submission_evidence": ev,
             "status": app.status,
+            "evidence_level": getattr(app, "evidence_level", 1) or 1,
+            "confirmation_number": getattr(app, "confirmation_number", "") or "",
+            "confirmation_text": getattr(app, "confirmation_text", "") or "",
+            "evidence_notes": getattr(app, "evidence_notes", "") or "",
             "failure_reason": app.failure_reason,
             "notes": app.notes or "",
             "recruiter_info": app.recruiter_info or "",
@@ -365,7 +369,9 @@ def get_assist_draft(job_id: int, db: Session = Depends(get_db)):
             "notice_period": profile.notice_period,
             "current_ctc": "0 LPA (Student / Fresher)",
             "expected_ctc": f"₹{profile.min_salary_inr:,} INR minimum",
-            "work_auth_india": "Yes, Indian citizen",
+            "work_auth": profile.work_authorization or "Yes, Indian citizen",
+            "work_auth_india": profile.work_authorization or "Yes, Indian citizen",
+            "verified_credentials": profile.education or "Integrated MTech CSE",
             "patents": "2 published patents (Driver Accident Predictor & Acoustic Doppler Session Guard)",
             "certifications": "AWS Solutions Architect"
         }

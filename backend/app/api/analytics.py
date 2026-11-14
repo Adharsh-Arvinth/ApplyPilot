@@ -75,10 +75,6 @@ def get_analytics(db: Session = Depends(get_db)):
     # 5. Top companies applied
     top_comp = db.query(Job.company, func.count(Job.id)).join(Application).group_by(Job.company).order_by(func.count(Job.id).desc()).limit(5).all()
     top_companies = [{"company": comp, "applications": cnt} for comp, cnt in top_comp]
-    if not top_companies and total_jobs > 0:
-        # Fallback to top discovered companies if application table is early stage
-        top_disc = db.query(Job.company, func.count(Job.id)).group_by(Job.company).order_by(func.count(Job.id).desc()).limit(5).all()
-        top_companies = [{"company": comp, "applications": max(cnt // 2, 1)} for comp, cnt in top_disc]
 
     # 6. Average response days
     avg_response_days = 4.2 if interviews > 0 else 0.0
@@ -155,8 +151,7 @@ def get_analytics(db: Session = Depends(get_db)):
         wds = datetime.datetime.combine(wd, datetime.time.min, tzinfo=datetime.timezone.utc)
         wde = datetime.datetime.combine(wd, datetime.time.max, tzinfo=datetime.timezone.utc)
         has_w_act = (db.query(Application).filter(Application.submitted_at >= wds, Application.submitted_at <= wde).count() > 0 or
-                     db.query(Job).filter(Job.created_at >= wds, Job.created_at <= wde).count() > 0 or
-                     wd <= now.date())
+                     db.query(Job).filter(Job.created_at >= wds, Job.created_at <= wde).count() > 0)
         weekly_days.append({
             "day": day_names[idx],
             "active": has_w_act,
@@ -207,7 +202,7 @@ def get_analytics(db: Session = Depends(get_db)):
         except Exception:
             pass
         if not factors:
-            factors = ["Python & PyTorch Stack", f"Location: {tm.location}", "Early Career 0-1 Yr"]
+            factors = [f"Location: {tm.location or 'India'}", f"Experience: {tm.experience_required or '0-1 years'}", "Verified Public ATS Listing"]
         top_matches.append({
             "id": tm.id,
             "company": tm.company,
@@ -229,28 +224,11 @@ def get_analytics(db: Session = Depends(get_db)):
             "title": upcoming_job.title,
             "scheduled_at": dt.isoformat(),
             "recruiter_info": upcoming_job.recruiter_info or "Senior Talent Lead",
-            "notes": upcoming_job.notes or "Technical screen on ML systems & distributed algorithms",
+            "notes": upcoming_job.notes or "Technical discussion",
             "proof_points": [
-                "MTech CSE Data Science, VIT Vellore (CGPA 7.62)",
-                "Patent: Proactive Multimodal Driver Accident Predictor",
-                "Patent: Acoustic Doppler Session Guard",
-                "Agentic Code Intelligence (25.59% NDCG@10 benchmark)"
-            ]
-        }
-    else:
-        # Fallback upcoming target interview
-        upcoming_interview = {
-            "job_id": 0,
-            "company": "Amazon (Target Pipeline)",
-            "title": "Data Scientist I - AI Lab",
-            "scheduled_at": (now + datetime.timedelta(days=2, hours=4)).isoformat(),
-            "recruiter_info": "Tech Talent Acquisition",
-            "notes": "Multimodal feature pipelines & code retrieval latency",
-            "proof_points": [
-                "MTech CSE Data Science, VIT Vellore (CGPA 7.62)",
-                "Patent: Proactive Multimodal Driver Accident Predictor",
-                "Patent: Acoustic Doppler Session Guard",
-                "Agentic Code Intelligence (25.59% NDCG@10 benchmark)"
+                f"{profile.education if profile else 'Technical Degree'}",
+                "Python & PyTorch Machine Learning Systems",
+                "Applied Data Science and Feature Engineering"
             ]
         }
 

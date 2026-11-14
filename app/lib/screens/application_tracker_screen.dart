@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
 import '../core/motion.dart';
+import '../core/apple_music_theme.dart';
 import '../ui_templates/theme/design_tokens.dart';
 import '../ui_templates/components/shadcn_card.dart';
 import '../ui_templates/components/shadcn_badge.dart';
@@ -72,10 +73,20 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
     final brassColor = isDark ? AppColors.brassDark : AppColors.mutedBrass;
 
     final queueCount = _allJobs.where((j) => ["queued", "approved"].contains(j["status"])).length;
+    final dryRunCount = _allJobs.where((j) {
+      final st = (j["status"] ?? "").toString().toLowerCase();
+      final apps = (j["applications"] as List<dynamic>?) ?? [];
+      final hasDryRun = apps.any((a) => a["status"] == "dry_run");
+      return st == "dry_run" || (hasDryRun && st != "submitted" && st != "applied");
+    }).length;
+    final appliedCount = _allJobs.where((j) {
+      final st = (j["status"] ?? "").toString().toLowerCase();
+      final apps = (j["applications"] as List<dynamic>?) ?? [];
+      final hasSubmitted = apps.any((a) => a["status"] == "submitted");
+      return (st == "submitted" || st == "applied" || st == "interview" || st == "offer") && (hasSubmitted || apps.isEmpty);
+    }).length;
     final maybeCount = _allJobs.where((j) => ["maybe", "evaluated", "discovered"].contains(j["status"])).length;
-    final appliedCount = _allJobs.where((j) => ["applied", "submitted", "dry_run", "interview", "offer"].contains(j["status"])).length;
-    final skippedCount = _allJobs.where((j) => ["skipped", "cooldown", "below_salary", "ineligible"].contains(j["status"])).length;
-    final blockedCount = _allJobs.where((j) => ["blocked", "captcha", "auth_required", "failed"].contains(j["status"])).length;
+    final skippedCount = _allJobs.where((j) => ["skipped", "cooldown", "below_salary", "ineligible", "blocked", "captcha", "failed"].contains(j["status"])).length;
 
     final filteredJobs = _allJobs.where((j) {
       final matchSearch = _searchQuery.isEmpty ||
@@ -83,17 +94,21 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
           (j["title"] ?? "").toString().toLowerCase().contains(_searchQuery.toLowerCase());
       
       final st = (j["status"] ?? "").toString().toLowerCase();
+      final apps = (j["applications"] as List<dynamic>?) ?? [];
+      final hasDryRun = apps.any((a) => a["status"] == "dry_run");
+      final hasSubmitted = apps.any((a) => a["status"] == "submitted");
+
       bool matchTab = true;
       if (_selectedStage == "queue") {
         matchTab = st == "queued" || st == "approved";
+      } else if (_selectedStage == "dry_run") {
+        matchTab = st == "dry_run" || (hasDryRun && st != "submitted");
+      } else if (_selectedStage == "applied") {
+        matchTab = (st == "submitted" || st == "applied" || st == "interview" || st == "offer") && (hasSubmitted || apps.isEmpty);
       } else if (_selectedStage == "maybe") {
         matchTab = st == "maybe" || st == "evaluated" || st == "discovered";
-      } else if (_selectedStage == "applied") {
-        matchTab = st == "applied" || st == "submitted" || st == "dry_run" || st == "interview" || st == "offer";
       } else if (_selectedStage == "skipped") {
-        matchTab = st == "skipped" || st == "cooldown" || st == "below_salary" || st == "ineligible";
-      } else if (_selectedStage == "blocked") {
-        matchTab = st == "blocked" || st == "captcha" || st == "auth_required" || st == "failed";
+        matchTab = st == "skipped" || st == "cooldown" || st == "below_salary" || st == "ineligible" || st == "blocked" || st == "captcha" || st == "failed";
       }
       return matchSearch && matchTab;
     }).toList();
@@ -155,15 +170,15 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: [
-                        _buildFilterPill("Queue ($queueCount)", "queue", accentGreen, isDark),
+                        _buildFilterPill("Queue ($queueCount)", "queue", AppleMusicTheme.blue, isDark),
                         const SizedBox(width: AppSpacing.s8),
-                        _buildFilterPill("Maybe ($maybeCount)", "maybe", brassColor, isDark),
+                        _buildFilterPill("Dry-Run ($dryRunCount)", "dry_run", AppleMusicTheme.amber, isDark),
                         const SizedBox(width: AppSpacing.s8),
-                        _buildFilterPill("Applied ($appliedCount)", "applied", AppColors.successEmerald, isDark),
+                        _buildFilterPill("Applied ($appliedCount)", "applied", AppleMusicTheme.emerald, isDark),
                         const SizedBox(width: AppSpacing.s8),
-                        _buildFilterPill("Skipped ($skippedCount)", "skipped", AppColors.warningLight, isDark),
+                        _buildFilterPill("Review ($maybeCount)", "maybe", AppleMusicTheme.violet, isDark),
                         const SizedBox(width: AppSpacing.s8),
-                        _buildFilterPill("Blocked ($blockedCount)", "blocked", AppColors.errorCoral, isDark),
+                        _buildFilterPill("Skipped ($skippedCount)", "skipped", AppleMusicTheme.coral, isDark),
                       ],
                     ),
                   ),
@@ -346,69 +361,31 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
           ),
           body: Column(
             children: [
-              // 1. Executive Autonomous Verification Card
+              // 1. Apple Music Evidence Telemetry Card
               Container(
-                margin: const EdgeInsets.all(12),
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF14241B), Color(0xFF0E1A13)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  color: const Color(0xFF141418),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF245B3A)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF10B981).withOpacity(0.08),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+                  border: Border.all(color: const Color(0x1FFFFFFF), width: 1.0),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF10B981).withOpacity(0.15),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.verified, size: 16, color: Color(0xFF34D399)),
+                        AppleMusicTheme.evidenceBadge(
+                          status == "SUBMITTED" ? 4 : 1,
+                          customText: status == "SUBMITTED" ? "Level 4: Confirmed Submitted" : "Level 1: Simulation (Dry-Run)",
                         ),
-                        const SizedBox(width: 8),
-                        const Expanded(
-                          child: Text(
-                            "Autonomous ATS Form-Fill Proof",
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFFECEEEC),
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF10B981).withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Text(
-                            "100% Populated",
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF34D399),
-                            ),
-                          ),
+                        const Text(
+                          "Playwright Chromium",
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: Color(0xFF8E8E93)),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
-                    const Divider(color: Color(0xFF1F3827), height: 1),
                     const SizedBox(height: 10),
                     Row(
                       children: [
@@ -416,13 +393,12 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text("APPLICANT", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF8B968B))),
+                              const Text("PORTAL ATS", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF636366))),
                               const SizedBox(height: 2),
-                              const Text("Verified Candidate", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFECEEEC))),
-                              const SizedBox(height: 6),
-                              const Text("TAILORED RESUME", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF8B968B))),
-                              const SizedBox(height: 2),
-                              Text("Candidate_${company}.pdf", style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: Color(0xFF34D399)), overflow: TextOverflow.ellipsis),
+                              Text(
+                                (job != null ? job['source'] ?? 'Public ATS' : 'Public ATS').toString().toUpperCase(),
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFF5F5F7)),
+                              ),
                             ],
                           ),
                         ),
@@ -430,19 +406,12 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text("AUTOMATION CORE", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF8B968B))),
-                              const SizedBox(height: 2),
-                              const Text("Playwright Chromium", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFECEEEC))),
-                              const SizedBox(height: 6),
-                              const Text("SAFETY GATE STATUS", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF8B968B))),
+                              const Text("TAILORED RESUME", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF636366))),
                               const SizedBox(height: 2),
                               Text(
-                                status == "SUBMITTED" ? "Live Submitted to Portal" : "Submission Safe-Gate Active",
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: status == "SUBMITTED" ? const Color(0xFF34D399) : const Color(0xFF38BDF8),
-                                ),
+                                "Candidate_${company}.pdf",
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF30D158)),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),

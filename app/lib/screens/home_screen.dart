@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
+import '../core/apple_music_theme.dart';
 import '../core/hallmark_tokens.dart';
 import '../widgets/smart_widgets.dart';
 import '../ui_templates/theme/design_tokens.dart';
@@ -340,33 +341,41 @@ class _HomeScreenState extends State<HomeScreen> {
     final finalWidgetOrder = [...pinnedList, ...unpinnedList];
 
     return Scaffold(
+      backgroundColor: isDark ? AppleMusicTheme.background : AppColors.canvasLight,
       appBar: AppBar(
         titleSpacing: AppSpacing.s16,
         elevation: 0,
-        backgroundColor: isDark ? HallmarkConsole.ground : AppColors.surfaceLight,
+        backgroundColor: isDark ? AppleMusicTheme.background : AppColors.surfaceLight,
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               "ApplyPilot",
               style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
                 letterSpacing: -0.3,
-                color: primaryTextColor,
+                color: isDark ? AppleMusicTheme.textPrimary : AppColors.textPrimaryLight,
               ),
             ),
             const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: HallmarkConsole.tagDecoration(tint: HallmarkConsole.coolLight),
-              child: const Text(
-                "CONSOLE",
+              decoration: BoxDecoration(
+                color: isDark ? AppleMusicTheme.emeraldSubtle : AppColors.racingGreenSubtle,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(
+                  color: isDark ? AppleMusicTheme.emerald.withOpacity(0.3) : AppColors.racingGreen.withOpacity(0.3),
+                  width: 0.8,
+                ),
+              ),
+              child: Text(
+                "AUTONOMOUS",
                 style: TextStyle(
                   fontSize: 9.5,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.6,
-                  color: HallmarkConsole.coolLight,
+                  color: isDark ? AppleMusicTheme.emerald : AppColors.racingGreen,
                 ),
               ),
             ),
@@ -376,18 +385,22 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: HallmarkConsole.tagDecoration(tint: ApplyPilotColors.aiViolet),
+              decoration: BoxDecoration(
+                color: AppleMusicTheme.violetSubtle,
+                borderRadius: BorderRadius.circular(AppleMusicTheme.radiusControl),
+                border: Border.all(color: AppleMusicTheme.violet.withOpacity(0.3)),
+              ),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.auto_awesome, size: 13, color: ApplyPilotColors.aiViolet),
+                  Icon(Icons.auto_awesome, size: 13, color: AppleMusicTheme.violet),
                   SizedBox(width: 4),
                   Text(
                     "AI Copilot",
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: ApplyPilotColors.aiViolet,
+                      color: AppleMusicTheme.violet,
                     ),
                   ),
                 ],
@@ -794,36 +807,43 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!isPaused) {
       return Container(
         margin: const EdgeInsets.only(bottom: AppSpacing.s12),
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12, vertical: AppSpacing.s8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: cardBg,
-          borderRadius: BorderRadius.circular(AppRadii.control),
-          border: Border.all(color: accentGreen.withOpacity(0.3)),
+          color: isDark ? AppleMusicTheme.surface : AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(AppleMusicTheme.radiusCard),
+          border: Border.all(color: isDark ? AppleMusicTheme.hairline : AppColors.borderHairlineLight),
         ),
         child: Row(
           children: [
             Container(
               width: 8,
               height: 8,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                color: accentGreen,
+                color: AppleMusicTheme.emerald,
               ),
             ),
             const SizedBox(width: AppSpacing.s8),
             Expanded(
               child: Text(
-                "Automation Running · $queueCount queued applications",
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: primaryTextColor),
+                "Automation Active · $queueCount queued applications",
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? AppleMusicTheme.textPrimary : AppColors.textPrimaryLight,
+                ),
               ),
             ),
-            InkWell(
-              onTap: _pauseAutomationFlow,
-              borderRadius: BorderRadius.circular(AppRadii.control),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                child: Text("Pause", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: amber)),
+            OutlinedButton(
+              onPressed: _pauseAutomationFlow,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppleMusicTheme.coral,
+                side: BorderSide(color: AppleMusicTheme.coral.withOpacity(0.5), width: 0.8),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                visualDensity: VisualDensity.compact,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppleMusicTheme.radiusControl)),
               ),
+              child: const Text("Pause", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
             ),
           ],
         ),
@@ -832,18 +852,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final isCap = state == "paused_by_daily_cap";
     final isBreaker = state == "paused_by_circuit_breaker";
-    final stateBadgeColor = isCap ? amber : (isBreaker ? coral : amber);
+    final stateBadgeColor = isCap ? AppleMusicTheme.amber : (isBreaker ? AppleMusicTheme.coral : AppleMusicTheme.amber);
     final stateTitle = isCap
         ? "PAUSED BY DAILY CAP"
         : (isBreaker ? "PAUSED BY CIRCUIT BREAKER" : (state == "paused_by_captcha" ? "PAUSED BY CAPTCHA" : "AUTOMATION PAUSED"));
 
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.s12),
-      padding: const EdgeInsets.all(AppSpacing.s16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        border: Border.all(color: stateBadgeColor.withOpacity(0.5), width: 1.2),
+        color: isDark ? AppleMusicTheme.surface : AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(AppleMusicTheme.radiusCard),
+        border: Border.all(color: stateBadgeColor.withOpacity(0.6), width: 1.0),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -853,14 +873,14 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.pause_circle_filled, size: 16, color: stateBadgeColor),
-                  const SizedBox(width: AppSpacing.s6),
+                  Icon(Icons.pause_circle_outline, size: 16, color: stateBadgeColor),
+                  const SizedBox(width: 6),
                   Text(
                     stateTitle,
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
-                      letterSpacing: 0.9,
+                      letterSpacing: 0.6,
                       color: stateBadgeColor,
                     ),
                   ),
@@ -869,54 +889,52 @@ class _HomeScreenState extends State<HomeScreen> {
               if (pausedAt.toString().isNotEmpty)
                 Text(
                   pausedAt.toString().contains("T") ? "at ${pausedAt.toString().split('T')[1].substring(0, 5)} IST" : "",
-                  style: TextStyle(fontSize: 10, color: secondaryTextColor),
+                  style: TextStyle(fontSize: 10, color: isDark ? AppleMusicTheme.textTertiary : AppColors.textMutedLight),
                 ),
             ],
           ),
-          const SizedBox(height: AppSpacing.s8),
+          const SizedBox(height: 6),
           Text(
             pauseReason.toString().replaceAll('_', ' ').toUpperCase(),
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: primaryTextColor),
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: isDark ? AppleMusicTheme.textPrimary : AppColors.textPrimaryLight,
+            ),
           ),
           if (pauseDetails.toString().isNotEmpty) ...[
             const SizedBox(height: 2),
             Text(
               pauseDetails.toString(),
-              style: TextStyle(fontSize: 11, height: 1.35, color: secondaryTextColor),
+              style: TextStyle(
+                fontSize: 11,
+                color: isDark ? AppleMusicTheme.textSecondary : AppColors.textSecondaryLight,
+              ),
             ),
           ],
-          const SizedBox(height: AppSpacing.s8),
-          Row(
-            children: [
-              Icon(Icons.info_outline, size: 13, color: secondaryTextColor),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  recovery.toString(),
-                  style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: secondaryTextColor),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.s12),
+          const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 "$queueCount jobs pending in queue",
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: secondaryTextColor),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: isDark ? AppleMusicTheme.textSecondary : AppColors.textSecondaryLight,
+                ),
               ),
               ElevatedButton.icon(
                 onPressed: _resumeAutomationFlow,
                 icon: const Icon(Icons.play_arrow, size: 15),
-                label: const Text("Resume Automation", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                label: const Text("Resume Automation", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: accentGreen,
-                  foregroundColor: AppColors.pureWhite,
+                  backgroundColor: AppleMusicTheme.emerald,
+                  foregroundColor: Colors.black,
                   visualDensity: VisualDensity.compact,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppleMusicTheme.radiusControl)),
                   elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 ),
               ),
             ],

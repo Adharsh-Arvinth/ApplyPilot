@@ -187,6 +187,10 @@ class Application(Base):
     submission_evidence_json = Column(Text, default="{}") # Contains response code, form field dump, hash
     
     status = Column(String(32), default="dry_run") # dry_run, submitted, failed, interview, offer
+    evidence_level = Column(Integer, default=1) # 1=simulation/dry_run, 2=form_completed, 3=submission_attempted, 4=submission_confirmed
+    confirmation_number = Column(String(128), default="")
+    confirmation_text = Column(Text, default="")
+    evidence_notes = Column(Text, default="")
     failure_reason = Column(Text, default="")
     notes = Column(Text, default="")
     recruiter_info = Column(String(256), default="")

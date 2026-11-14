@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/design_tokens.dart';
@@ -354,76 +355,83 @@ class KiteAppShell extends StatelessWidget {
   }
 
   Widget _buildMobileBottomBar(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: TemplateTokens.surface,
-        border: Border(top: BorderSide(color: TemplateTokens.border, width: 1.0)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: TemplateTokens.s4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: List.generate(items.length, (idx) {
-              final item = items[idx];
-              final isSelected = currentIndex == idx;
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Color(0xD90A0A0C),
+            border: Border(top: BorderSide(color: Color(0x1FFFFFFF), width: 0.8)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: List.generate(items.length, (idx) {
+                  final item = items[idx];
+                  final isSelected = currentIndex == idx;
+                  const activeColor = Color(0xFF30D158);
+                  const inactiveColor = Color(0xFF8E8E93);
 
-              return InkWell(
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  onNavigationChanged(idx);
-                },
-                borderRadius: BorderRadius.circular(TemplateTokens.radiusMd),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Stack(
-                        clipBehavior: Clip.none,
+                  return InkWell(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      onNavigationChanged(idx);
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            isSelected ? item.activeIcon : item.icon,
-                            size: 20,
-                            color: isSelected ? TemplateTokens.accent : TemplateTokens.textMuted,
-                          ),
-                          if (item.badgeCount > 0)
-                            Positioned(
-                              top: -4,
-                              right: -8,
-                              child: Container(
-                                padding: const EdgeInsets.all(3),
-                                decoration: const BoxDecoration(
-                                  color: TemplateTokens.error,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Text(
-                                  item.badgeCount > 9 ? "9+" : "${item.badgeCount}",
-                                  style: const TextStyle(
-                                    fontSize: 8,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white,
+                          Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Icon(
+                                isSelected ? item.activeIcon : item.icon,
+                                size: 22,
+                                color: isSelected ? activeColor : inactiveColor,
+                              ),
+                              if (item.badgeCount > 0)
+                                Positioned(
+                                  top: -4,
+                                  right: -8,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFFFF453A),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Text(
+                                      item.badgeCount > 9 ? "9+" : "${item.badgeCount}",
+                                      style: const TextStyle(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            item.label,
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                              color: isSelected ? activeColor : inactiveColor,
                             ),
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        item.label,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                          color: isSelected ? TemplateTokens.accent : TemplateTokens.textMuted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }),
+                    ),
+                  );
+                }),
+              ),
+            ),
           ),
         ),
       ),
