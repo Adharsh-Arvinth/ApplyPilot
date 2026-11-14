@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
+import '../core/motion.dart';
 
 class ApplicationTrackerScreen extends StatefulWidget {
   const ApplicationTrackerScreen({super.key});
@@ -20,10 +21,6 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
 
   List<dynamic> _allJobs = [];
   Map<String, dynamic> _kanbanData = {};
-
-  final List<String> _stages = [
-    "queue", "maybe", "applied", "skipped", "blocked"
-  ];
 
   @override
   void initState() {
@@ -225,65 +222,72 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
         final latestApp = apps.isNotEmpty ? apps.last : null;
         final status = (job["status"] ?? "discovered").toString();
         final score = (job["score"] as num? ?? 0.0).toDouble();
-        final matchPercent = ((score / 5.0) * 100).round();
         final eligStatus = job["eligibility_status"] ?? "eligible";
         final blockedCat = job["blocked_category"] ?? "";
         final skipReason = job["skip_reason"] ?? job["eligibility_reason"] ?? "";
         final matchingSkills = (job["matching_skills"] as List<dynamic>?) ?? [];
         final missingSkills = (job["missing_skills"] as List<dynamic>?) ?? [];
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: AppSpacing.s12),
-          child: Material(
-            color: cardBg,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadii.card),
-              side: BorderSide(color: borderColor),
-            ),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(AppRadii.card),
-              onTap: () => _openDetailModal(job),
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.s16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            job["company"] ?? "",
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: secondaryTextColor),
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final emerald = AppColors.getSemanticColor("emerald", isDark);
+        final amber = AppColors.getSemanticColor("amber", isDark);
+        final coral = AppColors.getSemanticColor("coral", isDark);
+        final dotColor = score >= 4.0 ? emerald : (score >= 3.0 ? amber : coral);
+
+        return MotionFadeSlide(
+          index: idx,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: AppSpacing.s12),
+            child: Material(
+              color: cardBg,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadii.card),
+                side: BorderSide(color: borderColor),
+              ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(AppRadii.card),
+                onTap: () => _openDetailModal(job),
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.s16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              job["company"] ?? "",
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: secondaryTextColor),
+                            ),
                           ),
-                        ),
-                        if (score > 0) ...[
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 6,
-                                height: 6,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: score >= 4.0 ? accentGreen : brassColor,
+                          if (score > 0) ...[
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 7,
+                                  height: 7,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: dotColor,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 5),
-                              Text(
-                                "• ${score.toStringAsFixed(1)} / 5.0",
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: primaryTextColor,
+                                const SizedBox(width: 6),
+                                Text(
+                                  "${score.toStringAsFixed(1)} / 5.0",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: primaryTextColor,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(width: AppSpacing.s8),
+                              ],
+                            ),
+                            const SizedBox(width: AppSpacing.s8),
+                          ],
+                          _buildStatusPill(status, accentGreen, brassColor),
                         ],
-                        _buildStatusPill(status, accentGreen, brassColor),
-                      ],
-                    ),
+                      ),
                     const SizedBox(height: 6),
                     Text(
                       job["title"] ?? "",
@@ -363,7 +367,7 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
               ),
             ),
           ),
-        );
+        ));
       },
     );
   }

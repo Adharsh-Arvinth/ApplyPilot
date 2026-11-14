@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
+import '../core/motion.dart';
 
 class AnswerBankScreen extends StatefulWidget {
   const AnswerBankScreen({super.key});
@@ -93,7 +94,6 @@ class _AnswerBankScreenState extends State<AnswerBankScreen> {
     final cardBg = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
     final borderColor = isDark ? AppColors.borderHairlineDark : AppColors.borderHairlineLight;
     final accentGreen = isDark ? AppColors.accentDark : AppColors.racingGreen;
-    final brassColor = isDark ? AppColors.brassDark : AppColors.mutedBrass;
 
     return Scaffold(
       appBar: AppBar(
@@ -189,17 +189,18 @@ class _AnswerBankScreenState extends State<AnswerBankScreen> {
                           final id = ans["id"] as int;
                           final isVerified = ans["is_verified"] == true;
                           final evidence = ans["supporting_evidence"] ?? "";
-                          final source = ans["source"] ?? "candidate_profile";
                           final allowReuse = ans["allow_reuse"] != false;
 
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: AppSpacing.s12),
-                            decoration: BoxDecoration(
-                              color: cardBg,
-                              borderRadius: BorderRadius.circular(AppRadii.card),
-                              border: Border.all(color: borderColor),
-                            ),
-                            child: Padding(
+                          return MotionFadeSlide(
+                            index: idx,
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: AppSpacing.s12),
+                              decoration: BoxDecoration(
+                                color: cardBg,
+                                borderRadius: BorderRadius.circular(AppRadii.card),
+                                border: Border.all(color: borderColor),
+                              ),
+                              child: Padding(
                               padding: const EdgeInsets.all(AppSpacing.s16),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -297,7 +298,7 @@ class _AnswerBankScreenState extends State<AnswerBankScreen> {
                                 ],
                               ),
                             ),
-                          );
+                          ));
                         },
                       ),
           ),

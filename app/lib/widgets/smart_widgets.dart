@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../core/theme.dart';
-import '../core/api_client.dart';
 
 class WidgetConfig {
   static const String goal = "goal";
@@ -598,7 +597,7 @@ class NeedsAttentionWidget extends StatelessWidget {
     final missingFields = (attentionData["missing_profile_fields"] as List<dynamic>?) ?? [];
     final isTripped = (attentionData["circuit_breaker_tripped"] ?? false) as bool;
 
-    final hasCritical = needsYouCount > 0 || isTripped;
+    final hasCritical = needsYouCount > 0 || isTripped || failedTasks > 0;
     final themeColor = hasCritical ? coral : amber;
 
     return Container(
@@ -675,7 +674,20 @@ class NeedsAttentionWidget extends StatelessWidget {
               ),
             ),
           ],
-          if (needsYouCount == 0 && pendingApprovals == 0 && missingFields.isEmpty)
+          if (failedTasks > 0) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, size: 16, color: coral),
+                  const SizedBox(width: AppSpacing.s8),
+                  Expanded(child: Text("$failedTasks automated task failed (review execution log)", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: primaryTextColor))),
+                  Icon(Icons.chevron_right, size: 16, color: secondaryTextColor),
+                ],
+              ),
+            ),
+          ],
+          if (needsYouCount == 0 && pendingApprovals == 0 && missingFields.isEmpty && failedTasks == 0)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
@@ -1022,7 +1034,6 @@ class QuickActionsWidget extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardBg = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
     final borderColor = isDark ? AppColors.borderHairlineDark : AppColors.borderHairlineLight;
-    final primaryTextColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
     final secondaryTextColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
     return Container(

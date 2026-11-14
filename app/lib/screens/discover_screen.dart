@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
+import '../core/motion.dart';
 import 'ai_assistant_screen.dart';
 
 class DiscoverScreen extends StatefulWidget {
@@ -229,17 +230,23 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                             final jobId = job["id"] as int;
                             final isExpanded = _expandedJobIds.contains(jobId);
                             final score = (job["score"] as num?)?.toDouble() ?? 0.0;
-                            final scorePct = (score / 5.0 * 100).round();
                             final fit = job["fit_breakdown"] as Map<String, dynamic>? ?? {};
 
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: AppSpacing.s12),
-                              decoration: BoxDecoration(
-                                color: cardBg,
-                                borderRadius: BorderRadius.circular(AppRadii.card),
-                                border: Border.all(color: borderColor),
-                              ),
-                              child: Column(
+                            final emerald = AppColors.getSemanticColor("emerald", isDark);
+                            final amber = AppColors.getSemanticColor("amber", isDark);
+                            final coral = AppColors.getSemanticColor("coral", isDark);
+                            final dotColor = score >= 4.0 ? emerald : (score >= 3.0 ? amber : coral);
+
+                            return MotionFadeSlide(
+                              index: idx,
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: AppSpacing.s12),
+                                decoration: BoxDecoration(
+                                  color: cardBg,
+                                  borderRadius: BorderRadius.circular(AppRadii.card),
+                                  border: Border.all(color: borderColor),
+                                ),
+                                child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Padding(
@@ -247,7 +254,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        // Header: Company + Match Badge
+                                        // Header: Company + Semantic Match Score Dot
                                         Row(
                                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                           children: [
@@ -266,16 +273,16 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
                                                 Container(
-                                                  width: 6,
-                                                  height: 6,
+                                                  width: 7,
+                                                  height: 7,
                                                   decoration: BoxDecoration(
                                                     shape: BoxShape.circle,
-                                                    color: score >= 4.0 ? accentGreen : brassColor,
+                                                    color: dotColor,
                                                   ),
                                                 ),
-                                                const SizedBox(width: 5),
+                                                const SizedBox(width: 6),
                                                 Text(
-                                                  "• ${score.toStringAsFixed(1)} / 5.0",
+                                                  "${score.toStringAsFixed(1)} / 5.0",
                                                   style: TextStyle(
                                                     fontSize: 12,
                                                     fontWeight: FontWeight.w600,
@@ -438,7 +445,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                                   ),
                                 ],
                               ),
-                            );
+                            ));
                           },
                         ),
                       ),
@@ -875,6 +882,25 @@ class _AiJobIntelligenceSheetState extends State<_AiJobIntelligenceSheet> {
                       ),
                     );
                   }),
+
+                  if (behavQs.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.s12),
+                    Text("BEHAVIORAL & CULTURE FIT QUESTIONS", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: secondaryTextColor)),
+                    const SizedBox(height: 8),
+                    ...behavQs.map((q) {
+                      final qMap = q as Map<String, dynamic>;
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(AppSpacing.s12),
+                        decoration: BoxDecoration(
+                          color: isDark ? ApplyPilotColors.darkCard : Colors.white,
+                          borderRadius: BorderRadius.circular(AppRadii.control),
+                          border: Border.all(color: isDark ? ApplyPilotColors.darkBorder : ApplyPilotColors.lightBorder),
+                        ),
+                        child: Text(qMap["question"] ?? "", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: primaryTextColor)),
+                      );
+                    }),
+                  ],
 
                   const SizedBox(height: AppSpacing.s16),
 

@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="ApplyPilot Backend API",
     description="Autonomous career intelligence & job application agent backend running on user's always-on Windows PC",
-    version="1.2.0",
+    version="1.3.0",
     lifespan=lifespan
 )
 

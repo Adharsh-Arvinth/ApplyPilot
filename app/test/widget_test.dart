@@ -6,6 +6,7 @@ import 'package:applypilot/core/theme.dart';
 import 'package:applypilot/widgets/smart_widgets.dart';
 import 'package:applypilot/widgets/interactive_charts.dart';
 import 'package:applypilot/screens/ai_assistant_screen.dart';
+import 'package:applypilot/core/motion.dart';
 
 void main() {
   testWidgets('ApplyPilotApp boots to MainNavigationShell when onboarding is complete', (WidgetTester tester) async {
@@ -100,6 +101,38 @@ void main() {
     expect(find.text("Career Advisor"), findsOneWidget);
     expect(find.byType(TextField), findsOneWidget);
     expect(find.text("Review my top matched jobs today"), findsOneWidget);
+  });
+
+  testWidgets('AppMotion components render and handle interactions', (WidgetTester tester) async {
+    bool tapped = false;
+
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.darkTheme,
+      home: Scaffold(
+        body: ListView(
+          children: [
+            InteractivePressable(
+              onTap: () => tapped = true,
+              child: const Text("Pressable Target"),
+            ),
+            const MotionFadeSlide(
+              index: 0,
+              child: Text("Staggered Item 0"),
+            ),
+            const ShimmerSkeleton(width: 120, height: 20),
+          ],
+        ),
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text("Pressable Target"), findsOneWidget);
+    expect(find.text("Staggered Item 0"), findsOneWidget);
+    expect(find.byType(ShimmerSkeleton), findsOneWidget);
+
+    await tester.tap(find.text("Pressable Target"));
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(tapped, isTrue);
   });
 }
 

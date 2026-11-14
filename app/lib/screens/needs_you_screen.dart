@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
+import '../core/motion.dart';
 
 class NeedsYouScreen extends StatefulWidget {
   const NeedsYouScreen({super.key});
@@ -343,16 +344,40 @@ class _NeedsYouScreenState extends State<NeedsYouScreen> {
                     final controller = _controllers[id];
                     final options = (item["options"] as List<dynamic>?) ?? [];
 
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: AppSpacing.s16),
-                      decoration: BoxDecoration(
-                        color: cardBg,
-                        borderRadius: BorderRadius.circular(AppRadii.card),
-                        border: Border.all(color: brassColor.withOpacity(0.4)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
+                    final coral = AppColors.getSemanticColor("coral", isDark);
+
+                    return MotionFadeSlide(
+                      index: idx,
+                      child: Dismissible(
+                        key: ValueKey("ny_$id"),
+                        direction: DismissDirection.endToStart,
+                        background: Container(
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          decoration: BoxDecoration(
+                            color: coral.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(AppRadii.card),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text("Dismiss", style: TextStyle(color: coral, fontWeight: FontWeight.bold, fontSize: 13)),
+                              const SizedBox(width: 8),
+                              Icon(Icons.delete_outline, color: coral),
+                            ],
+                          ),
+                        ),
+                        onDismissed: (_) => _dismissItem(id),
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: AppSpacing.s16),
+                          decoration: BoxDecoration(
+                            color: cardBg,
+                            borderRadius: BorderRadius.circular(AppRadii.card),
+                            border: Border.all(color: brassColor.withOpacity(0.4)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                           // Header: Company + Role Badge
                           Container(
                             padding: const EdgeInsets.all(AppSpacing.s16),
@@ -518,7 +543,7 @@ class _NeedsYouScreenState extends State<NeedsYouScreen> {
                           ),
                         ],
                       ),
-                    );
+                    )));
                   },
                 ),
     );

@@ -7,7 +7,7 @@
 [![Firebase](https://img.shields.io/badge/Cloud-Firebase%20Admin-FFCA28.svg?logo=firebase)](https://firebase.google.com)
 [![Playwright](https://img.shields.io/badge/Automation-Playwright-2EAD33.svg?logo=playwright)](https://playwright.dev)
 [![Tailscale](https://img.shields.io/badge/Network-Tailscale%20Mesh%20VPN-4F46E5.svg?logo=tailscale)](https://tailscale.com)
-[![Tests: 60 passed](https://img.shields.io/badge/Tests-60%20Backend%20%7C%205%20Flutter%20Passed-brightgreen.svg)]()
+[![Tests: 62 passed](https://img.shields.io/badge/Tests-62%20Backend%20%7C%206%20Flutter%20Passed-brightgreen.svg)]()
 [![Release: v1.3.0](https://img.shields.io/badge/Release-v1.3.0%20Production%20Ready-blue.svg)]()
 
 **ApplyPilot** is an autonomous, candidate-first career command center and application cockpit designed for Android and Web with an always-on Windows PC backend. Powered by **Google Gemini 2.5 Flash** and backed by **Firebase Cloud Infrastructure**, it automates genuine ATS job discovery across **Greenhouse, Lever, and Ashby**, two-stage eligibility and 5-factor fit scoring, ATS resume tailoring, intelligent Answer Bank recall, and ATS form filling, while escalating to you **only** when an application genuinely requires human judgment.
@@ -297,9 +297,9 @@ The production release artifact is compiled and verified:
 
 - **File**: `output/ApplyPilot.apk`
 - **Architecture**: `arm64-v8a` (Universal Modern Android)
-- **Version**: `1.3.0` (Complete Product Audit, Real ATS Discovery & UI/UX Upgrade)
-- **Size**: `18.18 MB` (19,064,524 bytes) — *Optimized lightweight build, zero GitHub size warnings*
-- **SHA-256**: `6341712640C8B158521EEFA2AD254415E932CCAB3B7D3CEEFBCD9FD186CC3944`
+- **Version**: `1.3.0` (Complete Product Audit, Real ATS Discovery, Motion & UI/UX Upgrade)
+- **Size**: `18.18 MB` (19,064,372 bytes) — *Optimized lightweight build, zero GitHub size warnings*
+- **SHA-256**: `864550C50EB97984D82B4F20C538CC4E2E03F523337DB1EBCCBD71ABAD74BB8B`
 - **Target SDK**: Android 14 (API 34) / Min SDK: Android 8.0 (API 26)
 - **Flutter Web Build**: Compiled to `app/build/web` and hosted natively at `http://localhost:8000/app/`
 - **Metadata**: Verified in `output/ApplyPilot-release-info.json`
