@@ -16,13 +16,13 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
   bool _loading = true;
   bool _isKanban = false;
   String _searchQuery = "";
-  String _selectedStage = "all"; // all, approved, submitted, interview, offer, rejected
+  String _selectedStage = "queue"; // queue, maybe, applied, blocked
 
   List<dynamic> _allJobs = [];
   Map<String, dynamic> _kanbanData = {};
 
   final List<String> _stages = [
-    "discovered", "evaluated", "approved", "preparing", "awaiting_review", "submitted", "interview", "offer", "rejected", "withdrawn"
+    "queue", "maybe", "applied", "blocked"
   ];
 
   @override
@@ -68,12 +68,28 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
     final accentGreen = isDark ? AppColors.accentDark : AppColors.racingGreen;
     final brassColor = isDark ? AppColors.brassDark : AppColors.mutedBrass;
 
+    final queueCount = _allJobs.where((j) => ["queued", "approved"].contains(j["status"])).length;
+    final maybeCount = _allJobs.where((j) => ["maybe", "evaluated", "discovered"].contains(j["status"])).length;
+    final appliedCount = _allJobs.where((j) => ["applied", "submitted", "dry_run", "interview", "offer"].contains(j["status"])).length;
+    final blockedCount = _allJobs.where((j) => ["blocked", "skipped", "rejected", "failed"].contains(j["status"])).length;
+
     final filteredJobs = _allJobs.where((j) {
       final matchSearch = _searchQuery.isEmpty ||
           (j["company"] ?? "").toString().toLowerCase().contains(_searchQuery.toLowerCase()) ||
           (j["title"] ?? "").toString().toLowerCase().contains(_searchQuery.toLowerCase());
-      final matchStage = _selectedStage == "all" || j["status"] == _selectedStage;
-      return matchSearch && matchStage;
+      
+      final st = (j["status"] ?? "").toString().toLowerCase();
+      bool matchTab = true;
+      if (_selectedStage == "queue") {
+        matchTab = st == "queued" || st == "approved";
+      } else if (_selectedStage == "maybe") {
+        matchTab = st == "maybe" || st == "evaluated" || st == "discovered";
+      } else if (_selectedStage == "applied") {
+        matchTab = st == "applied" || st == "submitted" || st == "dry_run" || st == "interview" || st == "offer";
+      } else if (_selectedStage == "blocked") {
+        matchTab = st == "blocked" || st == "skipped" || st == "rejected" || st == "failed";
+      }
+      return matchSearch && matchTab;
     }).toList();
 
     return Scaffold(
@@ -133,17 +149,13 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: [
-                        _buildFilterPill("All Stages", "all", accentGreen),
+                        _buildFilterPill("Queue ($queueCount)", "queue", accentGreen),
                         const SizedBox(width: AppSpacing.s8),
-                        _buildFilterPill("Approved", "approved", accentGreen),
+                        _buildFilterPill("Maybe ($maybeCount)", "maybe", brassColor),
                         const SizedBox(width: AppSpacing.s8),
-                        _buildFilterPill("Submitted", "submitted", accentGreen),
+                        _buildFilterPill("Applied ($appliedCount)", "applied", AppColors.successEmerald),
                         const SizedBox(width: AppSpacing.s8),
-                        _buildFilterPill("Interview", "interview", brassColor),
-                        const SizedBox(width: AppSpacing.s8),
-                        _buildFilterPill("Offer", "offer", AppColors.successLight),
-                        const SizedBox(width: AppSpacing.s8),
-                        _buildFilterPill("Closed", "rejected", AppColors.errorLight),
+                        _buildFilterPill("Blocked ($blockedCount)", "blocked", AppColors.errorCoral),
                       ],
                     ),
                   ),
@@ -207,6 +219,13 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
         final apps = (job["applications"] as List<dynamic>?) ?? [];
         final latestApp = apps.isNotEmpty ? apps.last : null;
         final status = (job["status"] ?? "discovered").toString();
+        final score = (job["score"] as num? ?? 0.0).toDouble();
+        final matchPercent = ((score / 5.0) * 100).round();
+        final eligStatus = job["eligibility_status"] ?? "eligible";
+        final blockedCat = job["blocked_category"] ?? "";
+        final skipReason = job["skip_reason"] ?? job["eligibility_reason"] ?? "";
+        final matchingSkills = (job["matching_skills"] as List<dynamic>?) ?? [];
+        final missingSkills = (job["missing_skills"] as List<dynamic>?) ?? [];
 
         return Container(
           margin: const EdgeInsets.only(bottom: AppSpacing.s12),
@@ -216,51 +235,117 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
               borderRadius: BorderRadius.circular(AppRadii.card),
               side: BorderSide(color: borderColor),
             ),
-            child: ListTile(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(AppRadii.card),
               onTap: () => _openDetailModal(job),
-              contentPadding: const EdgeInsets.all(AppSpacing.s16),
-              title: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      job["company"] ?? "",
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: secondaryTextColor),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.s16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            job["company"] ?? "",
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: secondaryTextColor),
+                          ),
+                        ),
+                        if (score > 0) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: accentGreen.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(AppRadii.badge),
+                              border: Border.all(color: accentGreen.withOpacity(0.3)),
+                            ),
+                            child: Text(
+                              "${score.toStringAsFixed(1)} / 5.0 ($matchPercent%)",
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: accentGreen),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.s8),
+                        ],
+                        _buildStatusPill(status, accentGreen, brassColor),
+                      ],
                     ),
-                  ),
-                  _buildStatusPill(status, accentGreen, brassColor),
-                ],
-              ),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 4),
-                  Text(
-                    job["title"] ?? "",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: primaryTextColor),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Icon(Icons.place_outlined, size: 12, color: secondaryTextColor),
-                      const SizedBox(width: 4),
-                      Text(job["location"] ?? "India", style: TextStyle(fontSize: 11, color: secondaryTextColor)),
-                      const SizedBox(width: 12),
-                      Icon(Icons.history, size: 12, color: secondaryTextColor),
-                      const SizedBox(width: 4),
-                      Text(
-                        latestApp != null ? "Applied ${latestApp['submitted_at'].toString().split('T')[0]}" : "Discovered",
-                        style: TextStyle(fontSize: 11, color: secondaryTextColor),
+                    const SizedBox(height: 6),
+                    Text(
+                      job["title"] ?? "",
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: primaryTextColor),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(Icons.place_outlined, size: 12, color: secondaryTextColor),
+                        const SizedBox(width: 4),
+                        Text(job["location"] ?? "India", style: TextStyle(fontSize: 11, color: secondaryTextColor)),
+                        const SizedBox(width: 12),
+                        Icon(Icons.work_outline, size: 12, color: secondaryTextColor),
+                        const SizedBox(width: 4),
+                        Text(job["experience_required"] ?? "0-1 yrs", style: TextStyle(fontSize: 11, color: secondaryTextColor)),
+                        const SizedBox(width: 12),
+                        Icon(Icons.history, size: 12, color: secondaryTextColor),
+                        const SizedBox(width: 4),
+                        Text(
+                          latestApp != null ? "Applied ${latestApp['submitted_at'].toString().split('T')[0]}" : "Tracked",
+                          style: TextStyle(fontSize: 11, color: secondaryTextColor),
+                        ),
+                      ],
+                    ),
+                    // Stage A & Blocked Reason Badges
+                    if (blockedCat.toString().isNotEmpty || eligStatus == "ineligible") ...[
+                      const SizedBox(height: AppSpacing.s8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: AppSpacing.s6),
+                        decoration: BoxDecoration(
+                          color: AppColors.errorCoral.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(AppRadii.control),
+                          border: Border.all(color: AppColors.errorCoral.withOpacity(0.25)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.block, size: 14, color: AppColors.errorCoral),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                skipReason.toString().isNotEmpty ? skipReason : "Ineligible for auto-apply: Experience requirements exceed early-career profile.",
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.errorCoral),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
-                  ),
-                  if (job["notes"] != null && job["notes"].toString().isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text("Note: ${job['notes']}", style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: secondaryTextColor)),
+                    // Skills Preview Chips
+                    if (matchingSkills.isNotEmpty || missingSkills.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.s8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          ...matchingSkills.take(3).map((s) => Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.successEmerald.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(AppRadii.badge),
+                            ),
+                            child: Text("✓ $s", style: const TextStyle(fontSize: 10, color: AppColors.successEmerald, fontWeight: FontWeight.w600)),
+                          )),
+                          ...missingSkills.take(2).map((s) => Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: secondaryTextColor.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(AppRadii.badge),
+                            ),
+                            child: Text("• $s", style: TextStyle(fontSize: 10, color: secondaryTextColor)),
+                          )),
+                        ],
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
-              trailing: const Icon(Icons.chevron_right, size: 20),
             ),
           ),
         );

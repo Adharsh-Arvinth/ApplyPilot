@@ -2,14 +2,18 @@ import io
 import json
 import secrets
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from pypdf import PdfReader
 from sqlalchemy.orm import Session
 from backend.app.core.config import settings
 from backend.app.core.database import get_db
 from backend.app.core.security import verify_token
-from backend.app.models import Profile, RunLog
-from backend.app.schemas import ProfileOut, ProfileUpdate, TokenRotationOut
+from backend.app.models import Profile, RunLog, CandidateRecord
+from backend.app.schemas import (
+    ProfileOut, ProfileUpdate, TokenRotationOut,
+    CandidateRecordOut, CandidateRecordCreate, CandidateRecordUpdate
+)
 
 router = APIRouter(prefix="/profile", tags=["Profile"], dependencies=[Depends(verify_token)])
 
@@ -51,7 +55,9 @@ def _format_profile_out(p: Profile) -> dict:
         "widget_preferences": widgets,
         "min_salary_inr": p.min_salary_inr,
         "daily_cap": p.daily_cap,
+        "daily_target": getattr(p, "daily_target", 50) or 50,
         "hourly_cap": p.hourly_cap,
+        "timezone": getattr(p, "timezone", "Asia/Kolkata") or "Asia/Kolkata",
         "min_fit_score": p.min_fit_score,
         "maybe_fit_score": p.maybe_fit_score,
         "active_hours_start": p.active_hours_start,
@@ -201,3 +207,66 @@ async def upload_resume(file: UploadFile = File(...), db: Session = Depends(get_
         "extracted_text_snippet": extracted_text[:400] if extracted_text else "",
         "message": "Resume uploaded successfully and ready for auto-tailoring."
     }
+
+# -------------------------------------------------------------
+# Structured Candidate Intelligence Records (Verifiable Truth)
+# -------------------------------------------------------------
+
+@router.get("/records", response_model=List[CandidateRecordOut], summary="List Candidate Records")
+def list_candidate_records(
+    category: Optional[str] = Query(None, description="Filter by category (education, work_experience, projects, publications, patents, certifications, technical_skills, achievements)"),
+    verification_status: Optional[str] = Query(None, description="Filter by status (verified, pending_verification, unverified)"),
+    db: Session = Depends(get_db)
+):
+    query = db.query(CandidateRecord)
+    if category:
+        query = query.filter(CandidateRecord.category == category)
+    if verification_status:
+        query = query.filter(CandidateRecord.verification_status == verification_status)
+    return query.order_by(CandidateRecord.category.asc(), CandidateRecord.date_added.desc()).all()
+
+@router.post("/records", response_model=CandidateRecordOut, summary="Add Candidate Record")
+def create_candidate_record(payload: CandidateRecordCreate, db: Session = Depends(get_db)):
+    record = CandidateRecord(
+        category=payload.category,
+        subcategory=payload.subcategory,
+        title=payload.title,
+        description=payload.description,
+        source_evidence=payload.source_evidence,
+        verification_status=payload.verification_status,
+        is_verified=payload.is_verified
+    )
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+    return record
+
+@router.put("/records/{record_id}", response_model=CandidateRecordOut, summary="Update Candidate Record")
+def update_candidate_record(record_id: int, payload: CandidateRecordUpdate, db: Session = Depends(get_db)):
+    record = db.query(CandidateRecord).filter(CandidateRecord.id == record_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Candidate record not found.")
+
+    for field, val in payload.model_dump(exclude_unset=True).items():
+        if hasattr(record, field):
+            setattr(record, field, val)
+
+    db.commit()
+    db.refresh(record)
+    return record
+
+@router.delete("/records/{record_id}", summary="Delete Candidate Record")
+def delete_candidate_record(record_id: int, db: Session = Depends(get_db)):
+    record = db.query(CandidateRecord).filter(CandidateRecord.id == record_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Candidate record not found.")
+
+    db.delete(record)
+    db.commit()
+    return {"status": "deleted", "id": record_id}
+
+@router.post("/records/seed", summary="Seed Canonical Verified Candidate Records")
+def seed_candidate_records_endpoint(db: Session = Depends(get_db)):
+    from backend.app.services.answer_service import seed_candidate_records
+    count = seed_candidate_records(db)
+    return {"status": "success", "records_seeded": count}

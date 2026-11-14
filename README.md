@@ -7,9 +7,9 @@
 [![Firebase](https://img.shields.io/badge/Cloud-Firebase%20Admin-FFCA28.svg?logo=firebase)](https://firebase.google.com)
 [![Playwright](https://img.shields.io/badge/Automation-Playwright-2EAD33.svg?logo=playwright)](https://playwright.dev)
 [![Tailscale](https://img.shields.io/badge/Network-Tailscale%20Mesh%20VPN-4F46E5.svg?logo=tailscale)](https://tailscale.com)
-[![Tests: 44 passed](https://img.shields.io/badge/Tests-44%20Backend%20%7C%205%20Flutter%20Passed-brightgreen.svg)]()
+[![Tests: 53 passed](https://img.shields.io/badge/Tests-53%20Backend%20%7C%205%20Flutter%20Passed-brightgreen.svg)]()
 
-**ApplyPilot** is an autonomous, candidate-first job application cockpit designed for Android and Web with an always-on Windows PC backend. Powered by **Google Gemini 2.5 Flash** and backed by **Firebase Cloud Infrastructure**, it automates high-volume job discovery, explainable 5-factor fit scoring, ATS resume tailoring, intelligent Answer Bank recall, and ATS form filling, while escalating to you **only** when an application genuinely requires human judgment.
+**ApplyPilot** is an autonomous, candidate-first job application cockpit designed for Android and Web with an always-on Windows PC backend. Powered by **Google Gemini 2.5 Flash** and backed by **Firebase Cloud Infrastructure**, it automates high-volume job discovery, two-stage eligibility and 5-factor fit scoring, ATS resume tailoring, intelligent Answer Bank recall, and ATS form filling, while escalating to you **only** when an application genuinely requires human judgment.
 
 ---
 
@@ -75,6 +75,55 @@ flowchart TD
     GeminiClient --> JDAnalysis & FitScoring & ResumeAI & AnswerAI & InterviewAI & CareerCopilot
     AdminSDK --> Firestore & FCM & AuthVerify & RemoteConfig
 ```
+
+---
+
+## Two-Stage Evaluation System & Intelligence Layer
+
+ApplyPilot implements an uncompromising **Two-Stage Evaluation System** to ensure high-velocity automation never applies to ineligible positions:
+
+### Stage A: Hard Eligibility Gate
+Before any job is evaluated for skill compatibility, it passes through mandatory eligibility criteria:
+- **Experience Ceiling & Leadership Filters**: Automatically detects and rejects senior/lead/director roles requiring 5+, 8+, or 10+ years (e.g. *Director of Data Science*, *Senior Lead ML Architect*).
+- **Academic Qualifications**: Verifies minimum degree requirements (e.g. Integrated MTech CSE Data Science).
+- **Salary Floor & Compensation**: Compares minimum offered salary against candidate floor (e.g. ₹12 LPA).
+- **Location & Work Authorization**: Flags remote vs on-site constraints.
+- **Classification Routing**:
+  - `eligible`: Passes all criteria, proceeds to Stage B scoring.
+  - `potentially_eligible`: Minor non-blocking gaps, proceeds to scoring.
+  - `ineligible`: Routed immediately to `blocked` with clear rejection reasons (e.g. `ineligible: Requires 10+ years experience, candidate has entry/intern level`).
+  - `needs_verification`: Missing explicit requirements, preserved for user review.
+
+### Stage B: Explainable 5-Factor Fit Scoring
+Only eligible or potentially eligible jobs are scored across:
+1. **Technical Stack** (Python, PyTorch, Scikit-Learn, FastAPI, SQL, Transformers)
+2. **Experience & Benchmark Fit**
+3. **Academic Alignment**
+4. **Location & Work Mode Preferences**
+5. **Compensation Expectations**
+
+Generates a clear **Score out of 5.0** and percentage match, with transparent matching skills chips, missing requirements, and evidence-based rationale.
+
+---
+
+## Verifiable Candidate Intelligence & Answer Bank
+
+- **Structured Proof Points**:
+  - **Education**: Differentiates University (VIT Vellore Integrated MTech CSE Data Science, 2022-2027, CGPA 7.62/10) from secondary schooling.
+  - **Patents (Strict Grounding)**: Grounded strictly in 2 published patent filings: *Accident Predictor with Multimodal Fusion* (App #202441058291) and *Acoustic Doppler Session Guard*.
+  - **Projects vs Benchmarks**: *Agentic Code Intelligence* (25.59% NDCG@10 vs 5.14% baseline on 8,765 Python functions) is strictly categorized under system benchmarks and research projects, never confused with patents.
+  - **Certifications**: AWS Certified Solutions Architect - Associate.
+- **Answer Bank Deduplication**: Redundant fields (`highest degree`) merged into canonical `degree`. Demographics harmonized to candidate profile (`Male`).
+- **Needs You Autonomous Inbox**: Escalates only true edge questions. Once answered, ApplyPilot stores the answer in the Answer Bank to resolve future identical questions autonomously. Displays an active autonomous shield, real-time resolved counts, and recent learning logs.
+
+---
+
+## Authoritative Daily Cap & Automation State Machine
+
+- **Timezone-Aware Reset (`Asia/Kolkata`)**: Daily submission caps and progress counters reset precisely at local midnight. Eliminates UI/backend discrepancies (e.g. `5/100` vs `0 remaining`).
+- **Deterministic 12-Stage State Machine**: `discovered` &rarr; `evaluating` &rarr; `eligible` / `ineligible` &rarr; `queued` &rarr; `needs_you` &rarr; `tailoring_resume` &rarr; `applying` &rarr; `submitted` / `blocked` / `failed` / `withdrawn`. Every transition is logged in `JobStateTransition` with timestamps and trigger reasons.
+- **Global Pause Immunity**: When the global pause switch is active, no background process, individual resume action, or Needs You answer submission can bypass it.
+- **Safety Rails**: Circuit breaker halts the queue upon 3 consecutive failures, 30-day per-company application cooldown, and hard dry-run mode until user explicitly enables `go_live`.
 
 ---
 
@@ -177,31 +226,20 @@ The backend initializes the **Firebase Admin SDK** using the service account cer
 ```
 ============================= test session starts =============================
 platform win32 -- Python 3.13.0, pytest-9.1.1 -- FastAPI 0.115.8
-collected 44 items
+collected 53 items
 
-backend/tests/test_gemini_firebase.py::test_firebase_service_status PASSED      [  2%]
-backend/tests/test_gemini_firebase.py::test_firebase_remote_config PASSED       [  4%]
-backend/tests/test_gemini_firebase.py::test_firebase_push_notification_dispatch PASSED [  6%]
-backend/tests/test_gemini_firebase.py::test_gemini_service_status PASSED        [  9%]
-backend/tests/test_gemini_firebase.py::test_gemini_job_intelligence PASSED      [ 11%]
-backend/tests/test_gemini_firebase.py::test_gemini_calculate_compatibility PASSED [ 13%]
-backend/tests/test_gemini_firebase.py::test_gemini_tailor_resume PASSED         [ 15%]
-backend/tests/test_gemini_firebase.py::test_gemini_suggest_form_answer PASSED   [ 18%]
-backend/tests/test_gemini_firebase.py::test_gemini_interview_prep PASSED        [ 20%]
-backend/tests/test_gemini_firebase.py::test_api_ai_status_endpoint PASSED       [ 22%]
-backend/tests/test_gemini_firebase.py::test_api_ai_chat_endpoint PASSED         [ 25%]
-backend/tests/test_gemini_firebase.py::test_api_firebase_status_endpoint PASSED [ 27%]
-backend/tests/test_gemini_firebase.py::test_api_firebase_config_endpoint PASSED [ 29%]
-backend/tests/test_phase1.py (6 tests) PASSED                                   [ 43%]
-backend/tests/test_phase3.py (5 tests) PASSED                                   [ 54%]
-backend/tests/test_phase4.py (3 tests) PASSED                                   [ 61%]
-backend/tests/test_phase5.py (2 tests) PASSED                                   [ 65%]
-backend/tests/test_phase6.py (3 tests) PASSED                                   [ 72%]
-backend/tests/test_phase7_50_jobs.py (1 test) PASSED                            [ 75%]
-backend/tests/test_refinement.py (5 tests) PASSED                               [ 86%]
+backend/tests/test_eligibility_and_state.py (9 tests) PASSED                     [ 17%]
+backend/tests/test_gemini_firebase.py (13 tests) PASSED                          [ 41%]
+backend/tests/test_phase1.py (6 tests) PASSED                                   [ 53%]
+backend/tests/test_phase3.py (5 tests) PASSED                                   [ 62%]
+backend/tests/test_phase4.py (3 tests) PASSED                                   [ 68%]
+backend/tests/test_phase5.py (2 tests) PASSED                                   [ 72%]
+backend/tests/test_phase6.py (3 tests) PASSED                                   [ 77%]
+backend/tests/test_phase7_50_jobs.py (1 test) PASSED                            [ 79%]
+backend/tests/test_refinement.py (5 tests) PASSED                               [ 89%]
 backend/tests/test_safety_audit.py (6 tests) PASSED                             [100%]
 
-================== 44 passed in 67.29s (100% Pass Rate) ===================
+================== 53 passed in 71.44s (100% Pass Rate) ===================
 ```
 
 ### Flutter Test Suite
@@ -221,9 +259,10 @@ backend/tests/test_safety_audit.py (6 tests) PASSED                             
 The production release artifact is compiled and verified:
 
 - **File**: `output/ApplyPilot.apk`
-- **Version**: `1.3.1` (Build 5)
-- **Size**: `54.3 MB` (54,329,878 bytes)
-- **SHA-256**: `62A0570CFAE133EBE8BDE317AF020B7E6DE5C19939C04CA46FCC741D760283F9`
+- **Version**: `1.2.0` (Mobile Cockpit & Backend Safety Architecture)
+- **Size**: `51.91 MB` (54,428,230 bytes)
+- **SHA-256**: `3116502EBD1F8C61460FAB37BEE3672679F6CE51C2CE1A5A50E7716793002B5C`
+- **Target SDK**: Android 14 (API 34) / Min SDK: Android 8.0 (API 26)
 - **Flutter Web Build**: Compiled to `app/build/web` and hosted natively at `http://localhost:8000/app/`
 - **Metadata**: Verified in `output/ApplyPilot-release-info.json`
 

@@ -51,10 +51,13 @@ def migrate_db():
         profile_cols = get_existing_cols("profiles")
         if "excluded_companies_json" not in profile_cols:
             conn.execute(text("ALTER TABLE profiles ADD COLUMN excluded_companies_json TEXT DEFAULT '[]';"))
-            conn.commit()
         if "widget_preferences_json" not in profile_cols:
             conn.execute(text("ALTER TABLE profiles ADD COLUMN widget_preferences_json TEXT DEFAULT '{}';"))
-            conn.commit()
+        if "daily_target" not in profile_cols:
+            conn.execute(text("ALTER TABLE profiles ADD COLUMN daily_target INTEGER DEFAULT 50;"))
+        if "timezone" not in profile_cols:
+            conn.execute(text("ALTER TABLE profiles ADD COLUMN timezone VARCHAR(64) DEFAULT 'Asia/Kolkata';"))
+        conn.commit()
 
         # 2. Migrate answer_bank
         bank_cols = get_existing_cols("answer_bank")
@@ -82,6 +85,16 @@ def migrate_db():
             ("notes", "TEXT DEFAULT ''"),
             ("recruiter_info", "VARCHAR(256) DEFAULT ''"),
             ("follow_up_date", "DATETIME"),
+            ("eligibility_status", "VARCHAR(32) DEFAULT 'needs_verification'"),
+            ("eligibility_reason", "TEXT DEFAULT ''"),
+            ("blocked_category", "VARCHAR(32) DEFAULT ''"),
+            ("role_relevance_score", "FLOAT DEFAULT 0.0"),
+            ("required_skills_json", "TEXT DEFAULT '[]'"),
+            ("matching_skills_json", "TEXT DEFAULT '[]'"),
+            ("missing_skills_json", "TEXT DEFAULT '[]'"),
+            ("missing_qualifications_json", "TEXT DEFAULT '[]'"),
+            ("company_logo_url", "VARCHAR(512) DEFAULT ''"),
+            ("is_saved", "BOOLEAN DEFAULT 0"),
         ]
         for col_name, col_def in job_additions:
             if col_name not in job_cols:
@@ -97,6 +110,16 @@ def migrate_db():
             ("notes", "TEXT DEFAULT ''"),
             ("recruiter_info", "VARCHAR(256) DEFAULT ''"),
             ("follow_up_date", "DATETIME"),
+            ("eligibility_status", "VARCHAR(32) DEFAULT 'needs_verification'"),
+            ("eligibility_reason", "TEXT DEFAULT ''"),
+            ("blocked_category", "VARCHAR(32) DEFAULT ''"),
+            ("role_relevance_score", "FLOAT DEFAULT 0.0"),
+            ("required_skills_json", "TEXT DEFAULT '[]'"),
+            ("matching_skills_json", "TEXT DEFAULT '[]'"),
+            ("missing_skills_json", "TEXT DEFAULT '[]'"),
+            ("missing_qualifications_json", "TEXT DEFAULT '[]'"),
+            ("company_logo_url", "VARCHAR(512) DEFAULT ''"),
+            ("is_saved", "BOOLEAN DEFAULT 0"),
         ]
         for col_name, col_def in app_additions:
             if col_name not in app_cols:

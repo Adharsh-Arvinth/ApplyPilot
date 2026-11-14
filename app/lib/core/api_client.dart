@@ -516,4 +516,91 @@ class ApiClient {
     }
     return {};
   }
+
+  // 12. Candidate Intelligence Records
+  Future<List<dynamic>> fetchCandidateRecords({String? category, String? verificationStatus}) async {
+    String url = "$_baseUrl/api/v1/profile/records";
+    final queryParams = <String>[];
+    if (category != null && category.isNotEmpty) {
+      queryParams.add("category=${Uri.encodeComponent(category)}");
+    }
+    if (verificationStatus != null && verificationStatus.isNotEmpty) {
+      queryParams.add("verification_status=${Uri.encodeComponent(verificationStatus)}");
+    }
+    if (queryParams.isNotEmpty) {
+      url += "?${queryParams.join('&')}";
+    }
+    final res = await http.get(Uri.parse(url), headers: _headers());
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    return [];
+  }
+
+  Future<Map<String, dynamic>> createCandidateRecord(Map<String, dynamic> data) async {
+    final res = await http.post(
+      Uri.parse("$_baseUrl/api/v1/profile/records"),
+      headers: _headers(),
+      body: jsonEncode(data),
+    );
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    throw Exception("Failed to create candidate record: ${res.statusCode}");
+  }
+
+  Future<Map<String, dynamic>> updateCandidateRecord(int id, Map<String, dynamic> data) async {
+    final res = await http.put(
+      Uri.parse("$_baseUrl/api/v1/profile/records/$id"),
+      headers: _headers(),
+      body: jsonEncode(data),
+    );
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    throw Exception("Failed to update candidate record: ${res.statusCode}");
+  }
+
+  Future<bool> deleteCandidateRecord(int id) async {
+    final res = await http.delete(
+      Uri.parse("$_baseUrl/api/v1/profile/records/$id"),
+      headers: _headers(),
+    );
+    return res.statusCode == 200;
+  }
+
+  Future<Map<String, dynamic>> seedCandidateRecords() async {
+    final res = await http.post(
+      Uri.parse("$_baseUrl/api/v1/profile/records/seed"),
+      headers: _headers(),
+    );
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    return {};
+  }
+
+  // 13. Needs You Summary & Bookmarking
+  Future<Map<String, dynamic>> fetchNeedsYouSummary() async {
+    try {
+      final res = await http.get(Uri.parse("$_baseUrl/api/v1/needs-you/summary"), headers: _headers());
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
+      }
+      return {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<Map<String, dynamic>> toggleSaveJob(int jobId) async {
+    final res = await http.post(
+      Uri.parse("$_baseUrl/api/v1/jobs/$jobId/toggle-save"),
+      headers: _headers(),
+    );
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    throw Exception("Failed to bookmark job: ${res.statusCode}");
+  }
 }

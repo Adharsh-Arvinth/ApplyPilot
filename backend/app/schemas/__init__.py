@@ -21,7 +21,9 @@ class ProfileBase(BaseModel):
     widget_preferences: Dict[str, Any] = {}
     min_salary_inr: int
     daily_cap: int
+    daily_target: int = 50
     hourly_cap: int
+    timezone: str = "Asia/Kolkata"
     min_fit_score: float
     maybe_fit_score: float
     active_hours_start: int
@@ -49,7 +51,9 @@ class ProfileUpdate(BaseModel):
     widget_preferences: Optional[Dict[str, Any]] = None
     min_salary_inr: Optional[int] = None
     daily_cap: Optional[int] = None
+    daily_target: Optional[int] = None
     hourly_cap: Optional[int] = None
+    timezone: Optional[str] = None
     min_fit_score: Optional[float] = None
     maybe_fit_score: Optional[float] = None
     active_hours_start: Optional[int] = None
@@ -166,6 +170,12 @@ class JobBase(BaseModel):
     education_score: float = 0.0
     location_score: float = 0.0
     compensation_score: float = 0.0
+    role_relevance_score: float = 0.0
+    eligibility_status: str = "needs_verification"
+    eligibility_reason: str = ""
+    blocked_category: str = ""
+    company_logo_url: str = ""
+    is_saved: bool = False
     status: str = "discovered"
     notes: str = ""
     recruiter_info: str = ""
@@ -182,6 +192,10 @@ class JobStatusUpdate(BaseModel):
 class JobOut(JobBase):
     id: int
     fit_breakdown: Dict[str, Any] = {}
+    required_skills: List[str] = []
+    matching_skills: List[str] = []
+    missing_skills: List[str] = []
+    missing_qualifications: List[str] = []
     posted_at: datetime.datetime
     created_at: datetime.datetime
     updated_at: datetime.datetime
@@ -223,12 +237,46 @@ class HealthOut(BaseModel):
 class StatsOut(BaseModel):
     daily_applied: int
     daily_cap: int
+    daily_target: int = 50
+    daily_remaining: int = 100
+    target_remaining: int = 50
+    is_paused: bool = False
+    is_circuit_broken: bool = False
+    go_live: bool = False
+    timezone: str = "Asia/Kolkata"
     needs_you_count: int
     maybe_count: int
     blocked_count: int
     interview_count: int
     queue_count: int
     total_tracked: int
+
+class CandidateRecordBase(BaseModel):
+    category: str # education, work_experience, projects, publications, patents, certifications, technical_skills, achievements
+    subcategory: str = ""
+    title: str
+    description: str = ""
+    source_evidence: str = ""
+    verification_status: str = "verified" # verified, pending_verification, unverified
+    is_verified: bool = True
+
+class CandidateRecordCreate(CandidateRecordBase):
+    pass
+
+class CandidateRecordUpdate(BaseModel):
+    category: Optional[str] = None
+    subcategory: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    source_evidence: Optional[str] = None
+    verification_status: Optional[str] = None
+    is_verified: Optional[bool] = None
+
+class CandidateRecordOut(CandidateRecordBase):
+    id: int
+    date_added: datetime.datetime
+    last_updated: datetime.datetime
+    model_config = ConfigDict(from_attributes=True)
 
 class AnalyticsOut(BaseModel):
     total_tracked: int

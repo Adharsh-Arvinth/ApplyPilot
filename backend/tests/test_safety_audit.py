@@ -18,11 +18,13 @@ def test_safety_daily_cap_enforcement():
     import asyncio
     async def _run():
         db = SessionLocal()
+        orig_cap = 100
         try:
             profile = db.query(Profile).first()
-            orig_cap = profile.daily_cap
-            profile.daily_cap = 0 # Force daily cap reached
-            db.commit()
+            if profile:
+                orig_cap = profile.daily_cap
+                profile.daily_cap = 0 # Force daily cap reached
+                db.commit()
 
             job = Job(
                 source="greenhouse",
@@ -37,10 +39,11 @@ def test_safety_daily_cap_enforcement():
             res = await AutoApplyEngine.process_job_application(db, job, profile)
             assert res["status"] == "halted"
             assert res["reason"] == "daily_cap_reached"
-
-            profile.daily_cap = orig_cap
-            db.commit()
         finally:
+            p = db.query(Profile).first()
+            if p:
+                p.daily_cap = orig_cap
+                db.commit()
             db.close()
     asyncio.run(_run())
 
@@ -74,13 +77,19 @@ def test_safety_30_day_company_cooldown():
         assert AutoApplyEngine._is_company_cooldown_active(db, "CooldownAuditCo") is True
         assert AutoApplyEngine._is_company_cooldown_active(db, "UnseenCompany123") is False
     finally:
+        p = db.query(Profile).first()
+        if p:
+            p.go_live = False
+            db.commit()
         db.close()
 
 # 3. TEST: Global Pause Switch
 def test_safety_pause_switch():
     db = SessionLocal()
+    orig_paused = False
     try:
         profile = db.query(Profile).first()
+        orig_paused = profile.is_paused if profile else False
         profile.is_paused = True
         db.commit()
 
@@ -89,11 +98,11 @@ def test_safety_pause_switch():
         data = res.json()
         assert data["status"] == "paused"
         assert "paused" in data["message"].lower()
-
-        # Unpause
-        profile.is_paused = False
-        db.commit()
     finally:
+        p = db.query(Profile).first()
+        if p:
+            p.is_paused = orig_paused
+            db.commit()
         db.close()
 
 # 4. TEST: Strict Go-Live Gate
@@ -118,6 +127,10 @@ def test_safety_go_live_gate_default():
         profile_after = db.query(Profile).first()
         assert profile_after.go_live is False, "Go-Live MUST stay False by default"
     finally:
+        p = db.query(Profile).first()
+        if p:
+            p.go_live = False
+            db.commit()
         db.close()
 
 # 5. TEST: Idempotency Protection against Duplicate Apply
@@ -145,6 +158,10 @@ def test_safety_idempotency_duplicate_submission():
         assert data["status"] == "already_applied"
         assert "already applied" in data["message"].lower()
     finally:
+        p = db.query(Profile).first()
+        if p:
+            p.go_live = False
+            db.commit()
         db.close()
 
 # 6. TEST: Dry-run Real Form Fill on Greenhouse & Lever without CAPTCHA trip

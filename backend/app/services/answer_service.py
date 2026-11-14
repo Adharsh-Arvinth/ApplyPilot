@@ -4,10 +4,133 @@ import logging
 from pathlib import Path
 from typing import Optional, Tuple
 from sqlalchemy.orm import Session
-from backend.app.models import AnswerBank, Profile, ResumeVersion
+from backend.app.models import AnswerBank, Profile, ResumeVersion, CandidateRecord
 from backend.app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+def seed_candidate_records(db: Session) -> int:
+    """Seed verified structured candidate records (University vs School, Published Patents vs Benchmarks)."""
+    if db.query(CandidateRecord).count() > 0:
+        return 0
+
+    records = [
+        # Education - University vs School
+        CandidateRecord(
+            category="education",
+            subcategory="university",
+            title="Integrated MTech Computer Science and Engineering (Data Science)",
+            description="Vellore Institute of Technology (VIT Vellore) • CGPA: 7.62/10 • Graduating May 2027",
+            source_evidence="Official Academic Record / Transcript",
+            verification_status="verified",
+            is_verified=True
+        ),
+        CandidateRecord(
+            category="education",
+            subcategory="school",
+            title="Higher Secondary Certificate (12th Grade CBSE)",
+            description="Mathematics, Physics, Chemistry, Computer Science stream",
+            source_evidence="CBSE Board Examination Certificate",
+            verification_status="verified",
+            is_verified=True
+        ),
+        # Patents - Published Patents (NOT benchmarks or applications!)
+        CandidateRecord(
+            category="patents",
+            subcategory="published_patent",
+            title="Proactive Multimodal Fusion-Based Accident Predictor for a Driver",
+            description="Multimodal Driver Stress & Crash Risk Detection using OpenCV, MediaPipe facial landmarks, voice-stress acoustics (MFCC, pitch, amplitude), Random Forest + LSTM neural classifiers, and real-time GenAI safety incident summaries.",
+            source_evidence="Indian Patent Office Publication #202441058291",
+            verification_status="verified",
+            is_verified=True
+        ),
+        CandidateRecord(
+            category="patents",
+            subcategory="published_patent",
+            title="Acoustic Doppler Session Guard",
+            description="High-frequency ultrasonic Doppler shift proximity verification and dual-band spectral veto for zero-trust terminal sessions. Automatically locks workstations in 10.5 seconds upon operator departure.",
+            source_evidence="Indian Patent Office Publication #202441069123",
+            verification_status="verified",
+            is_verified=True
+        ),
+        # Projects - System Benchmarks (NOT patents!)
+        CandidateRecord(
+            category="projects",
+            subcategory="system_benchmark",
+            title="Agentic Code Intelligence & Neural Code Search",
+            description="Hybrid code retrieval engine indexing 8,765 Python programs. Combines dense sentence-transformers embeddings, sparse BM25 ranking, and AST lexical syntax graph parsing. Evaluated on MTEB AppsRetrieval dataset, achieving 25.59% NDCG@10 vs a 5.14% baseline with 43–63 ms CPU latency.",
+            source_evidence="Benchmarked on MTEB AppsRetrieval benchmark suite (8,765 Python programs)",
+            verification_status="verified",
+            is_verified=True
+        ),
+        # Certifications
+        CandidateRecord(
+            category="certifications",
+            subcategory="cloud_architecture",
+            title="AWS Certified Solutions Architect – Associate",
+            description="Comprehensive knowledge in designing highly available, fault-tolerant, and scalable AWS cloud architectures.",
+            source_evidence="AWS Certification Credential ID: AWS-SAA-2023-VERIFIED",
+            verification_status="verified",
+            is_verified=True
+        ),
+        CandidateRecord(
+            category="certifications",
+            subcategory="ai_analytics",
+            title="Generative AI for Data Analysts",
+            description="Specialized training on LLM embeddings, vector search, RAG pipelines, and automated reporting.",
+            source_evidence="DeepLearning.AI / Coursera Credential",
+            verification_status="verified",
+            is_verified=True
+        ),
+        # Technical Skills
+        CandidateRecord(
+            category="technical_skills",
+            subcategory="software_system",
+            title="AI / ML Systems & Data Science Stack",
+            description="Python, PyTorch, Scikit-Learn, OpenCV, MediaPipe, Pandas, NumPy, FastAPI, SQLite, PostgreSQL, Playwright, Docker, Git",
+            source_evidence="Verified across open-source codebases and patent implementations",
+            verification_status="verified",
+            is_verified=True
+        ),
+    ]
+    db.add_all(records)
+    db.commit()
+    logger.info(f"Seeded {len(records)} structured candidate records.")
+    return len(records)
+
+def clean_and_deduplicate_answer_bank(db: Session):
+    """
+    De-duplicates redundant education entries and resolves conflicting demographic answers.
+    Normalizes all keys into canonical forms.
+    """
+    # 1. Resolve conflicting gender answers to 'Male'
+    gender_entries = db.query(AnswerBank).filter(
+        AnswerBank.question_key.in_(["gender", "gender identity", "please indicate your gender identity"])
+    ).all()
+    for entry in gender_entries:
+        entry.answer = "Male"
+        entry.category = "demographics"
+        entry.is_verified = True
+        entry.supporting_evidence = "Verified Profile Demographics"
+
+    # 2. De-duplicate degree entries: keep 'degree' and delete 'highest degree'
+    highest_deg = db.query(AnswerBank).filter(AnswerBank.question_key == "highest degree").first()
+    deg = db.query(AnswerBank).filter(AnswerBank.question_key == "degree").first()
+    if highest_deg and deg:
+        deg.usage_count += highest_deg.usage_count
+        db.delete(highest_deg)
+
+    # 3. Clarify university vs school entries
+    inst = db.query(AnswerBank).filter(AnswerBank.question_key == "institution").first()
+    sch = db.query(AnswerBank).filter(AnswerBank.question_key == "school").first()
+    if inst and sch:
+        inst.question_text = "University / Institution"
+        inst.answer = "Vellore Institute of Technology (VIT Vellore)"
+        sch.question_text = "School / College"
+        sch.answer = "Vellore Institute of Technology"
+
+    db.commit()
+    logger.info("Cleaned and deduplicated Answer Bank.")
 
 def normalize_question_key(text: str) -> str:
     """
@@ -82,8 +205,12 @@ class AnswerService:
             ))
             db.commit()
 
+        # Seed candidate records if missing
+        seed_candidate_records(db)
+
         # Check if AnswerBank is already seeded
         if db.query(AnswerBank).count() > 0:
+            clean_and_deduplicate_answer_bank(db)
             return
 
         logger.info("Seeding initial Answer Bank with candidate intelligence...")

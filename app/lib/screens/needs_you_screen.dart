@@ -14,6 +14,7 @@ class _NeedsYouScreenState extends State<NeedsYouScreen> {
   final ApiClient _api = ApiClient();
   bool _loading = true;
   List<dynamic> _items = [];
+  Map<String, dynamic> _summary = {};
   final Map<int, TextEditingController> _controllers = {};
   final Map<int, bool> _saveToBank = {};
   final Map<int, String> _modes = {};
@@ -35,10 +36,16 @@ class _NeedsYouScreenState extends State<NeedsYouScreen> {
   Future<void> _loadNeedsYou() async {
     setState(() => _loading = true);
     try {
-      final items = await _api.getNeedsYou();
+      final itemsFuture = _api.getNeedsYou();
+      final summaryFuture = _api.fetchNeedsYouSummary();
+      final results = await Future.wait([itemsFuture, summaryFuture]);
+      final items = results[0] as List<dynamic>;
+      final summary = results[1] as Map<String, dynamic>;
+
       if (mounted) {
         setState(() {
           _items = items;
+          _summary = summary;
           _loading = false;
         });
         for (final item in items) {
@@ -116,33 +123,215 @@ class _NeedsYouScreenState extends State<NeedsYouScreen> {
       body: _loading
           ? Center(child: CircularProgressIndicator(strokeWidth: 2, color: accentGreen))
           : _items.isEmpty
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.s32),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(AppSpacing.s20),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: accentGreen.withOpacity(0.08),
-                          ),
-                          child: Icon(Icons.done_all, size: 48, color: accentGreen),
+              ? SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20, vertical: AppSpacing.s24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Autonomous Status Badge
+                      Container(
+                        padding: const EdgeInsets.all(AppSpacing.s20),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.successEmerald.withOpacity(0.12),
+                          border: Border.all(color: AppColors.successEmerald.withOpacity(0.3), width: 2),
                         ),
-                        const SizedBox(height: AppSpacing.s20),
-                        Text(
-                          "All Caught Up",
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: primaryTextColor),
+                        child: const Icon(Icons.shield_outlined, size: 48, color: AppColors.successEmerald),
+                      ),
+                      const SizedBox(height: AppSpacing.s16),
+                      Text(
+                        "Inbox Clear · Autonomous Operations Active",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: primaryTextColor),
+                      ),
+                      const SizedBox(height: AppSpacing.s8),
+                      Text(
+                        "All active application workflows are resolving autonomously via verified candidate intelligence and Answer Bank memories.",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 13, height: 1.45, color: secondaryTextColor),
+                      ),
+                      const SizedBox(height: AppSpacing.s24),
+
+                      // Metric Summary Row
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.all(AppSpacing.s12),
+                              decoration: BoxDecoration(
+                                color: cardBg,
+                                borderRadius: BorderRadius.circular(AppRadii.control),
+                                border: Border.all(color: borderColor),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.auto_awesome, size: 14, color: AppColors.successEmerald),
+                                      const SizedBox(width: AppSpacing.s4),
+                                      Text("AUTO-RESOLVED", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: secondaryTextColor)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: AppSpacing.s6),
+                                  Text(
+                                    "${_summary['auto_processed_count'] ?? 0} answers",
+                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: primaryTextColor),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.s12),
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.all(AppSpacing.s12),
+                              decoration: BoxDecoration(
+                                color: cardBg,
+                                borderRadius: BorderRadius.circular(AppRadii.control),
+                                border: Border.all(color: borderColor),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.verified_user_outlined, size: 14, color: AppColors.racingGreen),
+                                      const SizedBox(width: AppSpacing.s4),
+                                      Text("BY CANDIDATE", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: secondaryTextColor)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: AppSpacing.s6),
+                                  Text(
+                                    "${_summary['resolved_count'] ?? 0} confirmed",
+                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: primaryTextColor),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.s24),
+
+                      // Last Resolved Question Card
+                      if (_summary["last_resolved"] != null) ...[
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            "LAST RESOLVED QUESTION",
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.8, color: secondaryTextColor),
+                          ),
                         ),
                         const SizedBox(height: AppSpacing.s8),
-                        Text(
-                          "The auto-apply engine has all the candidate intelligence it needs. Any new custom form questions will arrive here for your 1-tap review.",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 13, height: 1.4, color: secondaryTextColor),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(AppSpacing.s16),
+                          decoration: BoxDecoration(
+                            color: cardBg,
+                            borderRadius: BorderRadius.circular(AppRadii.card),
+                            border: Border.all(color: brassColor.withOpacity(0.35)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8, vertical: AppSpacing.s4),
+                                    decoration: BoxDecoration(
+                                      color: accentGreen.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(AppRadii.badge),
+                                    ),
+                                    child: Text(
+                                      _summary["last_resolved"]["company"] ?? "Company",
+                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: accentGreen),
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  const Icon(Icons.check_circle, size: 16, color: AppColors.successEmerald),
+                                  const SizedBox(width: AppSpacing.s4),
+                                  Text("Answer Stored", style: TextStyle(fontSize: 11, color: secondaryTextColor)),
+                                ],
+                              ),
+                              const SizedBox(height: AppSpacing.s10),
+                              Text(
+                                _summary["last_resolved"]["question"] ?? "",
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: primaryTextColor),
+                              ),
+                              const SizedBox(height: AppSpacing.s6),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(AppSpacing.s10),
+                                decoration: BoxDecoration(
+                                  color: isDark ? AppColors.surfaceSubtleDark : AppColors.surfaceSubtleLight,
+                                  borderRadius: BorderRadius.circular(AppRadii.control),
+                                  border: Border.all(color: borderColor),
+                                ),
+                                child: Text(
+                                  _summary["last_resolved"]["answer"] ?? "",
+                                  style: TextStyle(fontSize: 12, color: primaryTextColor),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
+                        const SizedBox(height: AppSpacing.s24),
                       ],
-                    ),
+
+                      // Recently Answered Questions List
+                      if ((_summary["recently_answered"] as List<dynamic>?)?.isNotEmpty ?? false) ...[
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            "RECENTLY LEARNED FROM YOU",
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.8, color: secondaryTextColor),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.s8),
+                        ...(_summary["recently_answered"] as List<dynamic>).map((item) {
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: AppSpacing.s8),
+                            padding: const EdgeInsets.all(AppSpacing.s12),
+                            decoration: BoxDecoration(
+                              color: cardBg,
+                              borderRadius: BorderRadius.circular(AppRadii.control),
+                              border: Border.all(color: borderColor),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.psychology_outlined, size: 18, color: AppColors.accentDark),
+                                const SizedBox(width: AppSpacing.s10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item["question"] ?? "",
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: primaryTextColor),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        "${item['company']} • ${item['answer']}",
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(fontSize: 11, color: secondaryTextColor),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Text(
+                                  item["answered_at"] ?? "",
+                                  style: TextStyle(fontSize: 10, color: secondaryTextColor),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                      ],
+                    ],
                   ),
                 )
               : ListView.builder(

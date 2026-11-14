@@ -37,6 +37,9 @@ class AppColors {
   static const Color brassGlow = Color(0xFFD4AF37);
 
   // Status & Utility Colors
+  static const Color successEmerald = Color(0xFF2D6A4F);
+  static const Color errorCoral = Color(0xFFE76F51);
+  static const Color aiViolet = Color(0xFF6A4C93);
   static const Color forestInk = Color(0xFF14221A);
   static const Color charcoal = Color(0xFF2B3A32);
   static const Color mutedGray = Color(0xFF5C6B63);
@@ -129,6 +132,7 @@ class AppSpacing {
   static const double s8 = 8.0;
   static const double s10 = 10.0;
   static const double s12 = 12.0;
+  static const double s14 = 14.0;
   static const double s16 = 16.0;
   static const double s20 = 20.0;
   static const double s24 = 24.0;

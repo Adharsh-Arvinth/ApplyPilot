@@ -1,59 +1,24 @@
 {
-  "appName": "ApplyPilot",
-  "version": "1.3.1",
-  "buildNumber": 5,
-  "package": "org.applypilot.applypilot",
-  "builtAt": "2026-11-14T09:35:10Z",
-  "sha256": "62A0570CFAE133EBE8BDE317AF020B7E6DE5C19939C04CA46FCC741D760283F9",
-  "sizeBytes": 54329878,
-  "backendCompatibility": ">=1.3.0",
-  "designSystem": "British Racing Green (#1B4332), Warm Ivory (#FAFAF7), Muted Brass (#C5A880), Obsidian Dark Mode (#0D1912), Semantic Color Matrix (Emerald, Blue, Violet, Amber, Coral, Teal), 4pt Spacing System",
-  "geminiAiLayer": {
-    "primaryModel": "gemini-2.5-flash",
-    "fallbackModel": "gemini-flash-latest",
-    "capabilities": [
-      "Deep Job Intelligence & JD Skill Extraction",
-      "Explainable 5-Factor Job Fit Scoring",
-      "ATS Keyword Analysis & Resume Bullet Point Tailoring",
-      "Truth-Grounded Answer Bank Suggestions",
-      "Predictive Technical & Behavioral Interview Preparation Guide",
-      "Conversational Career Advisor Copilot with Live System Context"
-    ],
-    "groundingSource": "Immutable Candidate Truth: Integrated MTech CSE (Data Science) VIT Vellore, 2 published patents, Agentic retrieval benchmark, AWS Solutions Architect"
-  },
-  "firebaseCloudPlatform": {
-    "projectId": "applypilot-89c65",
-    "services": [
-      "Firebase Admin SDK",
-      "Firestore Cloud Replica & Profile Sync",
-      "Firebase Cloud Messaging (FCM) Push Notifications",
-      "Firebase Auth Token Verification",
-      "Firebase Remote Config Diagnostics"
-    ]
-  },
-  "smartWidgets": [
-    "Application Goal Widget (Daily & Weekly Targets, Circular Meter, Remaining Count)",
-    "Interview Countdown Widget (Upcoming Schedule, Countdown Badge, Proof Point Prep Sheet)",
-    "Top Job Match Widget (Highest Fit Role, 94% Match Badge, 3 Matching Factors, Quick Apply)",
-    "Needs Attention Widget (Pending Approvals, Blocker Questions, Failed Tasks, Profile Gaps)",
-    "Career Streak Widget (Consecutive Active Days, M-T-W-T-F-S-S Dot Tracker, Consistency Milestone)",
-    "Backend Engine Health Widget (Tailscale Ping Latency, Service Uptime, Safe Mode Status)",
-    "Application Funnel Widget (Discovered -> Evaluated -> Approved -> Submitted -> Interview -> Offer)",
-    "Quick Actions Widget (1-Tap Discovery, CV Tailoring, Queue Review, Answer Bank, Pause/Resume)"
-  ],
-  "interactiveCharts": [
-    "7-Day & 4-Week Application Bar Chart (Interactive Tooltip, Velocity & Volume Toggle)",
-    "Conversion Funnel Pipeline Chart (Step Bars, Pass-Through % and Drop-Off Count)",
-    "Application Status Distribution Donut Chart (Concentric Arcs, Center Tap Legend)",
-    "Fit Score Histogram (4 Brackets: High Fit, Target, Borderline, Filtered)",
-    "Weekly Job-Search Activity Line Chart (Smooth Cubic Bezier Curve & Area Gradient Fill)",
-    "Company Application Density Chart (Ranked Horizontal Bars & Volume Metrics)",
-    "Resume Version Comparison Chart (Master vs Tailored ATS Scores & Interview Conversion)"
-  ],
-  "personalization": [
-    "Drag-and-Drop Reorderable Widget Customization Sheet",
-    "Toggle Visibility & Compact Density Modes",
-    "Pin Crucial Widgets to Top of Command Center",
-    "Dual Local SharedPreferences and Cloud Database Profile Sync"
+  "version": "1.2.0",
+  "version_name": "ApplyPilot Mobile Cockpit & Backend Safety Architecture",
+  "package_name": "com.applypilot.app",
+  "apk_filename": "ApplyPilot.apk",
+  "file_size_bytes": 54428230,
+  "file_size_mb": 51.91,
+  "sha256": "3116502EBD1F8C61460FAB37BEE3672679F6CE51C2CE1A5A50E7716793002B5C",
+  "build_type": "release",
+  "min_sdk": 26,
+  "target_sdk": 34,
+  "features_included": [
+    "Two-Stage Evaluation System (Stage A Eligibility Gate + Stage B Match Scoring)",
+    "Job Classifications: eligible, potentially_eligible, ineligible, needs_verification",
+    "Explainable Fit Breakdown (/5.0 composite score & percentage)",
+    "Structured Verifiable Candidate Intelligence Records (Education University vs School, Published Patents vs System Benchmarks)",
+    "Authoritative Timezone-Aware Daily Cap & Progress Counters (Asia/Kolkata)",
+    "Automation State Machine (12 lifecycle states, JobStateTransition logging)",
+    "Global Pause Gate (guaranteed immunity from Needs You background auto-resume overrides)",
+    "Needs You Rich Autonomous Empty State with memory learning log",
+    "Answer Bank Deduplication & Demographic Gender Harmonization",
+    "Full Material 3 Luxury British Racing Green & Obsidian Dark UI"
   ]
 }

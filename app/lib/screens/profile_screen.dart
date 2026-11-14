@@ -34,6 +34,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   List<String> _targetRoles = [];
   List<String> _locations = [];
   List<String> _excludedCompanies = [];
+  List<dynamic> _candidateRecords = [];
+  String _selectedRecordCategory = "all";
 
   final TextEditingController _newRoleController = TextEditingController();
   final TextEditingController _newLocController = TextEditingController();
@@ -43,6 +45,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _loadProfile();
+    _loadCandidateRecords();
+  }
+
+  Future<void> _loadCandidateRecords() async {
+    try {
+      final records = await _api.fetchCandidateRecords();
+      if (mounted) {
+        setState(() {
+          _candidateRecords = records;
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -147,6 +161,161 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       setState(() => _uploading = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Upload error: $e")));
+    }
+  }
+
+  void _openAddEditRecordModal({Map<String, dynamic>? record}) {
+    final isEditing = record != null;
+    final catController = TextEditingController(text: record?["category"] ?? "education");
+    final subcatController = TextEditingController(text: record?["subcategory"] ?? "university");
+    final titleController = TextEditingController(text: record?["title"] ?? "");
+    final descController = TextEditingController(text: record?["description"] ?? "");
+    final evidenceController = TextEditingController(text: record?["source_evidence"] ?? "");
+    String status = record?["verification_status"] ?? "verified";
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.card))),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            final isDark = Theme.of(ctx).brightness == Brightness.dark;
+            final primaryTextColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
+            final secondaryTextColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+            final cardBg = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
+            final accentGreen = isDark ? AppColors.accentDark : AppColors.racingGreen;
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: AppSpacing.s20,
+                right: AppSpacing.s20,
+                top: AppSpacing.s20,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + AppSpacing.s24,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          isEditing ? "Edit Candidate Record" : "Add Verifiable Proof Point",
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: primaryTextColor),
+                        ),
+                        const Spacer(),
+                        IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.s12),
+                    DropdownButtonFormField<String>(
+                      value: catController.text,
+                      decoration: const InputDecoration(labelText: "Category"),
+                      items: const [
+                        DropdownMenuItem(value: "education", child: Text("Education")),
+                        DropdownMenuItem(value: "patents", child: Text("Patents")),
+                        DropdownMenuItem(value: "projects", child: Text("Projects / Benchmarks")),
+                        DropdownMenuItem(value: "certifications", child: Text("Certifications")),
+                        DropdownMenuItem(value: "technical_skills", child: Text("Technical Skills")),
+                        DropdownMenuItem(value: "work_experience", child: Text("Work Experience")),
+                        DropdownMenuItem(value: "achievements", child: Text("Achievements")),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) setModalState(() => catController.text = val);
+                      },
+                    ),
+                    const SizedBox(height: AppSpacing.s12),
+                    TextField(
+                      controller: subcatController,
+                      decoration: const InputDecoration(
+                        labelText: "Subcategory / Tag (e.g. university, published_patent, system_benchmark)",
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.s12),
+                    TextField(
+                      controller: titleController,
+                      decoration: const InputDecoration(labelText: "Title / Name"),
+                    ),
+                    const SizedBox(height: AppSpacing.s12),
+                    TextField(
+                      controller: descController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(labelText: "Description & Specific Facts"),
+                    ),
+                    const SizedBox(height: AppSpacing.s12),
+                    TextField(
+                      controller: evidenceController,
+                      decoration: const InputDecoration(labelText: "Verification Evidence / Credential Link / Patent #"),
+                    ),
+                    const SizedBox(height: AppSpacing.s16),
+                    DropdownButtonFormField<String>(
+                      value: status,
+                      decoration: const InputDecoration(labelText: "Verification Status"),
+                      items: const [
+                        DropdownMenuItem(value: "verified", child: Text("Verified Ground Truth")),
+                        DropdownMenuItem(value: "pending_verification", child: Text("Pending Verification")),
+                        DropdownMenuItem(value: "unverified", child: Text("Unverified")),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) setModalState(() => status = val);
+                      },
+                    ),
+                    const SizedBox(height: AppSpacing.s20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: accentGreen,
+                          foregroundColor: AppColors.pureWhite,
+                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s14),
+                        ),
+                        onPressed: () async {
+                          final payload = {
+                            "category": catController.text,
+                            "subcategory": subcatController.text.trim(),
+                            "title": titleController.text.trim(),
+                            "description": descController.text.trim(),
+                            "source_evidence": evidenceController.text.trim(),
+                            "verification_status": status,
+                            "is_verified": status == "verified",
+                          };
+                          Navigator.pop(ctx);
+                          if (isEditing) {
+                            await _api.updateCandidateRecord(record["id"] as int, payload);
+                          } else {
+                            await _api.createCandidateRecord(payload);
+                          }
+                          _loadCandidateRecords();
+                        },
+                        child: Text(isEditing ? "Update Record" : "Save Verifiable Record", style: const TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteRecord(int id) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Delete Record?"),
+        content: const Text("Are you sure you want to remove this proof point?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Delete", style: TextStyle(color: AppColors.errorLight))),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await _api.deleteCandidateRecord(id);
+      _loadCandidateRecords();
     }
   }
 
@@ -362,11 +531,146 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                 const SizedBox(height: AppSpacing.s16),
 
-                // 5. Immutable Verified Proof Points
-                _buildSectionHeader("VERIFIED PROOF POINTS & PATENTS", secondaryTextColor),
+                // 5. Structured Verifiable Candidate Records
+                Row(
+                  children: [
+                    _buildSectionHeader("STRUCTURED CANDIDATE INTELLIGENCE", secondaryTextColor),
+                    const Spacer(),
+                    TextButton.icon(
+                      style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                      icon: const Icon(Icons.add, size: 16, color: AppColors.racingGreen),
+                      label: const Text("Add Proof Point", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.racingGreen)),
+                      onPressed: () => _openAddEditRecordModal(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.s8),
+
+                // Category Filter Chips
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      "all", "education", "patents", "projects", "certifications", "technical_skills", "achievements"
+                    ].map((cat) {
+                      final isSel = _selectedRecordCategory == cat;
+                      final label = cat == "all"
+                          ? "All (${_candidateRecords.length})"
+                          : "${cat[0].toUpperCase()}${cat.substring(1).replaceAll('_', ' ')}";
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: ChoiceChip(
+                          label: Text(label, style: TextStyle(fontSize: 11, color: isSel ? AppColors.pureWhite : primaryTextColor)),
+                          selected: isSel,
+                          selectedColor: accentGreen,
+                          backgroundColor: cardBg,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
+                          visualDensity: VisualDensity.compact,
+                          onSelected: (val) {
+                            if (val) setState(() => _selectedRecordCategory = cat);
+                          },
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.s10),
+
+                // Render Filtered Records
+                ..._candidateRecords.where((r) {
+                  if (_selectedRecordCategory == "all") return true;
+                  return r["category"] == _selectedRecordCategory;
+                }).map((record) {
+                  final isVerified = record["is_verified"] == true;
+                  final subcat = record["subcategory"] ?? "";
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: AppSpacing.s10),
+                    padding: const EdgeInsets.all(AppSpacing.s14),
+                    decoration: BoxDecoration(
+                      color: cardBg,
+                      borderRadius: BorderRadius.circular(AppRadii.card),
+                      border: Border.all(color: isVerified ? brassColor.withOpacity(0.35) : borderColor),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: (isVerified ? AppColors.successEmerald : AppColors.mutedBrass).withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(AppRadii.badge),
+                              ),
+                              child: Text(
+                                subcat.toString().replaceAll('_', ' ').toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: isVerified ? AppColors.successEmerald : brassColor,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.s8),
+                            if (isVerified)
+                              const Icon(Icons.verified, size: 14, color: AppColors.successEmerald),
+                            const Spacer(),
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined, size: 16),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              color: secondaryTextColor,
+                              onPressed: () => _openAddEditRecordModal(record: record),
+                            ),
+                            const SizedBox(width: AppSpacing.s10),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, size: 16),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              color: AppColors.errorLight,
+                              onPressed: () => _deleteRecord(record["id"] as int),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.s8),
+                        Text(
+                          record["title"] ?? "",
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: primaryTextColor),
+                        ),
+                        if ((record["description"] ?? "").toString().isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            record["description"] ?? "",
+                            style: TextStyle(fontSize: 12, height: 1.35, color: secondaryTextColor),
+                          ),
+                        ],
+                        if ((record["source_evidence"] ?? "").toString().isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Icon(Icons.link, size: 12, color: brassColor),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  "Evidence: ${record['source_evidence']}",
+                                  style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: brassColor),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                }),
+
+                const SizedBox(height: AppSpacing.s16),
+
+                // 6. Immutable Verified Proof Points Text
+                _buildSectionHeader("PROOF POINTS QUICK SUMMARY (PROMPT INJECTION)", secondaryTextColor),
                 const SizedBox(height: AppSpacing.s8),
                 _buildCard(cardBg, borderColor, [
-                  Text("Ground Truth Facts (Zero Fabrication Source)", style: TextStyle(fontSize: 11, color: secondaryTextColor)),
+                  Text("Ground Truth Prompt Ingestion (Immutable Baseline)", style: TextStyle(fontSize: 11, color: secondaryTextColor)),
                   const SizedBox(height: 6),
                   TextField(
                     controller: _proofPointsController,

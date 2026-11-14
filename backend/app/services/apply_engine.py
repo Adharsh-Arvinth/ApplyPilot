@@ -3,13 +3,14 @@ import re
 import random
 import asyncio
 import datetime
+import zoneinfo
 import logging
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple
 from playwright.async_api import async_playwright, Page, BrowserContext
 from sqlalchemy.orm import Session
 from backend.app.core.config import settings
-from backend.app.models import Job, Profile, Application, NeedsInput, RunLog
+from backend.app.models import Job, Profile, Application, NeedsInput, RunLog, JobStateTransition
 from backend.app.services.answer_service import AnswerService, normalize_question_key
 from backend.app.services.tailoring_service import ResumeTailoringService
 from backend.app.services.fcm_service import PushNotificationService
@@ -20,6 +21,30 @@ logger = logging.getLogger(__name__)
 _consecutive_failures = 0
 
 class AutoApplyEngine:
+    @classmethod
+    def is_circuit_broken(cls) -> bool:
+        global _consecutive_failures
+        return _consecutive_failures >= 3
+
+    @classmethod
+    def reset_circuit_breaker(cls):
+        global _consecutive_failures
+        _consecutive_failures = 0
+
+    @staticmethod
+    def _record_transition(db: Session, job: Job, new_state: str, reason: str = "", result: str = ""):
+        prev_state = job.status or "idle"
+        job.status = new_state
+        transition = JobStateTransition(
+            job_id=job.id,
+            previous_state=prev_state,
+            new_state=new_state,
+            reason=reason,
+            execution_result=result
+        )
+        db.add(transition)
+        db.commit()
+
     @staticmethod
     def _record_failure_and_check_circuit_breaker(db: Session, profile: Profile, reason: str):
         global _consecutive_failures
@@ -44,6 +69,7 @@ class AutoApplyEngine:
     def _record_success(db: Session):
         global _consecutive_failures
         _consecutive_failures = 0
+
     @staticmethod
     def _is_company_cooldown_active(db: Session, company: str) -> bool:
         """Check if candidate already applied to this company within 30 days."""
@@ -80,6 +106,11 @@ class AutoApplyEngine:
         Execute automated form fill & preview/submission for an eligible job.
         Strictly enforces dry-run unless profile.go_live is True and not force_dry_run.
         """
+        # 0. Global queue pause check
+        if profile and profile.is_paused:
+            logger.info(f"Skipping {job.company} — {job.title}: Global queue is paused.")
+            return {"status": "paused", "reason": "global_pause_active"}
+
         # 1. Deduplication & Idempotency check
         existing_app = db.query(Application).filter(
             Application.job_id == job.id,
@@ -91,22 +122,34 @@ class AutoApplyEngine:
 
         if AutoApplyEngine._is_company_cooldown_active(db, job.company):
             logger.info(f"Skipping {job.company}: Applied within 30-day cooldown window.")
-            job.status = "blocked"
+            AutoApplyEngine._record_transition(db, job, "blocked", "30-day company cooldown active", "cooldown_active")
             job.skip_reason = "30-day company cooldown active"
             db.commit()
             return {"status": "skipped", "reason": "30-day cooldown"}
 
-        # 2. Daily cap check
-        today_start = datetime.datetime.now(datetime.timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-        daily_count = db.query(Application).filter(Application.submitted_at >= today_start).count()
-        if daily_count >= profile.daily_cap:
-            logger.info(f"Daily application cap ({profile.daily_cap}) reached.")
+        # 2. Daily cap check with user timezone awareness
+        tz_str = getattr(profile, "timezone", "Asia/Kolkata") or "Asia/Kolkata"
+        try:
+            user_tz = zoneinfo.ZoneInfo(tz_str)
+        except Exception:
+            user_tz = zoneinfo.ZoneInfo("Asia/Kolkata")
+
+        now_local = datetime.datetime.now(user_tz)
+        start_of_day_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        start_of_day_utc = start_of_day_local.astimezone(datetime.timezone.utc)
+
+        daily_count = db.query(Application).filter(Application.submitted_at >= start_of_day_utc).count()
+        if profile.daily_cap is not None and daily_count >= profile.daily_cap:
+            logger.info(f"Daily application cap ({profile.daily_cap}) reached ({daily_count} applied today in {tz_str}).")
             db.add(RunLog(event_type="engine", message=f"Daily cap ({profile.daily_cap}) reached. Queue paused.", level="warn"))
             db.commit()
-            return {"status": "halted", "reason": "daily_cap_reached"}
+            return {"status": "halted", "reason": "daily_cap_reached", "daily_count": daily_count, "daily_cap": profile.daily_cap}
 
-        # 3. Generate tailored 1-page resume
-        resume_info = ResumeTailoringService.generate_tailored_resume(job.company, job.title)
+        # 3. State transition -> PREPARING
+        AutoApplyEngine._record_transition(db, job, "preparing", "Starting resume generation and form preparation")
+
+        # Generate tailored 1-page resume
+        resume_info = ResumeTailoringService.generate_tailored_resume(job.company, job.title, profile)
         pdf_path = resume_info["pdf_path"]
 
         is_live = profile.go_live and not force_dry_run
@@ -119,8 +162,8 @@ class AutoApplyEngine:
         form_screenshot = settings.OUTPUT_DIR / "screenshots" / f"{clean_comp}_{clean_role}_form_{ts}.png"
         confirm_screenshot = settings.OUTPUT_DIR / "screenshots" / f"{clean_comp}_{clean_role}_confirm_{ts}.png"
 
-        job.status = "applying"
-        db.commit()
+        # State transition -> APPLYING
+        AutoApplyEngine._record_transition(db, job, "applying", f"Browser launched for {mode_label} fill")
 
         async with async_playwright() as p:
             browser = await p.chromium.launch(
@@ -160,7 +203,7 @@ class AutoApplyEngine:
                 }""")
                 if has_captcha:
                     logger.warning(f"Interactive CAPTCHA challenge detected on {job.company}.")
-                    job.status = "blocked"
+                    AutoApplyEngine._record_transition(db, job, "blocked", "Interactive CAPTCHA challenge detected", "captcha_detected")
                     job.skip_reason = "Interactive CAPTCHA challenge detected"
                     db.commit()
                     await browser.close()
@@ -170,13 +213,13 @@ class AutoApplyEngine:
                 # 4. Fill standard Greenhouse / Lever / Ashby fields
                 # First Name
                 if await page.query_selector("#first_name, input[name='first_name']"):
-                    await AutoApplyEngine._type_human(page, "#first_name, input[name='first_name']", "Adharsh")
+                    await AutoApplyEngine._type_human(page, "#first_name, input[name='first_name']", profile.full_name.split()[0] if profile.full_name else "Candidate")
                 # Last Name
                 if await page.query_selector("#last_name, input[name='last_name']"):
-                    await AutoApplyEngine._type_human(page, "#last_name, input[name='last_name']", "Arvinth")
+                    await AutoApplyEngine._type_human(page, "#last_name, input[name='last_name']", profile.full_name.split()[-1] if profile.full_name and len(profile.full_name.split()) > 1 else "")
                 # Full Name (for Lever)
                 if await page.query_selector("input[name='name']"):
-                    await AutoApplyEngine._type_human(page, "input[name='name']", "Adharsh Arvinth")
+                    await AutoApplyEngine._type_human(page, "input[name='name']", profile.full_name)
                 # Email
                 if await page.query_selector("#email, input[name='email'], input[type='email']"):
                     await AutoApplyEngine._type_human(page, "#email, input[name='email'], input[type='email']", profile.email)
@@ -241,7 +284,7 @@ class AutoApplyEngine:
                     )
 
                     # Create NeedsInput record and halt this application
-                    job.status = "needs_input"
+                    AutoApplyEngine._record_transition(db, job, "needs_attention", f"Required field unresolved: {first_unresolved_label}", "needs_input")
                     needs = NeedsInput(
                         job_id=job.id,
                         question_text=first_unresolved_label,
@@ -268,7 +311,7 @@ class AutoApplyEngine:
                         await asyncio.sleep(4.0)
                         await page.screenshot(path=str(confirm_screenshot), full_page=True)
 
-                    job.status = "applied"
+                    AutoApplyEngine._record_transition(db, job, "submitted", "Live form submitted successfully", "submitted")
                     app_record = Application(
                         job_id=job.id,
                         resume_file=str(pdf_path),
@@ -284,7 +327,7 @@ class AutoApplyEngine:
                     return {"status": "submitted", "screenshot": str(confirm_screenshot)}
                 else:
                     # Dry-Run mode
-                    job.status = "applied" # Marked previewed
+                    AutoApplyEngine._record_transition(db, job, "applied", "Dry-run form preview generated and verified", "dry_run")
                     app_record = Application(
                         job_id=job.id,
                         resume_file=str(pdf_path),
@@ -301,7 +344,7 @@ class AutoApplyEngine:
 
             except Exception as e:
                 logger.error(f"Error executing form fill for {job.company}: {e}")
-                job.status = "blocked"
+                AutoApplyEngine._record_transition(db, job, "failed", f"Execution error: {str(e)[:120]}", "error")
                 job.skip_reason = f"Execution error: {str(e)[:120]}"
                 db.commit()
                 await browser.close()

@@ -26,6 +26,20 @@ def _format_job_out(job: Job) -> dict:
     except Exception:
         fit = {}
 
+    def _parse_list(val):
+        if not val:
+            return []
+        try:
+            res = json.loads(val)
+            return res if isinstance(res, list) else []
+        except Exception:
+            return []
+
+    req_skills = _parse_list(getattr(job, "required_skills_json", None))
+    match_skills = _parse_list(getattr(job, "matching_skills_json", None))
+    miss_skills = _parse_list(getattr(job, "missing_skills_json", None))
+    miss_quals = _parse_list(getattr(job, "missing_qualifications_json", None))
+
     apps = []
     for app in job.applications:
         try:
@@ -67,7 +81,17 @@ def _format_job_out(job: Job) -> dict:
         "education_score": job.education_score or 0.0,
         "location_score": job.location_score or 0.0,
         "compensation_score": job.compensation_score or 0.0,
+        "role_relevance_score": getattr(job, "role_relevance_score", 0.0) or 0.0,
+        "eligibility_status": getattr(job, "eligibility_status", "needs_verification") or "needs_verification",
+        "eligibility_reason": getattr(job, "eligibility_reason", "") or "",
+        "blocked_category": getattr(job, "blocked_category", "") or "",
+        "company_logo_url": getattr(job, "company_logo_url", "") or "",
+        "is_saved": bool(getattr(job, "is_saved", False)),
         "fit_breakdown": fit,
+        "required_skills": req_skills,
+        "matching_skills": match_skills,
+        "missing_skills": miss_skills,
+        "missing_qualifications": miss_quals,
         "status": job.status,
         "notes": job.notes or "",
         "recruiter_info": job.recruiter_info or "",
@@ -212,6 +236,15 @@ def swipe_job(job_id: int, body: SwipeAction, db: Session = Depends(get_db)):
     db.commit()
     return {"job_id": job.id, "new_status": job.status}
 
+@router.post("/jobs/{job_id}/toggle-save", summary="Bookmark / Save Job")
+def toggle_save_job(job_id: int, db: Session = Depends(get_db)):
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    job.is_saved = not bool(job.is_saved)
+    db.commit()
+    return {"job_id": job.id, "is_saved": job.is_saved}
+
 @router.post("/jobs/{job_id}/tailor", summary="Generate Tailored 1-Page PDF Resume")
 def tailor_resume(job_id: int, db: Session = Depends(get_db)):
     job = db.query(Job).filter(Job.id == job_id).first()
@@ -327,9 +360,21 @@ def trigger_backup(db: Session = Depends(get_db)):
 def get_stats(db: Session = Depends(get_db)):
     profile = db.query(Profile).first()
     daily_cap = profile.daily_cap if profile else 100
+    daily_target = getattr(profile, "daily_target", 50) or 50
+    tz_str = getattr(profile, "timezone", "Asia/Kolkata") or "Asia/Kolkata"
+    
+    try:
+        import zoneinfo
+        user_tz = zoneinfo.ZoneInfo(tz_str)
+    except Exception:
+        import zoneinfo
+        user_tz = zoneinfo.ZoneInfo("Asia/Kolkata")
 
-    today_start = datetime.datetime.now(datetime.timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    applied_count = db.query(Application).filter(Application.submitted_at >= today_start).count()
+    now_local = datetime.datetime.now(user_tz)
+    start_of_day_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_of_day_utc = start_of_day_local.astimezone(datetime.timezone.utc)
+
+    applied_count = db.query(Application).filter(Application.submitted_at >= start_of_day_utc).count()
     needs_you = db.query(NeedsInput).filter(NeedsInput.status == "pending").count()
     maybe = db.query(Job).filter(Job.status.in_(["maybe", "evaluated"])).count()
     blocked = db.query(Job).filter(Job.status.in_(["blocked", "skipped", "rejected"])).count()
@@ -340,6 +385,13 @@ def get_stats(db: Session = Depends(get_db)):
     return {
         "daily_applied": applied_count,
         "daily_cap": daily_cap,
+        "daily_target": daily_target,
+        "daily_remaining": max(0, daily_cap - applied_count),
+        "target_remaining": max(0, daily_target - applied_count),
+        "is_paused": bool(profile.is_paused) if profile else False,
+        "is_circuit_broken": AutoApplyEngine.is_circuit_broken(),
+        "go_live": bool(profile.go_live) if profile else False,
+        "timezone": tz_str,
         "needs_you_count": needs_you,
         "maybe_count": maybe,
         "blocked_count": blocked,

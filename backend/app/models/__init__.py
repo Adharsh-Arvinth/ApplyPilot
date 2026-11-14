@@ -31,7 +31,9 @@ class Profile(Base):
     
     min_salary_inr = Column(Integer, default=700000) # 7 LPA
     daily_cap = Column(Integer, default=100)
+    daily_target = Column(Integer, default=50)
     hourly_cap = Column(Integer, default=10)
+    timezone = Column(String(64), default="Asia/Kolkata")
     min_fit_score = Column(Float, default=4.0)
     maybe_fit_score = Column(Float, default=3.0)
     
@@ -111,7 +113,21 @@ class Job(Base):
     education_score = Column(Float, default=0.0)
     location_score = Column(Float, default=0.0)
     compensation_score = Column(Float, default=0.0)
+    role_relevance_score = Column(Float, default=0.0)
     fit_breakdown_json = Column(Text, default="{}")
+    
+    # Stage A: Eligibility & Stage B: Matching
+    eligibility_status = Column(String(32), default="needs_verification") # eligible, potentially_eligible, ineligible, needs_verification
+    eligibility_reason = Column(Text, default="")
+    blocked_category = Column(String(32), default="") # ineligible, below_salary, duplicate, expired, missing_verification, user_excluded, automation_failure
+    
+    # Structured Skills & Qualifications Intelligence
+    required_skills_json = Column(Text, default="[]")
+    matching_skills_json = Column(Text, default="[]")
+    missing_skills_json = Column(Text, default="[]")
+    missing_qualifications_json = Column(Text, default="[]")
+    company_logo_url = Column(String(512), default="")
+    is_saved = Column(Boolean, default=False)
     
     # Complete Application Lifecycle Progression:
     # DISCOVERED -> EVALUATED -> APPROVED (QUEUED) -> PREPARING -> AWAITING_REVIEW -> SUBMITTED -> INTERVIEW -> OFFER / REJECTED / WITHDRAWN / BLOCKED
@@ -128,6 +144,7 @@ class Job(Base):
 
     applications = relationship("Application", back_populates="job", cascade="all, delete-orphan")
     needs_inputs = relationship("NeedsInput", back_populates="job", cascade="all, delete-orphan")
+    state_transitions = relationship("JobStateTransition", back_populates="job", cascade="all, delete-orphan")
 
 
 class Application(Base):
@@ -179,3 +196,33 @@ class RunLog(Base):
     message = Column(Text, nullable=False)
     level = Column(String(16), default="info") # info, warn, error
     created_at = Column(DateTime, default=utcnow)
+
+
+class CandidateRecord(Base):
+    __tablename__ = "candidate_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    category = Column(String(64), index=True, nullable=False) # education, work_experience, projects, publications, patents, certifications, technical_skills, achievements
+    subcategory = Column(String(64), default="") # university, school, published_patent, patent_application, system_benchmark, software_system, cloud_architecture, ai_analytics
+    title = Column(String(256), nullable=False)
+    description = Column(Text, default="")
+    source_evidence = Column(Text, default="")
+    verification_status = Column(String(32), default="verified") # verified, pending_verification, unverified
+    is_verified = Column(Boolean, default=True)
+    date_added = Column(DateTime, default=utcnow)
+    last_updated = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class JobStateTransition(Base):
+    __tablename__ = "job_state_transitions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    job_id = Column(Integer, ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True)
+    previous_state = Column(String(32), default="idle")
+    new_state = Column(String(32), nullable=False)
+    reason = Column(Text, default="")
+    execution_result = Column(Text, default="")
+    created_at = Column(DateTime, default=utcnow)
+
+    job = relationship("Job", back_populates="state_transitions")
+
