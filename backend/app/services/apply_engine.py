@@ -218,79 +218,26 @@ class AutoApplyEngine:
             page = await context.new_page()
 
             try:
-                # Navigate to job posting
+                # Authentically navigate to live job posting
+                target_url = job.url.strip()
+                # For Lever postings, navigate directly to the application form
+                if (job.source or "").lower() == "lever" and not target_url.rstrip("/").endswith("/apply"):
+                    target_url = f"{target_url.rstrip('/')}/apply"
+
                 try:
-                    await page.goto(job.url, wait_until="domcontentloaded", timeout=15000)
-                    await asyncio.sleep(1.5)
+                    logger.info(f"Navigating Playwright to genuine live ATS URL: {target_url}")
+                    resp = await page.goto(target_url, wait_until="domcontentloaded", timeout=25000)
+                    await asyncio.sleep(2.0)
+                    if resp and resp.status >= 400:
+                        raise RuntimeError(f"Live ATS endpoint returned HTTP {resp.status}")
                 except Exception as net_err:
-                    logger.warning(f"Live navigation to {job.url} failed: {net_err}. Rendering simulated ATS form for dry-run verification.")
-                    cand_first = profile.full_name.split()[0] if profile.full_name else "Candidate"
-                    cand_last = profile.full_name.split()[-1] if profile.full_name and len(profile.full_name.split()) > 1 else "Candidate"
-                    resume_name = Path(pdf_path).name if pdf_path else "Tailored_ATS_Resume.pdf"
-                    mock_html = f"""
-                    <!DOCTYPE html>
-                    <html lang="en">
-                    <head>
-                      <meta charset="UTF-8">
-                      <title>{job.company} Careers — Application Form</title>
-                      <style>
-                        * {{ box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }}
-                        body {{ background: #f6f8fa; color: #24292f; }}
-                        .banner {{ background: linear-gradient(90deg, #064E3B, #047857); color: #ecfdf5; padding: 12px 30px; display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; }}
-                        .card {{ max-width: 800px; margin: 30px auto; background: white; border-radius: 12px; border: 1px solid #d0d7de; box-shadow: 0 4px 16px rgba(0,0,0,0.06); padding: 36px; }}
-                        h2 {{ color: #0969da; font-size: 24px; }}
-                        h3 {{ color: #1f2328; font-size: 18px; margin: 4px 0 16px; }}
-                        .row {{ display: flex; gap: 20px; margin-bottom: 16px; }}
-                        .col {{ flex: 1; }}
-                        label {{ display: block; font-size: 12px; font-weight: 700; text-transform: uppercase; color: #57606a; margin-bottom: 4px; }}
-                        input {{ width: 100%; padding: 10px 12px; border: 1.5px solid #2da44e; border-radius: 6px; font-size: 14px; background: #f6fffa; color: #1a7f37; font-weight: 600; }}
-                        .res-box {{ background: #f6fffa; border: 1.5px dashed #2da44e; border-radius: 8px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; margin: 20px 0; }}
-                        .res-title {{ font-size: 14px; font-weight: 700; color: #1a7f37; }}
-                        .btn {{ background: #2da44e; color: white; border: none; padding: 12px 28px; border-radius: 6px; font-size: 14px; font-weight: 700; }}
-                      </style>
-                    </head>
-                    <body>
-                      <div class="banner">
-                        <span>🟢 AUTONOMOUS DRY-RUN VERIFIED • ApplyPilot Engine</span>
-                        <span>ATS Source: {job.source.upper()}</span>
-                      </div>
-                      <div class="card">
-                        <h2>{job.company}</h2>
-                        <h3>{job.title}</h3>
-                        <p style="color:#57606a; font-size:13px; margin-bottom:24px;">📍 {job.location or 'Remote / India'} • Full-Time Position</p>
-                        
-                        <form id="application_form">
-                          <div class="row">
-                            <div class="col"><label>First Name *</label><input id="first_name" name="first_name" value="{cand_first}"></div>
-                            <div class="col"><label>Last Name *</label><input id="last_name" name="last_name" value="{cand_last}"></div>
-                          </div>
-                          <div class="row">
-                            <div class="col"><label>Email Address *</label><input id="email" name="email" value="{profile.email}"></div>
-                            <div class="col"><label>Phone Number *</label><input id="phone" name="phone" value="{profile.phone}"></div>
-                          </div>
-                          <div class="row">
-                            <div class="col"><label>LinkedIn Profile</label><input id="linkedin" name="linkedin" value="{profile.linkedin or ''}"></div>
-                            <div class="col"><label>GitHub / Portfolio</label><input id="github" name="github" value="{profile.github or ''}"></div>
-                          </div>
-                          
-                          <div class="res-box">
-                            <div>
-                              <div class="res-title">📎 {resume_name}</div>
-                              <div style="font-size:11px; color:#57606a;">Tailored ATS PDF generated & attached</div>
-                            </div>
-                            <span style="background:#dafbe1; color:#1a7f37; font-size:11px; font-weight:700; padding:4px 8px; border-radius:12px;">Verified Attached</span>
-                          </div>
-                          
-                          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:24px;">
-                            <span style="font-size:12px; color:#57606a; font-style:italic;">Safety Gate Active: Submission halted prior to final click</span>
-                            <button id="submit_app" class="btn" type="submit">Submit Application</button>
-                          </div>
-                        </form>
-                      </div>
-                    </body>
-                    </html>
-                    """
-                    await page.set_content(mock_html)
+                    logger.error(f"Live navigation to {target_url} failed: {net_err}")
+                    AutoApplyEngine._record_transition(db, job, "failed", f"ATS URL unreachable: {str(net_err)[:100]}", "url_error")
+                    job.skip_reason = f"ATS URL unreachable: {str(net_err)[:100]}"
+                    db.commit()
+                    await browser.close()
+                    AutoApplyEngine._record_failure_and_check_circuit_breaker(db, profile, "ATS unreachable")
+                    return {"status": "failed", "error": f"ATS URL unreachable: {net_err}"}
 
                 # Check for active interactive CAPTCHA challenge
                 has_captcha = await page.evaluate("""() => {
@@ -409,9 +356,16 @@ class AutoApplyEngine:
                     await browser.close()
                     return {"status": "needs_input", "question": first_unresolved_label}
 
-                # 7. Pre-submit screenshot
-                await page.screenshot(path=str(form_screenshot), full_page=True)
-                logger.info(f"Captured form preview screenshot: {form_screenshot}")
+                # 7. Pre-submit screenshot of the real ATS form
+                form_el = await page.query_selector("form, #application_form, .application-form, #app")
+                if form_el:
+                    try:
+                        await form_el.scroll_into_view_if_needed()
+                        await asyncio.sleep(1.0)
+                    except Exception:
+                        pass
+                await page.screenshot(path=str(form_screenshot), full_page=False)
+                logger.info(f"Captured authentic ATS form screenshot: {form_screenshot}")
 
                 # 8. Submit or Dry-Run
                 if is_live:

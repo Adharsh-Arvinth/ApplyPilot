@@ -445,6 +445,8 @@ class AnswerService:
 
         # 2. Dynamic profile binding (Never hardcoded strings)
         # Name
+        if re.search(r'\blegal\s*name\b', clean_key):
+            return profile.full_name, "always_use"
         if re.search(r'\bfirst\s*name\b', clean_key):
             return first_name, "always_use"
         if re.search(r'\blast\s*name\b', clean_key):
@@ -477,7 +479,15 @@ class AnswerService:
         # Work Auth & Notice Period
         if re.search(r'authorized.*work.*india|unrestricted.*right.*india|authorized to work in the country', clean_key):
             return "Yes", "always_use"
-        if re.search(r'require.*sponsorship.*india|sponsorship.*required', clean_key):
+        if re.search(r'\bcountry\b', clean_key):
+            return "India", "always_use"
+        if re.search(r'\bcity\b', clean_key):
+            return "Bengaluru", "always_use"
+        if re.search(r'own\s*words|plagiarism', clean_key):
+            return "Yes", "always_use"
+        if re.search(r'previously\s*worked|previously\s*employed', clean_key):
+            return "No", "always_use"
+        if re.search(r'require.*sponsorship|sponsorship.*required|immigration\s*sponsorship', clean_key):
             return "No", "always_use"
         if re.search(r'require.*sponsorship.*us|require.*visa', clean_key):
             return "Yes", "always_use"

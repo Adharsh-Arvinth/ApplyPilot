@@ -832,9 +832,15 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
                                       screenshotUrl = "${_api.baseUrl}/output/screenshots/$screenshotFilename";
                                     }
                                   }
+                                  if (screenshotUrl == null) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text("Screenshot is being captured by live Playwright automation...")),
+                                    );
+                                    return;
+                                  }
                                   _openFullScreenshotViewer(
                                     context,
-                                    screenshotUrl ?? "${_api.baseUrl}/output/screenshots/ServiceNow_Machine_Learning_Intern_proof_20261114_213917.png",
+                                    screenshotUrl,
                                     "${job['company']} Form Fill Proof",
                                     job: job,
                                     latestApp: latestApp,

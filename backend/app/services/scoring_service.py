@@ -526,7 +526,7 @@ Respond in strict JSON with composite score and explainable sub-scores:
 
         for job in jobs:
             prev_status = job.status
-            res = await ScoringService.score_job_with_llm(job, profile)
+            res = ScoringService._heuristic_score(job, profile)
             score = res["score"]
             reason = res["reason"]
             elig_status = res.get("eligibility_status", "eligible")
