@@ -80,7 +80,15 @@ class AutoApplyEngine:
         Execute automated form fill & preview/submission for an eligible job.
         Strictly enforces dry-run unless profile.go_live is True and not force_dry_run.
         """
-        # 1. Deduplication Cooldown check
+        # 1. Deduplication & Idempotency check
+        existing_app = db.query(Application).filter(
+            Application.job_id == job.id,
+            Application.status.in_(["submitted", "dry_run", "applied"])
+        ).first()
+        if existing_app:
+            logger.info(f"Skipping {job.company} — {job.title}: Already applied (Application ID: {existing_app.id}).")
+            return {"status": "skipped", "reason": "already_applied", "application_id": existing_app.id}
+
         if AutoApplyEngine._is_company_cooldown_active(db, job.company):
             logger.info(f"Skipping {job.company}: Applied within 30-day cooldown window.")
             job.status = "blocked"
@@ -130,10 +138,25 @@ class AutoApplyEngine:
                 await page.goto(job.url, wait_until="domcontentloaded", timeout=30000)
                 await asyncio.sleep(2.0)
 
-                # Check for interactive CAPTCHA
+                # Check for active interactive CAPTCHA challenge
                 has_captcha = await page.evaluate("""() => {
                     const iframes = Array.from(document.querySelectorAll('iframe'));
-                    return iframes.some(f => (f.src || '').includes('recaptcha') || (f.src || '').includes('hcaptcha'));
+                    const visibleCaptchaIframe = iframes.some(f => {
+                        const src = f.src || '';
+                        const isCaptcha = src.includes('recaptcha') || src.includes('hcaptcha');
+                        if (!isCaptcha) return false;
+                        // Ignore invisible background tokens & security enclaves
+                        if (src.includes('size=invisible') || src.includes('enclave') || src.includes('proxy.html')) return false;
+                        // Active image challenge frame (bframe) or large visible iframe
+                        if (src.includes('bframe')) return true;
+                        const rect = f.getBoundingClientRect();
+                        return rect.width > 50 && rect.height > 50;
+                    });
+                    const visibleBox = Array.from(document.querySelectorAll('.g-recaptcha, .h-captcha, [id*="captcha"]')).some(el => {
+                        const style = window.getComputedStyle(el);
+                        return style.display !== 'none' && style.visibility !== 'hidden' && el.offsetHeight > 20;
+                    });
+                    return visibleCaptchaIframe || visibleBox;
                 }""")
                 if has_captcha:
                     logger.warning(f"Interactive CAPTCHA challenge detected on {job.company}.")

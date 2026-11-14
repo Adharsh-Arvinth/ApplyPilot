@@ -3,8 +3,8 @@
   "version": "1.1.0",
   "buildNumber": 2,
   "package": "org.applypilot.applypilot",
-  "builtAt": "2026-11-14T07:56:44Z",
-  "sha256": "862E5A7A3E0393D83A32A6DEF7246BE0B97976B5A0980A0A22C795B78AEE6429",
+  "builtAt": "2026-11-14T08:14:00Z",
+  "sha256": "D4E1C1E225719E8518D8FAD2CC844188FE6FDF08291633A6A1B78BDDCA271814",
   "backendCompatibility": ">=1.1.0",
   "theme": "Apple Music Signature (OLED Black, #FA243C Crimson, Frosted Glass & Hairline Dividers)",
   "features": [

@@ -16,6 +16,7 @@ class _JobsScreenState extends State<JobsScreen> with SingleTickerProviderStateM
   Timer? _liveTimer;
 
   bool _initialLoading = true;
+  String? _fetchError;
   List<dynamic> _queueJobs = [];
   List<dynamic> _maybeJobs = [];
   List<dynamic> _appliedJobs = [];
@@ -51,11 +52,17 @@ class _JobsScreenState extends State<JobsScreen> with SingleTickerProviderStateM
           _maybeJobs = all.where((j) => j["status"] == "maybe").toList();
           _appliedJobs = all.where((j) => ["applied", "interview", "offer", "submitted"].contains(j["status"])).toList();
           _blockedJobs = all.where((j) => ["blocked", "skipped", "rejected", "failed"].contains(j["status"])).toList();
+          _fetchError = null;
           _initialLoading = false;
         });
       }
-    } catch (_) {
-      if (mounted && isInitial) setState(() => _initialLoading = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _fetchError = "Could not synchronize with Windows host: $e";
+          if (isInitial) _initialLoading = false;
+        });
+      }
     }
   }
 
@@ -612,6 +619,29 @@ class _JobsScreenState extends State<JobsScreen> with SingleTickerProviderStateM
           ? const Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.appleCrimson))
           : Column(
               children: [
+                if (_fetchError != null)
+                  Container(
+                    margin: const EdgeInsets.fromLTRB(AppSpacing.s16, AppSpacing.s8, AppSpacing.s16, 0),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.iosRed.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(AppRadii.control),
+                      border: Border.all(color: AppColors.iosRed.withOpacity(0.3), width: 0.5),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.cloud_off, size: 16, color: AppColors.iosRed),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(_fetchError!, style: const TextStyle(fontSize: 12, color: AppColors.iosRed)),
+                        ),
+                        TextButton(
+                          onPressed: () => _fetchJobs(isInitial: true),
+                          child: const Text("Retry", style: TextStyle(fontSize: 12, color: AppColors.iosRed, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(AppSpacing.s16, AppSpacing.s12, AppSpacing.s16, AppSpacing.s8),
                   child: TextField(

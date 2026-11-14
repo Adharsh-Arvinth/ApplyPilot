@@ -291,11 +291,34 @@ class JobDiscoveryService:
         profile = db.query(Profile).first()
         min_salary = profile.min_salary_inr if profile else 700000
 
-        pool = JobDiscoveryService.get_seed_verified_pool()
+        # 1. Fetch live jobs from top Greenhouse and Lever public boards
+        live_jobs = []
+        for gh_board in ["elastic", "figma", "datadog"]:
+            try:
+                board_jobs = await JobDiscoveryService.fetch_greenhouse_board(gh_board)
+                live_jobs.extend(board_jobs)
+            except Exception as e:
+                logger.warning(f"Failed live fetch for Greenhouse board {gh_board}: {e}")
+
+        for lever_board in ["palantir"]:
+            try:
+                lever_jobs = await JobDiscoveryService.fetch_lever_board(lever_board)
+                live_jobs.extend(lever_jobs)
+            except Exception as e:
+                logger.warning(f"Failed live fetch for Lever board {lever_board}: {e}")
+
+        # 2. Combine with verified seed pool
+        seed_pool = JobDiscoveryService.get_seed_verified_pool()
+        pool = live_jobs + seed_pool
         new_count = 0
+        seen_urls = set()
 
         for raw_job in pool:
             url = raw_job["url"]
+            if url in seen_urls:
+                continue
+            seen_urls.add(url)
+
             existing = db.query(Job).filter(Job.url == url).first()
             if existing:
                 continue

@@ -88,6 +88,17 @@ async def apply_to_job(job_id: int, db: Session = Depends(get_db)):
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found.")
+
+    # Idempotency check: prevent duplicate submissions
+    if job.status in ["applied", "submitted"]:
+        return {"status": "already_applied", "job_id": job.id, "message": f"Job {job.id} for {job.company} was already applied."}
+    if job.status == "applying":
+        return {"status": "in_progress", "job_id": job.id, "message": f"Application for {job.company} is currently executing."}
+
+    # Atomic lock transition
+    job.status = "applying"
+    db.commit()
+
     profile = db.query(Profile).first()
     result = await AutoApplyEngine.process_job_application(db, job, profile)
     return {"job_id": job.id, "company": job.company, "result": result}
@@ -98,9 +109,13 @@ async def apply_next_in_queue(db: Session = Depends(get_db)):
     if profile.is_paused:
         return {"status": "paused", "message": "Application queue is currently paused."}
 
+    # Atomically claim the top queued job to prevent race conditions
     next_job = db.query(Job).filter(Job.status == "queued").order_by(Job.score.desc()).first()
     if not next_job:
         return {"status": "empty", "message": "No queued jobs available."}
+
+    next_job.status = "applying"
+    db.commit()
 
     result = await AutoApplyEngine.process_job_application(db, next_job, profile)
     return {"job_id": next_job.id, "company": next_job.company, "result": result}

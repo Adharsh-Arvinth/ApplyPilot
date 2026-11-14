@@ -34,7 +34,7 @@ def get_health(db: Session = Depends(get_db)):
         "last_seen": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "queue_paused": is_paused,
         "go_live": go_live,
-        "version": "1.0.0"
+        "version": "1.1.0"
     }
 
 @router.get("/authenticated", summary="Authenticated Health Ping")

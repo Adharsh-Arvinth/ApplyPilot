@@ -22,8 +22,56 @@ class ResumeTailoringService:
 
         # Highlight projects based on role keywords
         role_lower = role.lower()
-        highlight_agentic = any(k in role_lower for k in ["code", "software", "python", "backend", "system", "search"])
-        highlight_cv = any(k in role_lower for k in ["vision", "driver", "multimodal", "camera", "media"])
+        highlight_agentic = any(k in role_lower for k in ["code", "software", "python", "backend", "system", "search", "nlp", "llm", "agent"])
+        highlight_cv = any(k in role_lower for k in ["vision", "driver", "multimodal", "camera", "media", "sensor"])
+
+        block_accident = """
+<div class="job-header">
+  <span>A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver</span>
+  <span>Patent Published</span>
+</div>
+<div class="job-sub">
+  <span>Technologies: Python, OpenCV, MediaPipe, Random Forest, LSTM, GenAI Safety Reports</span>
+  <span>Lead Inventor</span>
+</div>
+<ul>
+  <li>Engineered a real-time multimodal accident prevention architecture combining driver facial telemetry, cabin voice-stress signals (MFCC, pitch, amplitude), and GPS road risk signals.</li>
+  <li>Implemented OpenCV and MediaPipe for low-latency facial landmark extraction; trained Random Forest and LSTM neural architectures within strict latency budgets.</li>
+  <li>Integrated Generative AI to automate post-trip driver safety diagnostic summaries, personalizing safety recommendations.</li>
+</ul>"""
+
+        block_agentic = """
+<div class="job-header">
+  <span>Agentic Code Intelligence — AI Code Retrieval System</span>
+  <span>Benchmarked Implementation</span>
+</div>
+<div class="job-sub">
+  <span>Technologies: Python, Neural Embeddings, BM25, Abstract Syntax Tree (AST) Analysis</span>
+  <span>Independent R&D</span>
+</div>
+<ul>
+  <li>Developed a high-precision code retrieval system indexing 8,765 Python programs using hybrid dense embeddings, BM25 text rank, and structural AST parsing.</li>
+  <li>Benchmarked on MTEB AppsRetrieval: achieved <strong>25.59% NDCG@10</strong> vs a 5.14% baseline with ultra-fast <strong>43–63 ms CPU latency</strong>.</li>
+</ul>"""
+
+        block_doppler = """
+<div class="job-header">
+  <span>Acoustic Doppler Session Guard</span>
+  <span>Patent Published</span>
+</div>
+<div class="job-sub">
+  <span>Technologies: Python, Fast Fourier Transform (FFT), Signal Processing, Spectral Analysis</span>
+  <span>Co-Inventor</span>
+</div>
+<ul>
+  <li>Engineered an FFT-based acoustic proximity detection system identifying user departure motion patterns in background noise.</li>
+  <li>Designed a dual-band spectral veto algorithm to filter ambient noise, triggering automated system lock in 10.5 seconds.</li>
+</ul>"""
+
+        if highlight_agentic:
+            projects_html = block_agentic + block_accident + block_doppler
+        else:
+            projects_html = block_accident + block_agentic + block_doppler
 
         # Template conforming to 1-page ATS specifications
         html_content = f"""<!DOCTYPE html>
@@ -116,46 +164,7 @@ class ResumeTailoringService:
 </div>
 
 <h2>Published Patents & Research Implementations</h2>
-
-<div class="job-header">
-  <span>A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver</span>
-  <span>Patent Published</span>
-</div>
-<div class="job-sub">
-  <span>Technologies: Python, OpenCV, MediaPipe, Random Forest, LSTM, GenAI Safety Reports</span>
-  <span>Lead Inventor</span>
-</div>
-<ul>
-  <li>Engineered a real-time multimodal accident prevention architecture combining driver facial telemetry, cabin voice-stress signals (MFCC, pitch, amplitude), and GPS road risk signals.</li>
-  <li>Implemented OpenCV and MediaPipe for low-latency facial landmark extraction; trained Random Forest and LSTM neural architectures within strict latency budgets.</li>
-  <li>Integrated Generative AI to automate post-trip driver safety diagnostic summaries, personalizing safety recommendations.</li>
-</ul>
-
-<div class="job-header">
-  <span>Agentic Code Intelligence — AI Code Retrieval System</span>
-  <span>Benchmarked Implementation</span>
-</div>
-<div class="job-sub">
-  <span>Technologies: Python, Neural Embeddings, BM25, Abstract Syntax Tree (AST) Analysis</span>
-  <span>Independent R&D</span>
-</div>
-<ul>
-  <li>Developed a high-precision code retrieval system indexing 8,765 Python programs using hybrid dense embeddings, BM25 text rank, and structural AST parsing.</li>
-  <li>Benchmarked on MTEB AppsRetrieval: achieved <strong>25.59% NDCG@10</strong> vs a 5.14% baseline with ultra-fast <strong>43–63 ms CPU latency</strong>.</li>
-</ul>
-
-<div class="job-header">
-  <span>Acoustic Doppler Session Guard</span>
-  <span>Patent Published</span>
-</div>
-<div class="job-sub">
-  <span>Technologies: Python, Fast Fourier Transform (FFT), Signal Processing, Spectral Analysis</span>
-  <span>Co-Inventor</span>
-</div>
-<ul>
-  <li>Engineered an FFT-based acoustic proximity detection system identifying user departure motion patterns in background noise.</li>
-  <li>Designed a dual-band spectral veto algorithm to filter ambient noise, triggering automated system lock in 10.5 seconds.</li>
-</ul>
+{projects_html}
 
 <h2>Technical Skills & Certifications</h2>
 <div class="skills-grid">
