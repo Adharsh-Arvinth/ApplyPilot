@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
+import '../core/hallmark_tokens.dart';
 import '../main.dart';
 import 'ai_assistant_screen.dart';
 
@@ -165,14 +166,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.all(AppSpacing.s16),
         children: [
           // 1. Appearance / Theme
-          _buildSectionHeader("APPEARANCE & THEME", secondaryTextColor),
+          _buildSectionHeader("Appearance and theme", secondaryTextColor),
           const SizedBox(height: AppSpacing.s8),
           Container(
             padding: const EdgeInsets.all(AppSpacing.s16),
             decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(AppRadii.card),
-              border: Border.all(color: borderColor),
+              color: isDark ? HallmarkConsole.panel : cardBg,
+              borderRadius: BorderRadius.circular(HallmarkConsole.radiusPanel),
+              border: Border.all(color: isDark ? HallmarkConsole.rule : borderColor, width: HallmarkConsole.ruleWidth),
             ),
             child: ValueListenableBuilder<ThemeMode>(
               valueListenable: themeModeNotifier,
@@ -211,14 +212,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: AppSpacing.s20),
 
           // 2. Tailscale PC Host Connection
-          _buildSectionHeader("TAILSCALE PC HOST CONNECTION", secondaryTextColor),
+          _buildSectionHeader("Tailscale host connection", secondaryTextColor),
           const SizedBox(height: AppSpacing.s8),
           Container(
             padding: const EdgeInsets.all(AppSpacing.s16),
             decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(AppRadii.card),
-              border: Border.all(color: borderColor),
+              color: isDark ? HallmarkConsole.panel : cardBg,
+              borderRadius: BorderRadius.circular(HallmarkConsole.radiusPanel),
+              border: Border.all(color: isDark ? HallmarkConsole.rule : borderColor, width: HallmarkConsole.ruleWidth),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -280,14 +281,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: AppSpacing.s20),
 
           // 3. Database & Backups
-          _buildSectionHeader("DATA PRESERVATION & BACKUPS", secondaryTextColor),
+          _buildSectionHeader("Data preservation & backups", secondaryTextColor),
           const SizedBox(height: AppSpacing.s8),
           Container(
             padding: const EdgeInsets.all(AppSpacing.s16),
             decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(AppRadii.card),
-              border: Border.all(color: borderColor),
+              color: isDark ? HallmarkConsole.panel : cardBg,
+              borderRadius: BorderRadius.circular(HallmarkConsole.radiusPanel),
+              border: Border.all(color: isDark ? HallmarkConsole.rule : borderColor, width: HallmarkConsole.ruleWidth),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -311,14 +312,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: AppSpacing.s20),
 
           // 4. Firebase Cloud Synchronization
-          _buildSectionHeader("FIREBASE CLOUD INFRASTRUCTURE", secondaryTextColor),
+          _buildSectionHeader("Cloud infrastructure & sync", secondaryTextColor),
           const SizedBox(height: AppSpacing.s8),
           Container(
             padding: const EdgeInsets.all(AppSpacing.s16),
             decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(AppRadii.card),
-              border: Border.all(color: borderColor),
+              color: isDark ? HallmarkConsole.panel : cardBg,
+              borderRadius: BorderRadius.circular(HallmarkConsole.radiusPanel),
+              border: Border.all(color: isDark ? HallmarkConsole.rule : borderColor, width: HallmarkConsole.ruleWidth),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -393,14 +394,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: AppSpacing.s20),
 
           // 5. Gemini AI Intelligence Layer
-          _buildSectionHeader("GEMINI AI INTELLIGENCE LAYER", secondaryTextColor),
+          _buildSectionHeader("Gemini AI intelligence engines", secondaryTextColor),
           const SizedBox(height: AppSpacing.s8),
           Container(
             padding: const EdgeInsets.all(AppSpacing.s16),
             decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(AppRadii.card),
-              border: Border.all(color: borderColor),
+              color: isDark ? HallmarkConsole.panel : cardBg,
+              borderRadius: BorderRadius.circular(HallmarkConsole.radiusPanel),
+              border: Border.all(color: isDark ? HallmarkConsole.rule : borderColor, width: HallmarkConsole.ruleWidth),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -483,7 +484,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildSectionHeader(String title, Color color) {
     return Text(
       title,
-      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: color),
+      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: color),
     );
   }
 }

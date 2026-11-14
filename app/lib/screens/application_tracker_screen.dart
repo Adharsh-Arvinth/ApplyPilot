@@ -418,7 +418,7 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
                             children: [
                               const Text("APPLICANT", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF8B968B))),
                               const SizedBox(height: 2),
-                              const Text("Adharsh Arvinth", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFECEEEC))),
+                              const Text("Verified Candidate", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFECEEEC))),
                               const SizedBox(height: 6),
                               const Text("TAILORED RESUME", style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF8B968B))),
                               const SizedBox(height: 2),

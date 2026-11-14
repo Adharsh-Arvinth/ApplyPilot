@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
+import '../core/hallmark_tokens.dart';
 import '../core/motion.dart';
 
 class NeedsYouScreen extends StatefulWidget {
@@ -276,7 +277,7 @@ class _NeedsYouScreenState extends State<NeedsYouScreen> {
                                     children: [
                                       const Icon(Icons.auto_awesome, size: 14, color: AppColors.successEmerald),
                                       const SizedBox(width: AppSpacing.s4),
-                                      Text("AUTO-RESOLVED", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: secondaryTextColor)),
+                                      Text("Auto-resolved", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: secondaryTextColor)),
                                     ],
                                   ),
                                   const SizedBox(height: AppSpacing.s6),
@@ -304,7 +305,7 @@ class _NeedsYouScreenState extends State<NeedsYouScreen> {
                                     children: [
                                       const Icon(Icons.verified_user_outlined, size: 14, color: AppColors.racingGreen),
                                       const SizedBox(width: AppSpacing.s4),
-                                      Text("BY CANDIDATE", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: secondaryTextColor)),
+                                      Text("By candidate", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: secondaryTextColor)),
                                     ],
                                   ),
                                   const SizedBox(height: AppSpacing.s6),
@@ -476,9 +477,9 @@ class _NeedsYouScreenState extends State<NeedsYouScreen> {
                         child: Container(
                           margin: const EdgeInsets.only(bottom: AppSpacing.s16),
                           decoration: BoxDecoration(
-                            color: cardBg,
-                            borderRadius: BorderRadius.circular(AppRadii.card),
-                            border: Border.all(color: brassColor.withOpacity(0.4)),
+                            color: isDark ? HallmarkConsole.panel : cardBg,
+                            borderRadius: BorderRadius.circular(HallmarkConsole.radiusPanel),
+                            border: Border.all(color: HallmarkConsole.amber.withOpacity(0.4), width: HallmarkConsole.ruleWidth),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -487,12 +488,12 @@ class _NeedsYouScreenState extends State<NeedsYouScreen> {
                           Container(
                             padding: const EdgeInsets.all(AppSpacing.s16),
                             decoration: BoxDecoration(
-                              color: brassColor.withOpacity(0.08),
-                              borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.card)),
+                              color: HallmarkConsole.amber.withOpacity(0.08),
+                              borderRadius: const BorderRadius.vertical(top: Radius.circular(HallmarkConsole.radiusPanel)),
                             ),
                             child: Row(
                               children: [
-                                Icon(Icons.assignment_late_outlined, size: 18, color: brassColor),
+                                const Icon(Icons.assignment_late_outlined, size: 18, color: HallmarkConsole.amber),
                                 const SizedBox(width: AppSpacing.s8),
                                 Expanded(
                                   child: Column(
@@ -511,14 +512,10 @@ class _NeedsYouScreenState extends State<NeedsYouScreen> {
                                 ),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8, vertical: AppSpacing.s4),
-                                  decoration: BoxDecoration(
-                                    color: cardBg,
-                                    borderRadius: BorderRadius.circular(AppRadii.badge),
-                                    border: Border.all(color: borderColor),
-                                  ),
+                                  decoration: HallmarkConsole.tagDecoration(tint: HallmarkConsole.amber),
                                   child: Text(
-                                    (item["field_type"] ?? "text").toString().toUpperCase(),
-                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: secondaryTextColor),
+                                    (item["field_type"] ?? "text").toString().toLowerCase(),
+                                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: HallmarkConsole.amber),
                                   ),
                                 ),
                               ],
@@ -531,8 +528,8 @@ class _NeedsYouScreenState extends State<NeedsYouScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  "QUESTION FROM ATS FORM",
-                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.8, color: secondaryTextColor),
+                                  "Question from employer form",
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: secondaryTextColor),
                                 ),
                                 const SizedBox(height: AppSpacing.s6),
                                 Text(
@@ -544,8 +541,8 @@ class _NeedsYouScreenState extends State<NeedsYouScreen> {
                                 // If dropdown options exist, display quick chips
                                 if (options.isNotEmpty) ...[
                                   Text(
-                                    "SELECT OPTION",
-                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: secondaryTextColor),
+                                    "Select option",
+                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: secondaryTextColor),
                                   ),
                                   const SizedBox(height: AppSpacing.s6),
                                   Wrap(

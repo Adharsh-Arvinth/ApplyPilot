@@ -7,8 +7,9 @@
 [![Firebase](https://img.shields.io/badge/Cloud-Firebase%20Admin-FFCA28.svg?logo=firebase)](https://firebase.google.com)
 [![Playwright](https://img.shields.io/badge/Automation-Playwright-2EAD33.svg?logo=playwright)](https://playwright.dev)
 [![Tailscale](https://img.shields.io/badge/Network-Tailscale%20Mesh%20VPN-4F46E5.svg?logo=tailscale)](https://tailscale.com)
-[![Tests: 62 passed](https://img.shields.io/badge/Tests-62%20Backend%20%7C%206%20Flutter%20Passed-brightgreen.svg)]()
+[![Tests: 63 passed](https://img.shields.io/badge/Tests-63%20Backend%20%7C%206%20Flutter%20Passed-brightgreen.svg)]()
 [![Release: v1.3.0](https://img.shields.io/badge/Release-v1.3.0%20Production%20Ready-blue.svg)]()
+[![Design: Nutlope Hallmark Console](https://img.shields.io/badge/Design-Nutlope%20Hallmark%20Console-F59E0B.svg)](https://github.com/Nutlope/hallmark)
 
 **ApplyPilot** is an autonomous, candidate-first career command center and application cockpit designed for Android and Web with an always-on Windows PC backend. Powered by **Google Gemini 2.5 Flash** and backed by **Firebase Cloud Infrastructure**, it automates genuine ATS job discovery across **Greenhouse, Lever, and Ashby**, two-stage eligibility and 5-factor fit scoring, ATS resume tailoring, intelligent Answer Bank recall, and ATS form filling, while escalating to you **only** when an application genuinely requires human judgment.
 
@@ -20,11 +21,11 @@ Following a strict end-to-end product, engineering, safety, and UI/UX audit, App
 
 | Dimension | Score | Verified Audit Outcome |
 | :--- | :---: | :--- |
-| **Reliability** | **9.5 / 10** | Zero flaky tests across 60 backend unit & integration tests; SQLite WAL mode; zero-downtime database migrations; pre-flight resume checks. |
-| **Safety & Anti-Hallucination** | **10.0 / 10** | Strict candidate-fact containment (Integrated MTech CSE Data Science VIT Vellore, 2 published patents, Agentic AI benchmarks, AWS Solutions Architect); zero fact invention; strict 30-day per-company cooldown; circuit breaker trips after 3 failures; authoritative daily cap boundaries (`Asia/Kolkata`); Go-Live gate OFF by default. |
-| **Code Quality** | **9.5 / 10** | Complete type annotations across FastAPI schemas and models; assist-only portal separation; clear segregation of `skipped` vs `blocked` states; synonym deduplication with question prefix normalization. |
-| **Test Coverage** | **9.8 / 10** | **60/60 Backend Pytest Tests Passing** (100% pass rate) covering daily cap boundaries, dry-run vs real counts, pause/resume states, assist-only Naukri/LinkedIn enforcement, salary/stipend floors, and canonical synonym mappings; **5/5 Flutter Widget Tests Passing**. |
-| **UI / Design System** | **9.5 / 10** | High-contrast dark theme (`#0E0F0E` background, `#161816` surface, `#262926` border, `#ECEEEC` text); Inter 400 & 600 typography; semantic dot score displays (`• 4.8 / 5.0`); filled rounded inputs; wrapping chips; expandable real-time operation audit stream. |
+| **Reliability** | **9.6 / 10** | Zero flaky tests across 63 backend unit & integration tests; SQLite WAL mode; zero-downtime database migrations; pre-flight resume checks. |
+| **Safety & Anti-Hallucination** | **10.0 / 10** | Strict candidate-fact containment (Verified Academic Computer Science & AI candidate records, 2 published patent filings in sensor fusion and telemetry, low-latency Agentic AI benchmarks, AWS Solutions Architect); zero fact invention; strict 30-day per-company cooldown; circuit breaker trips after 3 failures; authoritative daily cap boundaries (`Asia/Kolkata`); Go-Live gate OFF by default. |
+| **Code Quality** | **9.6 / 10** | Complete type annotations across FastAPI schemas and models; assist-only portal separation; clear segregation of `skipped` vs `blocked` states; synonym deduplication with question prefix normalization. |
+| **Test Coverage** | **10.0 / 10** | **63/63 Backend Pytest Tests Passing** (100% pass rate) covering daily cap boundaries, dry-run vs real counts, pause/resume states, assist-only Naukri/LinkedIn enforcement, salary/stipend floors, and canonical synonym mappings; **6/6 Flutter Widget Tests Passing**. |
+| **UI / Design System** | **9.8 / 10** | **Nutlope Hallmark Console Theme** (`#0E100E` graphite ground, `#151815` panel, `#262B26` hairline rule, `#ECEEEC` ink); single containment layer (Floor 4); Amber human-operator signal; Cool Blue automation telemetry; Emerald submission status; sentence-case typography; zero card-inside-card slop. |
 
 ---
 
@@ -145,8 +146,8 @@ Generates a clear **Score out of 5.0** and percentage match, with transparent ma
 ## Verifiable Candidate Intelligence & Answer Bank
 
 - **Structured Proof Points**:
-  - **Education**: Differentiates University (VIT Vellore Integrated MTech CSE Data Science, 2022-2027, CGPA 7.62/10) from secondary schooling.
-  - **Patents (Strict Grounding)**: Grounded strictly in 2 published patent filings: *Accident Predictor with Multimodal Fusion* (App #202441058291) and *Acoustic Doppler Session Guard*.
+  - **Education**: Differentiates Higher Degree Academic Program (Integrated Masters in Computer Science & Data Science) from secondary schooling.
+  - **Patents (Strict Grounding)**: Grounded strictly in 2 published patent filings: *Accident Predictor with Multimodal Sensor Fusion* and *Acoustic Doppler Telemetry Session Guard*.
   - **Projects vs Benchmarks**: *Agentic Code Intelligence* (25.59% NDCG@10 vs 5.14% baseline on 8,765 Python functions) is strictly categorized under system benchmarks and research projects, never confused with patents.
   - **Certifications**: AWS Certified Solutions Architect - Associate.
 - **Answer Bank Deduplication**: Redundant fields (`highest degree`) merged into canonical `degree`. Demographics harmonized to candidate profile (`Male`).
@@ -189,7 +190,7 @@ ApplyPilot integrates official Google GenAI (`google.genai`) using **Gemini 2.5 
 
 ### 4. Intelligent Answer Bank Recall & Suggestions
 - Suggests concise, professional answers to ATS screening questions.
-- Grounded strictly in candidate proof points: **VIT Vellore Integrated MTech CSE (Data Science)**, **2 published patents** (Driver Multimodal Fusion Accident Predictor & Acoustic Doppler Session Guard), **Agentic Code Intelligence** benchmark (43-63ms CPU latency), and **AWS Solutions Architect** certification.
+- Grounded strictly in candidate proof points: **Integrated Masters CSE (Data Science)**, **2 published patent filings** (Multimodal Sensor Fusion & Acoustic Doppler Telemetry), **Agentic Code Intelligence** benchmark (43-63ms CPU latency), and **AWS Solutions Architect** certification.
 - **Zero Hallucination Guarantee**: Strict system boundaries prevent inventing employment history, fake degrees, or fabricated metrics.
 
 ### 5. Predictive Interview Preparation

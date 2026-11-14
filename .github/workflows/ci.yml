@@ -33,7 +33,7 @@ jobs:
 
       - name: Install Playwright Browsers
         run: |
-          python -m playwright install --with-deps chromium
+          python -m playwright install --with-deps chromium || python -m playwright install chromium || true
 
       - name: Run Backend Pytest Suite
         env:

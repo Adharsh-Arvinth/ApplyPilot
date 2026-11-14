@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
+import '../core/hallmark_tokens.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -405,7 +406,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: AppSpacing.s16),
 
                 // 2. Personal Information
-                _buildSectionHeader("PERSONAL & CONTACT DETAILS", secondaryTextColor),
+                _buildSectionHeader("Personal and contact details", secondaryTextColor),
                 const SizedBox(height: AppSpacing.s8),
                 _buildCard(cardBg, borderColor, [
                   _buildTextField("Full Name", _nameController),
@@ -422,7 +423,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: AppSpacing.s16),
 
                 // 3. Education & Credentials
-                _buildSectionHeader("ACADEMIC & WORK AUTHORIZATION", secondaryTextColor),
+                _buildSectionHeader("Academic and work authorization", secondaryTextColor),
                 const SizedBox(height: AppSpacing.s8),
                 _buildCard(cardBg, borderColor, [
                   _buildTextField("Highest Degree & Discipline", _educationController),
@@ -451,7 +452,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: AppSpacing.s16),
 
                 // 4. Target Roles & Locations
-                _buildSectionHeader("CAREER CRITERIA & TARGET ROLES", secondaryTextColor),
+                _buildSectionHeader("Career criteria and target roles", secondaryTextColor),
                 const SizedBox(height: AppSpacing.s8),
                 _buildCard(cardBg, borderColor, [
                   Text("Target Roles", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primaryTextColor)),
@@ -550,7 +551,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 // 5. Facts the AI can use
                 Row(
                   children: [
-                    _buildSectionHeader("FACTS THE AI CAN USE", secondaryTextColor),
+                    _buildSectionHeader("Facts available for AI tailoring", secondaryTextColor),
                     const Spacer(),
                     TextButton.icon(
                       style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
@@ -683,7 +684,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: AppSpacing.s16),
 
                 // 6. Immutable Verified Proof Points Text
-                _buildSectionHeader("PROOF POINTS QUICK SUMMARY (PROMPT INJECTION)", secondaryTextColor),
+                _buildSectionHeader("Proof points baseline (ground truth)", secondaryTextColor),
                 const SizedBox(height: AppSpacing.s8),
                 _buildCard(cardBg, borderColor, [
                   Text("Ground Truth Prompt Ingestion (Immutable Baseline)", style: TextStyle(fontSize: 11, color: secondaryTextColor)),
@@ -717,17 +718,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildSectionHeader(String title, Color color) {
     return Text(
       title,
-      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: color),
+      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: color),
     );
   }
 
   Widget _buildCard(Color cardBg, Color borderColor, List<Widget> children) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(AppSpacing.s16),
       decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        border: Border.all(color: borderColor),
+        color: isDark ? HallmarkConsole.panel : cardBg,
+        borderRadius: BorderRadius.circular(HallmarkConsole.radiusPanel),
+        border: Border.all(color: isDark ? HallmarkConsole.rule : borderColor, width: HallmarkConsole.ruleWidth),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
     );

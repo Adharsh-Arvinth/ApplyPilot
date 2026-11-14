@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
+import '../core/hallmark_tokens.dart';
 import '../widgets/smart_widgets.dart';
 import '../ui_templates/theme/design_tokens.dart';
 import '../ui_templates/components/shadcn_card.dart';
@@ -340,39 +341,32 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        titleSpacing: AppSpacing.s12,
+        titleSpacing: AppSpacing.s16,
+        elevation: 0,
+        backgroundColor: isDark ? HallmarkConsole.ground : AppColors.surfaceLight,
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-              decoration: BoxDecoration(
-                color: accentGreen.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(AppRadii.badge),
-                border: Border.all(color: accentGreen.withOpacity(0.3), width: 0.8),
-              ),
-              child: Text(
-                "APPLYPILOT",
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.8,
-                  color: accentGreen,
-                ),
+            Text(
+              "ApplyPilot",
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.3,
+                color: primaryTextColor,
               ),
             ),
-            const SizedBox(width: AppSpacing.s8),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 135),
-              child: Text(
-                "Command Center",
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-                softWrap: false,
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: HallmarkConsole.tagDecoration(tint: HallmarkConsole.coolLight),
+              child: const Text(
+                "CONSOLE",
                 style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: primaryTextColor,
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.6,
+                  color: HallmarkConsole.coolLight,
                 ),
               ),
             ),
@@ -381,21 +375,32 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(
             icon: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: ApplyPilotColors.aiViolet.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: HallmarkConsole.tagDecoration(tint: ApplyPilotColors.aiViolet),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.auto_awesome, size: 13, color: ApplyPilotColors.aiViolet),
+                  SizedBox(width: 4),
+                  Text(
+                    "AI Copilot",
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: ApplyPilotColors.aiViolet,
+                    ),
+                  ),
+                ],
               ),
-              child: const Icon(Icons.auto_awesome, size: 17, color: ApplyPilotColors.aiViolet),
             ),
-            tooltip: "Gemini Career Advisor",
+            tooltip: "Gemini Career Copilot",
             onPressed: () {
               HapticFeedback.lightImpact();
               Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantScreen()));
             },
           ),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, size: 20),
+            icon: Icon(Icons.more_vert, size: 20, color: secondaryTextColor),
             tooltip: "More Options",
             onSelected: (val) {
               if (val == "customize") _openCustomizer();
@@ -446,7 +451,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 6),
         ],
       ),
       body: _loading

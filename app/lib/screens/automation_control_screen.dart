@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
+import '../core/hallmark_tokens.dart';
 
 class AutomationControlScreen extends StatefulWidget {
   const AutomationControlScreen({super.key});
@@ -166,19 +167,22 @@ class _AutomationControlScreenState extends State<AutomationControlScreen> {
                 Container(
                   padding: const EdgeInsets.all(AppSpacing.s20),
                   decoration: BoxDecoration(
-                    color: isPaused ? AppColors.errorLight.withOpacity(0.08) : cardBg,
-                    borderRadius: BorderRadius.circular(AppRadii.card),
-                    border: Border.all(color: isPaused ? AppColors.errorLight : borderColor),
+                    color: isPaused ? HallmarkConsole.amber.withOpacity(0.08) : (isDark ? HallmarkConsole.panel : cardBg),
+                    borderRadius: BorderRadius.circular(HallmarkConsole.radiusPanel),
+                    border: Border.all(
+                      color: isPaused ? HallmarkConsole.amber : (isDark ? HallmarkConsole.rule : borderColor),
+                      width: HallmarkConsole.ruleWidth,
+                    ),
                   ),
                   child: Row(
                     children: [
                       Container(
                         padding: const EdgeInsets.all(AppSpacing.s12),
                         decoration: BoxDecoration(
-                          color: (isPaused ? AppColors.errorLight : accentGreen).withOpacity(0.12),
+                          color: (isPaused ? HallmarkConsole.amber : accentGreen).withOpacity(0.12),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(isPaused ? Icons.pause_circle_filled : Icons.play_circle_filled, size: 28, color: isPaused ? AppColors.errorLight : accentGreen),
+                        child: Icon(isPaused ? Icons.pause_circle_filled : Icons.play_circle_filled, size: 28, color: isPaused ? HallmarkConsole.amber : accentGreen),
                       ),
                       const SizedBox(width: AppSpacing.s16),
                       Expanded(
@@ -199,9 +203,9 @@ class _AutomationControlScreenState extends State<AutomationControlScreen> {
                       ElevatedButton(
                         onPressed: _togglePause,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: isPaused ? AppColors.successLight : AppColors.errorLight,
+                          backgroundColor: isPaused ? accentGreen : HallmarkConsole.amber,
                           foregroundColor: AppColors.pureWhite,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HallmarkConsole.radiusControl)),
                         ),
                         child: Text(isPaused ? "Resume" : "Emergency Pause", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                       ),
@@ -215,9 +219,12 @@ class _AutomationControlScreenState extends State<AutomationControlScreen> {
                 Container(
                   padding: const EdgeInsets.all(AppSpacing.s20),
                   decoration: BoxDecoration(
-                    color: isLive ? AppColors.warningLight.withOpacity(0.08) : cardBg,
-                    borderRadius: BorderRadius.circular(AppRadii.card),
-                    border: Border.all(color: isLive ? AppColors.warningLight : borderColor),
+                    color: isLive ? HallmarkConsole.amber.withOpacity(0.08) : (isDark ? HallmarkConsole.panel : cardBg),
+                    borderRadius: BorderRadius.circular(HallmarkConsole.radiusPanel),
+                    border: Border.all(
+                      color: isLive ? HallmarkConsole.amber : (isDark ? HallmarkConsole.rule : borderColor),
+                      width: HallmarkConsole.ruleWidth,
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -229,12 +236,11 @@ class _AutomationControlScreenState extends State<AutomationControlScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                isLive ? "LIVE SUBMISSION MODE" : "DRY-RUN SAFE MODE (DEFAULT)",
+                                isLive ? "Live submission mode" : "Dry-run safe mode (active)",
                                 style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w800,
-                                  color: isLive ? AppColors.warningLight : accentGreen,
-                                  letterSpacing: 0.8,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: isLive ? HallmarkConsole.amber : HallmarkConsole.coolLight,
                                 ),
                               ),
                               const SizedBox(height: 2),

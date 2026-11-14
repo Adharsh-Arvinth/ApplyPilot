@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
+import '../core/hallmark_tokens.dart';
 import '../core/motion.dart';
 
 class AnswerBankScreen extends StatefulWidget {
@@ -196,9 +197,9 @@ class _AnswerBankScreenState extends State<AnswerBankScreen> {
                             child: Container(
                               margin: const EdgeInsets.only(bottom: AppSpacing.s12),
                               decoration: BoxDecoration(
-                                color: cardBg,
-                                borderRadius: BorderRadius.circular(AppRadii.card),
-                                border: Border.all(color: borderColor),
+                                color: isDark ? HallmarkConsole.panel : cardBg,
+                                borderRadius: BorderRadius.circular(HallmarkConsole.radiusPanel),
+                                border: Border.all(color: isDark ? HallmarkConsole.rule : borderColor, width: HallmarkConsole.ruleWidth),
                               ),
                               child: Padding(
                               padding: const EdgeInsets.all(AppSpacing.s16),
@@ -275,9 +276,22 @@ class _AnswerBankScreenState extends State<AnswerBankScreen> {
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text(
-                                        "${ans['category'].toString().toUpperCase()} • ${allowReuse ? 'Auto-Reuse' : 'Ask Each Time'}",
-                                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: secondaryTextColor),
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: HallmarkConsole.tagDecoration(),
+                                            child: Text(
+                                              ans['category'].toString().toLowerCase(),
+                                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: secondaryTextColor),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            allowReuse ? "Auto-reuse permitted" : "Confirm before use",
+                                            style: TextStyle(fontSize: 11, color: secondaryTextColor),
+                                          ),
+                                        ],
                                       ),
                                       Row(
                                         children: [

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
+import '../core/hallmark_tokens.dart';
 import '../core/motion.dart';
 import 'ai_assistant_screen.dart';
 
@@ -253,9 +254,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                               child: Container(
                                 margin: const EdgeInsets.only(bottom: AppSpacing.s12),
                                 decoration: BoxDecoration(
-                                  color: cardBg,
-                                  borderRadius: BorderRadius.circular(AppRadii.card),
-                                  border: Border.all(color: borderColor),
+                                  color: isDark ? HallmarkConsole.panel : cardBg,
+                                  borderRadius: BorderRadius.circular(HallmarkConsole.radiusPanel),
+                                  border: Border.all(color: isDark ? HallmarkConsole.rule : borderColor, width: HallmarkConsole.ruleWidth),
                                 ),
                                 child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -397,31 +398,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                                         ),
                                         Row(
                                           children: [
-                                            // Gemini Job Intelligence & Interview Prep
-                                            IconButton(
-                                              icon: const Icon(Icons.auto_awesome, size: 18, color: ApplyPilotColors.aiViolet),
-                                              tooltip: "Gemini Intelligence & Interview Prep",
-                                              onPressed: () => _showAiJobIntelligenceModal(job),
-                                            ),
-                                            // Tailor Simulator
-                                            IconButton(
-                                              icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
-                                              tooltip: "Preview Tailored Resume",
-                                              onPressed: () => _showTailoringModal(job),
-                                            ),
-                                            // Reject Job
-                                            IconButton(
-                                              icon: Icon(Icons.close, size: 18, color: AppColors.getSemanticColor("coral", isDark)),
-                                              tooltip: "Reject Job",
-                                              onPressed: () => _rejectJob(jobId),
-                                            ),
-                                            // Exclude Company
-                                            IconButton(
-                                              icon: const Icon(Icons.block_outlined, size: 18),
-                                              tooltip: "Exclude Company",
-                                              onPressed: () => _excludeCompany(jobId, job["company"] ?? ""),
-                                            ),
-                                            const SizedBox(width: AppSpacing.s4),
                                             if (job["is_assist_only"] == true || job["source"] == "naukri" || job["source"] == "linkedin")
                                               ElevatedButton.icon(
                                                 onPressed: () {
@@ -437,24 +413,78 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                                                   backgroundColor: brassColor,
                                                   foregroundColor: AppColors.pureWhite,
                                                   elevation: 0,
-                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HallmarkConsole.radiusControl)),
                                                   padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: AppSpacing.s8),
                                                   visualDensity: VisualDensity.compact,
                                                 ),
                                               )
                                             else
-                                              ElevatedButton(
+                                              ElevatedButton.icon(
                                                 onPressed: () => _approveJob(jobId),
                                                 style: ElevatedButton.styleFrom(
                                                   backgroundColor: accentGreen,
                                                   foregroundColor: AppColors.pureWhite,
                                                   elevation: 0,
-                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(HallmarkConsole.radiusControl)),
                                                   padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12, vertical: AppSpacing.s8),
                                                   visualDensity: VisualDensity.compact,
                                                 ),
-                                                child: const Text("Approve", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                                icon: const Icon(Icons.check, size: 13),
+                                                label: const Text("Queue Application", style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
                                               ),
+                                            const SizedBox(width: AppSpacing.s4),
+                                            PopupMenuButton<String>(
+                                              icon: Icon(Icons.more_horiz, size: 18, color: secondaryTextColor),
+                                              tooltip: "Job Actions",
+                                              onSelected: (action) {
+                                                if (action == "ai_prep") _showAiJobIntelligenceModal(job);
+                                                if (action == "resume") _showTailoringModal(job);
+                                                if (action == "reject") _rejectJob(jobId);
+                                                if (action == "exclude") _excludeCompany(jobId, job["company"] ?? "");
+                                              },
+                                              itemBuilder: (ctx) => [
+                                                const PopupMenuItem(
+                                                  value: "ai_prep",
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(Icons.auto_awesome, size: 16, color: ApplyPilotColors.aiViolet),
+                                                      SizedBox(width: 8),
+                                                      Text("Gemini Intel & STAR Prep", style: TextStyle(fontSize: 12)),
+                                                    ],
+                                                  ),
+                                                ),
+                                                const PopupMenuItem(
+                                                  value: "resume",
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(Icons.picture_as_pdf_outlined, size: 16),
+                                                      SizedBox(width: 8),
+                                                      Text("Preview Tailored Resume", style: TextStyle(fontSize: 12)),
+                                                    ],
+                                                  ),
+                                                ),
+                                                PopupMenuItem(
+                                                  value: "reject",
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(Icons.close, size: 16, color: AppColors.getSemanticColor("coral", isDark)),
+                                                      const SizedBox(width: 8),
+                                                      Text("Reject Job", style: TextStyle(fontSize: 12, color: AppColors.getSemanticColor("coral", isDark))),
+                                                    ],
+                                                  ),
+                                                ),
+                                                const PopupMenuItem(
+                                                  value: "exclude",
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(Icons.block_outlined, size: 16),
+                                                      SizedBox(width: 8),
+                                                      Text("Exclude Company", style: TextStyle(fontSize: 12)),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
                                           ],
                                         ),
                                       ],
