@@ -2,7 +2,8 @@ import logging
 from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, FileResponse
+from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from backend.app.core.config import settings
@@ -87,3 +88,11 @@ def root():
         "status": "online",
         "docs": "/docs"
     }
+
+@app.get("/{filename:path}")
+def serve_root_fallback(filename: str):
+    if flutter_web_dir.exists():
+        target = flutter_web_dir / filename
+        if target.exists() and target.is_file():
+            return FileResponse(str(target))
+    raise HTTPException(status_code=404, detail="Not Found")
