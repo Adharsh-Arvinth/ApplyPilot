@@ -235,14 +235,14 @@ class JobOut(JobBase):
 class NeedsInputOut(BaseModel):
     id: int
     job_id: int
-    company: str
-    role: str
-    question_text: str
-    field_type: str
+    company: str = ""
+    role: str = ""
+    question_text: str = ""
+    field_type: str = "text"
     options: List[str] = []
-    suggested_answer: str
-    answer: str
-    status: str
+    suggested_answer: Optional[str] = ""
+    answer: Optional[str] = ""
+    status: str = "pending"
     created_at: datetime.datetime
     model_config = ConfigDict(from_attributes=True)
 

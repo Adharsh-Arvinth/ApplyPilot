@@ -601,7 +601,7 @@ class AutoApplyEngine:
                     return {"status": "submitted", "screenshot": str(confirm_screenshot)}
                 else:
                     # Dry-Run mode
-                    AutoApplyEngine._record_transition(db, job, "applied", "Dry-run form preview generated and verified", "dry_run")
+                    AutoApplyEngine._record_transition(db, job, "dry_run", "Dry-run form preview generated and verified", "dry_run")
                     app_record = Application(
                         job_id=job.id,
                         resume_file=str(pdf_path),

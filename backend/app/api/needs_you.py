@@ -96,8 +96,8 @@ def list_needs_you(db: Session = Depends(get_db)):
             "question_text": item.question_text,
             "field_type": item.field_type,
             "options": opts,
-            "suggested_answer": item.suggested_answer,
-            "answer": item.answer,
+            "suggested_answer": item.suggested_answer or "",
+            "answer": item.answer or "",
             "status": item.status,
             "created_at": item.created_at
         })

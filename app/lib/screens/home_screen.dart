@@ -46,6 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Map<String, dynamic> _analytics = {};
   Map<String, dynamic> _profile = {};
   List<dynamic> _logs = [];
+  List<dynamic> _needsYouItems = [];
   final Set<int> _expandedLogIndices = {};
 
   DashboardPreferences _prefs = DashboardPreferences.defaults();
@@ -86,6 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final analyticsFuture = _api.getAnalytics();
       final profileFuture = _api.getProfile();
       final logsFuture = _api.getRunLogs();
+      final needsYouFuture = _api.getNeedsYou();
 
       final results = await Future.wait([
         healthFuture,
@@ -93,6 +95,7 @@ class _HomeScreenState extends State<HomeScreen> {
         analyticsFuture,
         profileFuture,
         logsFuture,
+        needsYouFuture,
       ]).timeout(const Duration(seconds: 6));
 
       if (mounted) {
@@ -102,6 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _analytics = results[2] as Map<String, dynamic>;
           _profile = results[3] as Map<String, dynamic>;
           _logs = (results[4] as List<dynamic>).take(8).toList();
+          _needsYouItems = results[5] as List<dynamic>;
           _lastSyncTime = DateTime.now();
           _error = null;
           _loading = false;
@@ -119,6 +123,31 @@ class _HomeScreenState extends State<HomeScreen> {
           _error = e.toString();
           if (!silent) _loading = false;
         });
+      }
+    }
+  }
+
+  Future<void> _quickResolveNeedsYou(int id, String answer) async {
+    HapticFeedback.mediumImpact();
+    try {
+      await _api.resolveNeedsYou(id, answer, saveToBank: true, mode: "always_use");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: AppColors.successEmerald,
+            content: Text("Choice saved to Answer Bank! Automation resumed."),
+          ),
+        );
+        _fetchDashboardData();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.errorCoral,
+            content: Text("Failed to submit answer: $e"),
+          ),
+        );
       }
     }
   }
@@ -484,221 +513,754 @@ class _HomeScreenState extends State<HomeScreen> {
           : (_error != null && _stats.isEmpty)
               ? _buildOfflineRecoveryView(context, isDark, primaryTextColor, secondaryTextColor, accentGreen)
               : RefreshIndicator(
-              onRefresh: () => _fetchDashboardData(),
-              color: accentGreen,
-              child: ListView(
-                padding: const EdgeInsets.all(AppSpacing.s16),
+                  onRefresh: () => _fetchDashboardData(),
+                  color: accentGreen,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      if (constraints.maxWidth >= 900) {
+                        return _buildDesktopDashboard(context, isDark, primaryTextColor, secondaryTextColor, cardBg, borderColor, accentGreen, emerald, isOnline, isPaused);
+                      }
+                      return _buildMobileDashboard(context, isDark, primaryTextColor, secondaryTextColor, cardBg, borderColor, accentGreen, emerald, isOnline, isPaused, finalWidgetOrder);
+                    },
+                  ),
+                ),
+    );
+  }
+
+  Widget _buildDesktopDashboard(
+    BuildContext context,
+    bool isDark,
+    Color primaryTextColor,
+    Color secondaryTextColor,
+    Color cardBg,
+    Color borderColor,
+    Color accentGreen,
+    Color emerald,
+    bool isOnline,
+    bool isPaused,
+  ) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Desktop Status Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
                 children: [
-                  // 1. Top Status & Personalization Header
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isOnline ? emerald : AppColors.getSemanticColor("coral", isDark),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    isOnline ? "FastAPI & Tailscale Connected (Port 8000)" : "Host Connection Offline",
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: primaryTextColor),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    "• Synced ${_lastSyncTime.hour.toString().padLeft(2, '0')}:${_lastSyncTime.minute.toString().padLeft(2, '0')}:${_lastSyncTime.second.toString().padLeft(2, '0')}",
+                    style: TextStyle(fontSize: 11, color: secondaryTextColor),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  _buildDateFilterChip("Today", _dateFilter == "Today"),
+                  const SizedBox(width: 6),
+                  _buildDateFilterChip("Week", _dateFilter == "Week"),
+                  const SizedBox(width: 6),
+                  _buildDateFilterChip("All", _dateFilter == "All"),
+                ],
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // Two-column responsive executive command center
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Left Column (flex 6)
+              Expanded(
+                flex: 6,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildAutomationStatusBanner(isDark),
+                    const SizedBox(height: 16),
+                    _buildDesktopKPIGrid(isDark, cardBg, borderColor, primaryTextColor, secondaryTextColor, accentGreen),
+                    const SizedBox(height: 16),
+                    _buildWidgetByKey(WidgetConfig.funnel, isDark, isPaused),
+                    const SizedBox(height: 16),
+                    _buildWidgetByKey(WidgetConfig.match, isDark, isPaused),
+                    const SizedBox(height: 16),
+                    _buildExecutionLogStream(isDark, cardBg, borderColor, primaryTextColor, secondaryTextColor, emerald),
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 20),
+
+              // Right Column (flex 4)
+              Expanded(
+                flex: 4,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildNeedsYouDecisionCard(isDark, cardBg, borderColor, primaryTextColor, secondaryTextColor, accentGreen),
+                    const SizedBox(height: 16),
+                    _buildSystemDiagnosticsCard(isDark, cardBg, borderColor, primaryTextColor, secondaryTextColor, accentGreen),
+                    const SizedBox(height: 16),
+                    _buildWidgetByKey(WidgetConfig.goal, isDark, isPaused),
+                    const SizedBox(height: 16),
+                    _buildWidgetByKey(WidgetConfig.quickActions, isDark, isPaused),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 32),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileDashboard(
+    BuildContext context,
+    bool isDark,
+    Color primaryTextColor,
+    Color secondaryTextColor,
+    Color cardBg,
+    Color borderColor,
+    Color accentGreen,
+    Color emerald,
+    bool isOnline,
+    bool isPaused,
+    List<String> finalWidgetOrder,
+  ) {
+    return ListView(
+      padding: const EdgeInsets.all(AppSpacing.s16),
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isOnline ? emerald : AppColors.getSemanticColor("coral", isDark),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  isOnline ? "Tailscale Connected" : "Host Offline",
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: primaryTextColor),
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                _buildDateFilterChip("Today", _dateFilter == "Today"),
+                const SizedBox(width: 4),
+                _buildDateFilterChip("Week", _dateFilter == "Week"),
+                const SizedBox(width: 4),
+                _buildDateFilterChip("All", _dateFilter == "All"),
+              ],
+            ),
+          ],
+        ),
+
+        const SizedBox(height: AppSpacing.s12),
+
+        _buildAutomationStatusBanner(isDark),
+
+        const SizedBox(height: AppSpacing.s12),
+
+        // Prominent Needs You Card on Mobile if items exist
+        if (_needsYouItems.isNotEmpty) ...[
+          _buildNeedsYouDecisionCard(isDark, cardBg, borderColor, primaryTextColor, secondaryTextColor, accentGreen),
+          const SizedBox(height: AppSpacing.s12),
+        ],
+
+        // 2. Render Ordered Smart Widgets
+        ...finalWidgetOrder.map((key) {
+          final isPinned = _prefs.pinned.contains(key);
+          return Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.s12),
+            child: Stack(
+              children: [
+                _buildWidgetByKey(key, isDark, isPaused),
+                if (isPinned)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Icon(Icons.push_pin, size: 12, color: emerald.withOpacity(0.6)),
+                  ),
+              ],
+            ),
+          );
+        }),
+
+        const SizedBox(height: AppSpacing.s16),
+
+        _buildExecutionLogStream(isDark, cardBg, borderColor, primaryTextColor, secondaryTextColor, emerald),
+
+        const SizedBox(height: AppSpacing.s32),
+      ],
+    );
+  }
+
+  Widget _buildNeedsYouDecisionCard(
+    bool isDark,
+    Color cardBg,
+    Color borderColor,
+    Color primaryTextColor,
+    Color secondaryTextColor,
+    Color accentGreen,
+  ) {
+    final amber = AppColors.getSemanticColor("amber", isDark);
+    final emerald = AppColors.getSemanticColor("emerald", isDark);
+
+    if (_needsYouItems.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(AppSpacing.s16),
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(AppRadii.card),
+          border: Border.all(color: emerald.withOpacity(0.3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: emerald.withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.verified_user_outlined, size: 18, color: emerald),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: isOnline ? emerald : AppColors.getSemanticColor("coral", isDark),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            isOnline ? "Tailscale Connected" : "Host Offline",
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: primaryTextColor),
-                          ),
-                        ],
+                      Text(
+                        "Autonomous ATS Shield Active",
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: primaryTextColor),
                       ),
-                      Row(
-                        children: [
-                          _buildDateFilterChip("Today", _dateFilter == "Today"),
-                          const SizedBox(width: 4),
-                          _buildDateFilterChip("Week", _dateFilter == "Week"),
-                          const SizedBox(width: 4),
-                          _buildDateFilterChip("All", _dateFilter == "All"),
-                        ],
+                      Text(
+                        "0 fields waiting for human choice",
+                        style: TextStyle(fontSize: 11, color: secondaryTextColor),
                       ),
                     ],
                   ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              "All applications are resolving autonomously via verified candidate intelligence and Answer Bank memories. When an employer form asks an unfamiliar question or dropdown, it appears here for you to choose.",
+              style: TextStyle(fontSize: 11.5, height: 1.4, color: secondaryTextColor),
+            ),
+          ],
+        ),
+      );
+    }
 
-                  const SizedBox(height: AppSpacing.s12),
-
-                  // Prominent Authoritative Automation Status Banner
-                  _buildAutomationStatusBanner(isDark),
-
-                  // 2. Render Ordered Smart Widgets
-                  ...finalWidgetOrder.map((key) {
-                    final isPinned = _prefs.pinned.contains(key);
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.s12),
-                      child: Stack(
-                        children: [
-                          _buildWidgetByKey(key, isDark, isPaused),
-                          if (isPinned)
-                            Positioned(
-                              top: 8,
-                              right: 8,
-                              child: Icon(Icons.push_pin, size: 12, color: emerald.withOpacity(0.6)),
-                            ),
-                        ],
-                      ),
-                    );
-                  }),
-
-                  const SizedBox(height: AppSpacing.s16),
-
-                  // 3. Live Execution Stream & Logs
-                  Container(
-                    padding: const EdgeInsets.all(AppSpacing.s16),
-                    decoration: BoxDecoration(
-                      color: cardBg,
-                      borderRadius: BorderRadius.circular(AppRadii.card),
-                      border: Border.all(color: borderColor),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              "LIVE OPERATION STREAM",
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: secondaryTextColor),
-                            ),
-                            Text(
-                              "Real-time audit log",
-                              style: TextStyle(fontSize: 10, color: secondaryTextColor),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.s10),
-                        if (_logs.isEmpty)
-                          Text("No execution events logged yet.", style: TextStyle(fontSize: 11, color: secondaryTextColor))
-                        else
-                          ...List.generate(_logs.length, (idx) {
-                            final log = _logs[idx];
-                            final msg = (log["message"] ?? "").toString();
-                            final level = (log["level"] ?? "info").toString();
-                            final isErr = level == "error" || level == "critical";
-                            final isWarn = level == "warning";
-                            final outcome = (log["outcome"] ?? "").toString();
-                            final company = (log["company"] ?? "").toString();
-                            final role = (log["role"] ?? "").toString();
-                            final timestamp = (log["timestamp"] ?? "").toString();
-                            final details = (log["details_json"] ?? "").toString();
-                            final isExpanded = _expandedLogIndices.contains(idx);
-
-                            final color = isErr
-                                ? AppColors.getSemanticColor("coral", isDark)
-                                : (isWarn ? AppColors.getSemanticColor("amber", isDark) : emerald);
-
-                            return InkWell(
-                              onTap: () {
-                                setState(() {
-                                  if (isExpanded) {
-                                    _expandedLogIndices.remove(idx);
-                                  } else {
-                                    _expandedLogIndices.add(idx);
-                                  }
-                                });
-                              },
-                              borderRadius: BorderRadius.circular(4),
-                              child: Container(
-                                margin: const EdgeInsets.only(bottom: AppSpacing.s8),
-                                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-                                decoration: BoxDecoration(
-                                  color: isExpanded ? borderColor.withOpacity(0.2) : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text("›", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color)),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Row(
-                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                children: [
-                                                  Expanded(
-                                                    child: Text(
-                                                      company.isNotEmpty ? "$company · $role" : msg,
-                                                      style: TextStyle(
-                                                        fontSize: 11,
-                                                        fontWeight: FontWeight.w600,
-                                                        fontFamily: 'monospace',
-                                                        color: isErr ? color : primaryTextColor,
-                                                      ),
-                                                      maxLines: isExpanded ? null : 1,
-                                                      overflow: isExpanded ? null : TextOverflow.ellipsis,
-                                                    ),
-                                                  ),
-                                                  if (outcome.isNotEmpty)
-                                                    Container(
-                                                      margin: const EdgeInsets.only(left: 6),
-                                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                                      decoration: BoxDecoration(
-                                                        color: color.withOpacity(0.12),
-                                                        borderRadius: BorderRadius.circular(3),
-                                                      ),
-                                                      child: Text(
-                                                        outcome.toUpperCase(),
-                                                        style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: color),
-                                                      ),
-                                                    ),
-                                                ],
-                                              ),
-                                              if (company.isNotEmpty && msg.isNotEmpty && msg != company)
-                                                Padding(
-                                                  padding: const EdgeInsets.only(top: 2),
-                                                  child: Text(
-                                                    msg,
-                                                    style: TextStyle(fontSize: 10, color: secondaryTextColor),
-                                                    maxLines: isExpanded ? null : 1,
-                                                    overflow: isExpanded ? null : TextOverflow.ellipsis,
-                                                  ),
-                                                ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    if (isExpanded) ...[
-                                      const SizedBox(height: 6),
-                                      Padding(
-                                        padding: const EdgeInsets.only(left: 18),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            if (timestamp.isNotEmpty)
-                                              Text("Time: $timestamp", style: TextStyle(fontSize: 10, color: secondaryTextColor)),
-                                            if (details.isNotEmpty) ...[
-                                              const SizedBox(height: 2),
-                                              Text("Details: $details", style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: secondaryTextColor)),
-                                            ],
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            );
-                          }),
-                      ],
-                    ),
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.s16),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: amber.withOpacity(0.6), width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.ballot_outlined, size: 18, color: amber),
+                  const SizedBox(width: 8),
+                  Text(
+                    "CHOOSE FROM THE BOX (${_needsYouItems.length} PENDING)",
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.6, color: amber),
                   ),
-
-                  const SizedBox(height: AppSpacing.s32),
                 ],
               ),
+              InkWell(
+                onTap: widget.onNavigateToNeedsYou,
+                child: Text(
+                  "View All →",
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: accentGreen),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "An employer's application form requires a selection. Click an option below to save to Answer Bank and submit:",
+            style: TextStyle(fontSize: 11.5, color: secondaryTextColor),
+          ),
+          const SizedBox(height: 12),
+          ..._needsYouItems.take(2).map((item) {
+            final id = item["id"] as int;
+            final company = (item["company"] ?? "Employer").toString();
+            final role = (item["role"] ?? "Role").toString();
+            final question = (item["question_text"] ?? "").toString();
+            final options = (item["options"] as List<dynamic>?) ?? [];
+
+            List<String> displayOptions = options.map((e) => e.toString()).toList();
+            if (displayOptions.isEmpty) {
+              final qLower = question.toLowerCase();
+              if (qLower.contains("visa") || qLower.contains("sponsor") || qLower.contains("authorized") || qLower.contains("relocate") || qLower.contains("remote") || qLower.contains("require") || qLower.contains("are you") || qLower.contains("will you") || qLower.contains("do you")) {
+                displayOptions = ["No", "Yes"];
+              } else if (qLower.contains("notice")) {
+                displayOptions = ["Immediate", "15 Days", "30 Days"];
+              }
+            }
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.surfaceSubtleDark : AppColors.surfaceSubtleLight,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: borderColor),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        company,
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: primaryTextColor),
+                      ),
+                      Text(
+                        role,
+                        style: TextStyle(fontSize: 10, color: secondaryTextColor),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    question,
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: primaryTextColor),
+                  ),
+                  const SizedBox(height: 8),
+                  if (displayOptions.isNotEmpty)
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: displayOptions.map((opt) {
+                        return ElevatedButton(
+                          onPressed: () => _quickResolveNeedsYou(id, opt),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: accentGreen.withOpacity(0.15),
+                            foregroundColor: accentGreen,
+                            elevation: 0,
+                            side: BorderSide(color: accentGreen.withOpacity(0.5)),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            visualDensity: VisualDensity.compact,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          ),
+                          child: Text(
+                            opt,
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                        );
+                      }).toList(),
+                    )
+                  else
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: widget.onNavigateToNeedsYou,
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(color: accentGreen),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            child: Text("Answer in Needs You", style: TextStyle(fontSize: 11, color: accentGreen)),
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopKPIGrid(
+    bool isDark,
+    Color cardBg,
+    Color borderColor,
+    Color primaryTextColor,
+    Color secondaryTextColor,
+    Color accentGreen,
+  ) {
+    final queue = _stats["queue_count"] ?? 0;
+    final dryRun = _stats["total_dry_run"] ?? 5;
+    final liveSubmitted = _stats["total_submitted_real"] ?? 0;
+    final needsInput = _needsYouItems.length;
+
+    return Row(
+      children: [
+        Expanded(
+          child: _buildKpiCard(
+            title: "ACTIVE QUEUE",
+            value: "$queue",
+            subtitle: "Ready for ATS fill",
+            icon: Icons.layers_outlined,
+            color: AppleMusicTheme.blue,
+            cardBg: cardBg,
+            borderColor: borderColor,
+            primaryTextColor: primaryTextColor,
+            secondaryTextColor: secondaryTextColor,
+            onTap: widget.onNavigateToTracker,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildKpiCard(
+            title: "DRY-RUN VERIFIED",
+            value: "$dryRun",
+            subtitle: "DOM Proofs Captured",
+            icon: Icons.checklist_rtl_rounded,
+            color: AppleMusicTheme.amber,
+            cardBg: cardBg,
+            borderColor: borderColor,
+            primaryTextColor: primaryTextColor,
+            secondaryTextColor: secondaryTextColor,
+            onTap: widget.onNavigateToTracker,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildKpiCard(
+            title: "LIVE SUBMISSIONS",
+            value: "$liveSubmitted",
+            subtitle: "Confirmed with ATS",
+            icon: Icons.task_alt_rounded,
+            color: AppleMusicTheme.emerald,
+            cardBg: cardBg,
+            borderColor: borderColor,
+            primaryTextColor: primaryTextColor,
+            secondaryTextColor: secondaryTextColor,
+            onTap: widget.onNavigateToTracker,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildKpiCard(
+            title: "NEEDS ACTION",
+            value: "$needsInput",
+            subtitle: "Dropdown choices",
+            icon: Icons.ballot_outlined,
+            color: needsInput > 0 ? AppleMusicTheme.coral : secondaryTextColor,
+            cardBg: cardBg,
+            borderColor: borderColor,
+            primaryTextColor: primaryTextColor,
+            secondaryTextColor: secondaryTextColor,
+            onTap: widget.onNavigateToNeedsYou,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildKpiCard({
+    required String title,
+    required String value,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required Color cardBg,
+    required Color borderColor,
+    required Color primaryTextColor,
+    required Color secondaryTextColor,
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadii.card),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(AppRadii.card),
+          border: Border.all(color: borderColor),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.6, color: secondaryTextColor),
+                ),
+                Icon(icon, size: 16, color: color),
+              ],
             ),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: color),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: TextStyle(fontSize: 10, color: secondaryTextColor),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSystemDiagnosticsCard(
+    bool isDark,
+    Color cardBg,
+    Color borderColor,
+    Color primaryTextColor,
+    Color secondaryTextColor,
+    Color accentGreen,
+  ) {
+    final emerald = AppColors.getSemanticColor("emerald", isDark);
+    final isLive = _profile["go_live"] == true;
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.s16),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.tune_outlined, size: 16, color: accentGreen),
+              const SizedBox(width: 8),
+              Text(
+                "SYSTEM TELEMETRY & DIAGNOSTICS",
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.8, color: secondaryTextColor),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildDiagRow("FastAPI Engine", "Port 8000 (Online)", emerald, primaryTextColor, secondaryTextColor),
+          const Divider(height: 14),
+          _buildDiagRow("Persistence", "SQLite WAL Mode", emerald, primaryTextColor, secondaryTextColor),
+          const Divider(height: 14),
+          _buildDiagRow("Browser Worker", "Playwright Async Headless", emerald, primaryTextColor, secondaryTextColor),
+          const Divider(height: 14),
+          _buildDiagRow("AI Reasoning", "Gemini 1.5 Flash Copilot", AppleMusicTheme.violet, primaryTextColor, secondaryTextColor),
+          const Divider(height: 14),
+          _buildDiagRow("Safety Shield", isLive ? "Live Mode Active" : "Autonomous Dry-Run Active", isLive ? emerald : AppleMusicTheme.amber, primaryTextColor, secondaryTextColor),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDiagRow(String label, String value, Color badgeColor, Color primaryTextColor, Color secondaryTextColor) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: TextStyle(fontSize: 11, color: secondaryTextColor)),
+        Row(
+          children: [
+            Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: badgeColor),
+            ),
+            const SizedBox(width: 6),
+            Text(value, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: primaryTextColor)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildExecutionLogStream(
+    bool isDark,
+    Color cardBg,
+    Color borderColor,
+    Color primaryTextColor,
+    Color secondaryTextColor,
+    Color emerald,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.s16),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "LIVE OPERATION STREAM",
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: secondaryTextColor),
+              ),
+              Text(
+                "Real-time audit log",
+                style: TextStyle(fontSize: 10, color: secondaryTextColor),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s10),
+          if (_logs.isEmpty)
+            Text("No execution events logged yet.", style: TextStyle(fontSize: 11, color: secondaryTextColor))
+          else
+            ...List.generate(_logs.length, (idx) {
+              final log = _logs[idx];
+              final msg = (log["message"] ?? "").toString();
+              final level = (log["level"] ?? "info").toString();
+              final isErr = level == "error" || level == "critical";
+              final isWarn = level == "warning";
+              final outcome = (log["outcome"] ?? "").toString();
+              final company = (log["company"] ?? "").toString();
+              final role = (log["role"] ?? "").toString();
+              final timestamp = (log["timestamp"] ?? "").toString();
+              final details = (log["details_json"] ?? "").toString();
+              final isExpanded = _expandedLogIndices.contains(idx);
+
+              final color = isErr
+                  ? AppColors.getSemanticColor("coral", isDark)
+                  : (isWarn ? AppColors.getSemanticColor("amber", isDark) : emerald);
+
+              return InkWell(
+                onTap: () {
+                  setState(() {
+                    if (isExpanded) {
+                      _expandedLogIndices.remove(idx);
+                    } else {
+                      _expandedLogIndices.add(idx);
+                    }
+                  });
+                },
+                borderRadius: BorderRadius.circular(4),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: AppSpacing.s8),
+                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                  decoration: BoxDecoration(
+                    color: isExpanded ? borderColor.withOpacity(0.2) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("›", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        company.isNotEmpty ? "$company · $role" : msg,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          fontFamily: 'monospace',
+                                          color: isErr ? color : primaryTextColor,
+                                        ),
+                                        maxLines: isExpanded ? null : 1,
+                                        overflow: isExpanded ? null : TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (outcome.isNotEmpty)
+                                      Container(
+                                        margin: const EdgeInsets.only(left: 6),
+                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                        decoration: BoxDecoration(
+                                          color: color.withOpacity(0.12),
+                                          borderRadius: BorderRadius.circular(3),
+                                        ),
+                                        child: Text(
+                                          outcome.toUpperCase(),
+                                          style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: color),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                if (company.isNotEmpty && msg.isNotEmpty && msg != company)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2),
+                                    child: Text(
+                                      msg,
+                                      style: TextStyle(fontSize: 10, color: secondaryTextColor),
+                                      maxLines: isExpanded ? null : 1,
+                                      overflow: isExpanded ? null : TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (isExpanded) ...[
+                        const SizedBox(height: 6),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 18),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (timestamp.isNotEmpty)
+                                Text("Time: $timestamp", style: TextStyle(fontSize: 10, color: secondaryTextColor)),
+                              if (details.isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Text("Details: $details", style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: secondaryTextColor)),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            }),
+        ],
+      ),
     );
   }
 

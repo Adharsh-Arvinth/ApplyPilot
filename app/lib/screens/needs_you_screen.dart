@@ -538,34 +538,119 @@ class _NeedsYouScreenState extends State<NeedsYouScreen> {
                                 ),
                                 const SizedBox(height: AppSpacing.s16),
 
-                                // If dropdown options exist, display quick chips
+                                // If dropdown options exist, display interactive select box cards
                                 if (options.isNotEmpty) ...[
-                                  Text(
-                                    "Select option",
-                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: secondaryTextColor),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: accentGreen.withOpacity(0.08),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: accentGreen.withOpacity(0.2)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.ballot_outlined, size: 14, color: accentGreen),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            "FORM DROPDOWN OPTIONS • TAP TO CHOOSE FROM THE BOX",
+                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.5, color: accentGreen),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                  const SizedBox(height: AppSpacing.s6),
-                                  Wrap(
-                                    spacing: AppSpacing.s8,
-                                    runSpacing: AppSpacing.s6,
+                                  const SizedBox(height: AppSpacing.s8),
+                                  Column(
                                     children: options.map<Widget>((opt) {
                                       final optStr = opt.toString();
                                       final isSelected = controller?.text == optStr;
-                                      return ChoiceChip(
-                                        label: Text(optStr, style: TextStyle(fontSize: 12, color: isSelected ? AppColors.pureWhite : primaryTextColor)),
-                                        selected: isSelected,
-                                        selectedColor: accentGreen,
-                                        backgroundColor: cardBg,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
-                                        onSelected: (val) {
-                                          if (val) {
-                                            setState(() => controller?.text = optStr);
-                                          }
+                                      return InkWell(
+                                        onTap: () {
+                                          HapticFeedback.selectionClick();
+                                          setState(() => controller?.text = optStr);
                                         },
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Container(
+                                          margin: const EdgeInsets.only(bottom: 6),
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                          decoration: BoxDecoration(
+                                            color: isSelected ? accentGreen.withOpacity(0.12) : cardBg,
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(
+                                              color: isSelected ? accentGreen : borderColor,
+                                              width: isSelected ? 1.5 : 1.0,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                                                size: 16,
+                                                color: isSelected ? accentGreen : secondaryTextColor,
+                                              ),
+                                              const SizedBox(width: 10),
+                                              Expanded(
+                                                child: Text(
+                                                  optStr,
+                                                  style: TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                                    color: isSelected ? primaryTextColor : secondaryTextColor,
+                                                  ),
+                                                ),
+                                              ),
+                                              if (isSelected)
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: accentGreen.withOpacity(0.15),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                  child: Text(
+                                                    "SELECTED",
+                                                    style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: accentGreen),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
                                       );
                                     }).toList(),
                                   ),
                                   const SizedBox(height: AppSpacing.s12),
+                                ],
+
+                                if (options.isEmpty) ...[
+                                  // Suggest quick options if it is a standard question
+                                  Builder(builder: (ctx) {
+                                    final qLower = (item["question_text"] ?? "").toString().toLowerCase();
+                                    List<String> suggestions = [];
+                                    if (qLower.contains("visa") || qLower.contains("sponsor") || qLower.contains("authorized") || qLower.contains("relocate") || qLower.contains("remote") || qLower.contains("require") || qLower.contains("are you") || qLower.contains("will you") || qLower.contains("do you")) {
+                                      suggestions = ["No", "Yes"];
+                                    } else if (qLower.contains("notice")) {
+                                      suggestions = ["Immediate", "15 Days", "30 Days"];
+                                    } else if (qLower.contains("experience")) {
+                                      suggestions = ["0-1 years", "1-2 years", "2+ years"];
+                                    }
+                                    if (suggestions.isEmpty) return const SizedBox.shrink();
+
+                                    return Padding(
+                                      padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+                                      child: Wrap(
+                                        spacing: 6,
+                                        children: suggestions.map((sug) => ActionChip(
+                                          label: Text(sug, style: TextStyle(fontSize: 11, color: primaryTextColor)),
+                                          backgroundColor: cardBg,
+                                          side: BorderSide(color: borderColor),
+                                          onPressed: () {
+                                            HapticFeedback.selectionClick();
+                                            setState(() => controller?.text = sug);
+                                          },
+                                        )).toList(),
+                                      ),
+                                    );
+                                  }),
                                 ],
 
                                 Text(
@@ -653,8 +738,8 @@ class _NeedsYouScreenState extends State<NeedsYouScreen> {
                                         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s14, vertical: AppSpacing.s8),
                                         visualDensity: VisualDensity.compact,
                                       ),
-                                      icon: const Icon(Icons.check, size: 15),
-                                      label: const Text("Accept & Continue", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                      icon: const Icon(Icons.play_arrow_rounded, size: 16),
+                                      label: const Text("Submit Choice & Resume", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                                     ),
                                   ],
                                 ),
