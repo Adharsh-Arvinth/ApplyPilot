@@ -476,35 +476,53 @@ class AnswerService:
         if re.search(r'\bgraduation.*year\b', clean_key):
             return "2027", "always_use"
 
-        # Work Auth & Notice Period
-        if re.search(r'authorized.*work.*india|unrestricted.*right.*india|authorized to work in the country', clean_key):
+        # Work Authorization, Sponsorship & Compliance (Evaluated first to avoid broad keyword shadowing)
+        if re.search(r'require.*sponsorship.*us|require.*visa.*us', clean_key):
             return "Yes", "always_use"
-        if re.search(r'\bcountry\b', clean_key):
-            return "India", "always_use"
-        if re.search(r'\bcity\b', clean_key):
-            return "Bengaluru", "always_use"
-        if re.search(r'own\s*words|plagiarism', clean_key):
+        if re.search(r'sponsorship|require.*visa|visa.*sponsorship|employment.*visa|immigration.*sponsorship', clean_key):
+            return "No", "always_use"
+        if re.search(r'authorized.*work|work.*authorization|legally.*authorized|unrestricted.*right', clean_key):
+            return "Yes", "always_use"
+        if re.search(r'sanctioned|embargoed|sanction', clean_key):
+            return "No", "always_use"
+        if re.search(r'relocate|relocation|willing.*relocate', clean_key):
             return "Yes", "always_use"
         if re.search(r'previously\s*worked|previously\s*employed', clean_key):
             return "No", "always_use"
-        if re.search(r'require.*sponsorship|sponsorship.*required|immigration\s*sponsorship', clean_key):
-            return "No", "always_use"
-        if re.search(r'require.*sponsorship.*us|require.*visa', clean_key):
+        if re.search(r'own\s*words|plagiarism', clean_key):
             return "Yes", "always_use"
-        if re.search(r'\bnotice.*period\b', clean_key):
-            return profile.notice_period, "always_use"
-        if re.search(r'start.*date|earliest.*start|preferred start', clean_key):
-            return "Immediate", "always_use"
+
+        # Compensation
+        if re.search(r'usd|eur|\$', clean_key) and re.search(r'salary|compensation|ctc', clean_key):
+            return "85,000", "always_use"
         if re.search(r'salary|expected.*ctc|compensation', clean_key):
             return "₹7,00,000 per year minimum, negotiable", "always_use"
-        if re.search(r'relocate|relocation', clean_key):
-            return profile.relocation_preference, "always_use"
-        if re.search(r'how did you hear', clean_key):
-            return "Company career page", "always_use"
+
+        # Notice & Availability
+        if re.search(r'\bnotice.*period\b', clean_key):
+            return profile.notice_period or "Immediate / 15 Days", "always_use"
+        if re.search(r'start.*date|earliest.*start|preferred start', clean_key):
+            return "Immediate", "always_use"
+
+        # Demographics & Diversity
+        if re.search(r'veteran', clean_key):
+            return "I am not a protected veteran", "always_use"
+        if re.search(r'disability', clean_key):
+            return "No, I do not have a disability", "always_use"
         if re.search(r'gender', clean_key):
-            return "Prefer not to say", "always_use"
+            return "Male", "always_use"
         if re.search(r'pronoun', clean_key):
             return "He/Him/His", "always_use"
+        if re.search(r'how did you hear', clean_key):
+            return "Company career page", "always_use"
+
+        # Standalone Location fields (Must not shadow complex sentences)
+        if re.search(r'^\s*(what\s+is\s+your\s+)?country(\s+of\s+residence|\s+of\s+citizenship)?\s*$|which\s+country\s+do\s+you\s+reside', clean_key):
+            return "India", "always_use"
+        if re.search(r'^\s*(what\s+is\s+your\s+)?city\s*$|current\s+city|which\s+city', clean_key):
+            return "Bengaluru", "always_use"
+        if clean_key in ["country", "current country", "citizenship"]:
+            return "India", "always_use"
 
         # 3. Check DB partial matches
         partial = db.query(AnswerBank).filter(

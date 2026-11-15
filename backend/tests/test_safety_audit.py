@@ -173,6 +173,9 @@ def test_safety_real_form_fill_dry_run():
         try:
             profile = db.query(Profile).first()
             profile.go_live = False # Dry-run only
+            profile.is_paused = False
+            db.commit()
+            AutoApplyEngine.reset_circuit_breaker()
 
             # 1. Test real Greenhouse form
             job_gh = db.query(Job).filter(Job.url.contains("5426468004")).first()

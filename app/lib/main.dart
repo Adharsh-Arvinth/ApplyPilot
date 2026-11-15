@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/theme.dart';
 import 'core/api_client.dart';
@@ -31,7 +32,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await ApiClient().init();
   final prefs = await SharedPreferences.getInstance();
-  final onboardingDone = prefs.getBool("onboarding_complete") ?? false;
+  final onboardingDone = kIsWeb ? true : (prefs.getBool("onboarding_complete") ?? false);
 
   final savedTheme = prefs.getString("theme_mode") ?? "dark";
   if (savedTheme == "light") {

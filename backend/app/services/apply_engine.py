@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import random
 import asyncio
 import datetime
@@ -320,40 +321,161 @@ class AutoApplyEngine:
                         except Exception:
                             label_text = ""
 
-                    if label_text:
-                        resolved = AnswerService.resolve_answer(db, label_text)
+                    if not label_text:
+                        continue
+
+                    # Determine if required
+                    try:
+                        is_required = (
+                            "*" in label_text or 
+                            await inp.get_attribute("required") is not None or 
+                            await inp.get_attribute("aria-required") == "true" or
+                            await inp.evaluate("el => el.closest('.required, [data-required=\"true\"]') !== null")
+                        )
+                    except Exception:
+                        is_required = "*" in label_text
+
+                    tag = await inp.evaluate("el => el.tagName.toLowerCase()")
+                    resolved = AnswerService.resolve_answer(db, label_text)
+
+                    if tag == "select":
+                        # Extract all available options from the dropdown
+                        options_data = await inp.evaluate("""el => {
+                            return Array.from(el.options || []).map(o => ({
+                                text: o.text.trim(),
+                                value: o.value.trim()
+                            })).filter(o => o.text.length > 0 && !o.text.toLowerCase().startsWith('select') && !o.text.toLowerCase().startsWith('choose') && !o.text.toLowerCase().startsWith('--'));
+                        }""")
+                        opt_texts = [o["text"] for o in options_data]
+
                         if resolved:
-                            ans_val, mode = resolved
-                            tag = await inp.evaluate("el => el.tagName.toLowerCase()")
-                            if tag == "select":
+                            ans_val, _ = resolved
+                            matched_val = None
+                            for opt in options_data:
+                                ot = opt["text"].lower()
+                                av = ans_val.lower()
+                                if av == ot or av in ot or ot in av:
+                                    matched_val = opt["value"]
+                                    break
+                            
+                            if matched_val:
                                 try:
-                                    await inp.select_option(label=ans_val)
+                                    await inp.select_option(value=matched_val)
                                 except Exception:
                                     try:
-                                        await inp.select_option(value=ans_val)
+                                        await inp.select_option(label=ans_val)
                                     except Exception:
                                         pass
-                            else:
-                                await inp.fill(ans_val)
-                            logger.info(f"Filled field [{label_text[:30]}]: {ans_val[:30]}")
-                        else:
-                            # Required check: if label has asterisk, required attribute, or required parent class
-                            try:
-                                is_required = (
-                                    "*" in label_text or 
-                                    await inp.get_attribute("required") is not None or 
-                                    await inp.get_attribute("aria-required") == "true" or
-                                    await inp.evaluate("el => el.closest('.required, [data-required=\"true\"]') !== null")
-                                )
-                            except Exception:
-                                is_required = "*" in label_text
-                            if is_required:
-                                unresolved_fields.append((label_text, inp))
+                                # Trigger DOM and jQuery Select2 change events
+                                try:
+                                    await inp.evaluate("""(el, v) => {
+                                        el.value = v;
+                                        el.dispatchEvent(new Event('change', {bubbles: true}));
+                                        el.dispatchEvent(new Event('input', {bubbles: true}));
+                                        if (window.$ && $(el).select2) {
+                                            $(el).val(v).trigger('change');
+                                        }
+                                    }""", matched_val)
+                                except Exception:
+                                    pass
+                                logger.info(f"Selected dropdown option [{matched_val}] for [{label_text[:30]}]")
+                            elif is_required and opt_texts:
+                                unresolved_fields.append({
+                                    "label": label_text,
+                                    "type": "select",
+                                    "options": opt_texts,
+                                    "element": inp
+                                })
+                        elif is_required and opt_texts:
+                            unresolved_fields.append({
+                                "label": label_text,
+                                "type": "select",
+                                "options": opt_texts,
+                                "element": inp
+                            })
+                    else:
+                        # Text / URL / Textarea inputs
+                        if resolved:
+                            ans_val, _ = resolved
+                            await inp.fill(ans_val)
+                            logger.info(f"Filled text field [{label_text[:30]}]: {ans_val[:30]}")
+                        elif is_required:
+                            unresolved_fields.append({
+                                "label": label_text,
+                                "type": "textarea" if tag == "textarea" else "text",
+                                "options": [],
+                                "element": inp
+                            })
 
-                # 6. Check for unanswerable required fields -> "Needs You"
+                # 5b. Radio Button Groups (Yes/No choices, multiple choice)
+                radio_inputs = await page.query_selector_all("input[type='radio']")
+                radio_groups = {}
+                for r in radio_inputs:
+                    r_name = await r.get_attribute("name")
+                    if r_name:
+                        radio_groups.setdefault(r_name, []).append(r)
+
+                for r_name, r_items in radio_groups.items():
+                    first_r = r_items[0]
+                    try:
+                        r_label = await first_r.evaluate("""el => {
+                            const container = el.closest('.field, .form-group, fieldset, .application-question, div');
+                            if (container) {
+                                const l = container.querySelector('legend, label, .label, [id*="label"]');
+                                if (l) return l.innerText.trim();
+                            }
+                            return '';
+                        }""")
+                    except Exception:
+                        r_label = ""
+
+                    if not r_label:
+                        continue
+
+                    # Extract options for each radio item
+                    r_opts = []
+                    for r_el in r_items:
+                        r_id = await r_el.get_attribute("id")
+                        r_text = ""
+                        if r_id:
+                            lbl = await page.query_selector(f"label[for='{r_id}']")
+                            if lbl:
+                                r_text = (await lbl.inner_text()).strip()
+                        if not r_text:
+                            r_text = (await r_el.get_attribute("value") or "").strip()
+                        if r_text:
+                            r_opts.append((r_text, r_el))
+
+                    resolved = AnswerService.resolve_answer(db, r_label)
+                    if resolved:
+                        ans_val, _ = resolved
+                        for opt_text, r_el in r_opts:
+                            if ans_val.lower() == opt_text.lower() or ans_val.lower() in opt_text.lower() or opt_text.lower() in ans_val.lower():
+                                await r_el.check()
+                                try:
+                                    await r_el.evaluate("el => el.dispatchEvent(new Event('change', {bubbles: true}))")
+                                except Exception:
+                                    pass
+                                logger.info(f"Checked radio [{opt_text}] for [{r_label[:30]}]")
+                                break
+                    else:
+                        is_req = "*" in r_label
+                        if is_req and r_opts:
+                            unresolved_fields.append({
+                                "label": r_label,
+                                "type": "radio",
+                                "options": [o[0] for o in r_opts],
+                                "element": first_r
+                            })
+
+                # 6. Check for unanswerable required fields -> "Needs You" (Ask to choose from the box)
                 if unresolved_fields:
-                    first_unresolved_label, _ = unresolved_fields[0]
-                    logger.warning(f"Field '{first_unresolved_label}' requires human input for {job.company}.")
+                    unresolved = unresolved_fields[0]
+                    first_unresolved_label = unresolved["label"] if isinstance(unresolved, dict) else unresolved[0]
+                    unresolved_type = unresolved["type"] if isinstance(unresolved, dict) else "text"
+                    unresolved_opts = unresolved["options"] if isinstance(unresolved, dict) else []
+
+                    logger.warning(f"Field '{first_unresolved_label}' requires human input for {job.company} (options: {unresolved_opts}).")
                     
                     # Dispatch push notification to user's phone
                     PushNotificationService.send_needs_you_alert(
@@ -363,19 +485,19 @@ class AutoApplyEngine:
                     )
 
                     # Create NeedsInput record and halt this application
-                    AutoApplyEngine._record_transition(db, job, "needs_attention", f"Required field unresolved: {first_unresolved_label}", "needs_input")
+                    AutoApplyEngine._record_transition(db, job, "needs_attention", f"Required choice unresolved: {first_unresolved_label[:60]}", "needs_input")
                     needs = NeedsInput(
                         job_id=job.id,
                         question_text=first_unresolved_label,
-                        field_type="text",
-                        options_json="[]",
-                        suggested_answer="",
+                        field_type=unresolved_type,
+                        options_json=json.dumps(unresolved_opts),
+                        suggested_answer=unresolved_opts[0] if unresolved_opts else "",
                         status="pending"
                     )
                     db.add(needs)
                     db.commit()
                     await browser.close()
-                    return {"status": "needs_input", "question": first_unresolved_label}
+                    return {"status": "needs_input", "question": first_unresolved_label, "options": unresolved_opts}
 
                 # 7. Pre-submit screenshot of the real ATS form
                 form_el = await page.query_selector("form, #application_form, .application-form, #app")
