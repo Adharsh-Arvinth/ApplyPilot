@@ -306,6 +306,19 @@ class AutoApplyEngine:
                         aria = await inp.get_attribute("aria-label")
                         if aria:
                             label_text = aria.strip()
+                    if not label_text:
+                        # Extract label from ancestor field container (Greenhouse / Lever custom questions)
+                        try:
+                            label_text = await inp.evaluate("""el => {
+                                const container = el.closest('.field, .form-group, .application-question, .custom-question, div');
+                                if (container) {
+                                    const l = container.querySelector('label, .legend, .label, [id*="label"]');
+                                    if (l) return l.innerText.trim();
+                                }
+                                return '';
+                            }""")
+                        except Exception:
+                            label_text = ""
 
                     if label_text:
                         resolved = AnswerService.resolve_answer(db, label_text)
@@ -324,8 +337,16 @@ class AutoApplyEngine:
                                 await inp.fill(ans_val)
                             logger.info(f"Filled field [{label_text[:30]}]: {ans_val[:30]}")
                         else:
-                            # Required check: if label has asterisk or field has required attribute
-                            is_required = "*" in label_text or await inp.get_attribute("required") is not None
+                            # Required check: if label has asterisk, required attribute, or required parent class
+                            try:
+                                is_required = (
+                                    "*" in label_text or 
+                                    await inp.get_attribute("required") is not None or 
+                                    await inp.get_attribute("aria-required") == "true" or
+                                    await inp.evaluate("el => el.closest('.required, [data-required=\"true\"]') !== null")
+                                )
+                            except Exception:
+                                is_required = "*" in label_text
                             if is_required:
                                 unresolved_fields.append((label_text, inp))
 
@@ -372,11 +393,77 @@ class AutoApplyEngine:
                     submit_btn = await page.query_selector("#submit_app, button[type='submit'], input[type='submit']")
                     if submit_btn:
                         await submit_btn.click()
-                        await page.wait_for_load_state("networkidle", timeout=15000)
+                        try:
+                            await page.wait_for_load_state("networkidle", timeout=15000)
+                        except Exception:
+                            pass
                         await asyncio.sleep(4.0)
                         await page.screenshot(path=str(confirm_screenshot), full_page=True)
 
-                    AutoApplyEngine._record_transition(db, job, "submitted", "Live form submitted successfully", "submitted")
+                    # Strictly verify whether the ATS accepted or rejected the submission
+                    has_validation_errors = False
+                    try:
+                        has_validation_errors = await page.evaluate("""() => {
+                            const errs = Array.from(document.querySelectorAll(
+                                '.field-error, .error, .error-message, [aria-invalid="true"], .has-error, .invalid-feedback, ul.errors, .validation-error'
+                            )).filter(el => el.offsetParent !== null && el.innerText.trim().length > 0);
+                            const body = document.body ? document.body.innerText.toLowerCase() : '';
+                            return errs.length > 0 || body.includes('this field is required') || body.includes('please fill out this field');
+                        }""")
+                    except Exception:
+                        pass
+
+                    current_url = page.url.lower()
+                    page_text = ""
+                    try:
+                        page_text = (await page.inner_text("body")).lower()
+                    except Exception:
+                        pass
+
+                    is_confirmed = (
+                        "confirmation" in current_url or 
+                        "thanks" in current_url or
+                        "thank you for applying" in page_text or 
+                        "application submitted" in page_text or 
+                        "application received" in page_text or
+                        "we have received your application" in page_text
+                    )
+
+                    if has_validation_errors or not is_confirmed:
+                        logger.warning(f"Submission rejected by ATS validation for {job.company}.")
+                        unanswered_q = "Custom ATS Screening Questions"
+                        try:
+                            unanswered_q = await page.evaluate("""() => {
+                                const err = document.querySelector('.field-error, .error, [aria-invalid="true"]');
+                                if (err) {
+                                    const lbl = err.closest('.field, div')?.querySelector('label');
+                                    if (lbl && lbl.innerText.trim()) return lbl.innerText.trim();
+                                }
+                                return 'Custom ATS Screening Questions';
+                            }""")
+                        except Exception:
+                            pass
+
+                        AutoApplyEngine._record_transition(
+                            db, job, "needs_attention", 
+                            f"ATS form rejected: required fields missing ({unanswered_q[:60]})", 
+                            "validation_failed"
+                        )
+                        job.skip_reason = f"ATS form rejected: {unanswered_q[:60]}"
+                        needs = NeedsInput(
+                            job_id=job.id,
+                            question_text=unanswered_q,
+                            field_type="text",
+                            options_json="[]",
+                            suggested_answer="",
+                            status="pending"
+                        )
+                        db.add(needs)
+                        db.commit()
+                        await browser.close()
+                        return {"status": "needs_input", "question": unanswered_q, "screenshot": str(confirm_screenshot)}
+
+                    AutoApplyEngine._record_transition(db, job, "submitted", "Live form submitted and confirmed successfully", "submitted")
                     app_record = Application(
                         job_id=job.id,
                         resume_file=str(pdf_path),
