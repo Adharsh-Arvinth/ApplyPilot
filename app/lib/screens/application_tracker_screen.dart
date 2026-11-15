@@ -77,13 +77,14 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
       final st = (j["status"] ?? "").toString().toLowerCase();
       final apps = (j["applications"] as List<dynamic>?) ?? [];
       final hasDryRun = apps.any((a) => a["status"] == "dry_run");
-      return st == "dry_run" || (hasDryRun && st != "submitted" && st != "applied");
+      final hasSubmitted = apps.any((a) => a["status"] == "submitted");
+      return !hasSubmitted && (st == "dry_run" || hasDryRun);
     }).length;
     final appliedCount = _allJobs.where((j) {
       final st = (j["status"] ?? "").toString().toLowerCase();
       final apps = (j["applications"] as List<dynamic>?) ?? [];
       final hasSubmitted = apps.any((a) => a["status"] == "submitted");
-      return (st == "submitted" || st == "applied" || st == "interview" || st == "offer") && (hasSubmitted || apps.isEmpty);
+      return hasSubmitted || (st == "submitted" && apps.isNotEmpty);
     }).length;
     final maybeCount = _allJobs.where((j) => ["maybe", "evaluated", "discovered"].contains(j["status"])).length;
     final skippedCount = _allJobs.where((j) => ["skipped", "cooldown", "below_salary", "ineligible", "blocked", "captcha", "failed"].contains(j["status"])).length;
@@ -102,9 +103,9 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
       if (_selectedStage == "queue") {
         matchTab = st == "queued" || st == "approved";
       } else if (_selectedStage == "dry_run") {
-        matchTab = st == "dry_run" || (hasDryRun && st != "submitted");
+        matchTab = !hasSubmitted && (st == "dry_run" || hasDryRun);
       } else if (_selectedStage == "applied") {
-        matchTab = (st == "submitted" || st == "applied" || st == "interview" || st == "offer") && (hasSubmitted || apps.isEmpty);
+        matchTab = hasSubmitted || (st == "submitted" && apps.isNotEmpty);
       } else if (_selectedStage == "maybe") {
         matchTab = st == "maybe" || st == "evaluated" || st == "discovered";
       } else if (_selectedStage == "skipped") {
