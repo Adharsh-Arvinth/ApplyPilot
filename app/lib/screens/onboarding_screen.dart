@@ -17,8 +17,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final _api = ApiClient();
   int _currentStep = 0;
 
-  final _urlCtrl = TextEditingController(text: "");
-  final _tokenCtrl = TextEditingController(text: "");
+  final _urlCtrl = TextEditingController(text: ApiClient.defaultTailscaleUrl);
+  final _tokenCtrl = TextEditingController(text: ApiClient.defaultAuthToken);
 
   @override
   void initState() {
@@ -31,8 +31,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final url = prefs.getString("server_url") ?? "";
     final token = prefs.getString("auth_token") ?? "";
     if (mounted) {
-      if (url.isNotEmpty) _urlCtrl.text = url;
-      if (token.isNotEmpty) _tokenCtrl.text = token;
+      if (url.isNotEmpty && !url.contains("100.x.y.z")) {
+        _urlCtrl.text = url;
+      } else {
+        _urlCtrl.text = ApiClient.defaultTailscaleUrl;
+      }
+      if (token.isNotEmpty) {
+        _tokenCtrl.text = token;
+      } else {
+        _tokenCtrl.text = ApiClient.defaultAuthToken;
+      }
     }
   }
 

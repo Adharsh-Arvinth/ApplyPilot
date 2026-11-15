@@ -13,20 +13,26 @@ class ApiClient {
   factory ApiClient() => _instance;
   ApiClient._internal();
 
-  String _baseUrl = "http://100.x.y.z:8000";
-  String _token = "";
+  static const String defaultTailscaleUrl = "http://100.97.30.113:8000";
+  static const String defaultAuthToken = "mApIGVEyORqpXbJzPhrhLPk9pRaS_vPOFyxH07nuPV4";
+
+  String _baseUrl = defaultTailscaleUrl;
+  String _token = defaultAuthToken;
 
   String get baseUrl => _baseUrl;
   String get token => _token;
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
-    String defaultUrl = "http://100.x.y.z:8000";
+    String defaultUrl = defaultTailscaleUrl;
     if (kIsWeb && Uri.base.origin.startsWith("http")) {
       defaultUrl = Uri.base.origin;
     }
-    _baseUrl = prefs.getString("server_url") ?? defaultUrl;
-    _token = prefs.getString("auth_token") ?? "";
+    final savedUrl = prefs.getString("server_url") ?? "";
+    _baseUrl = (savedUrl.isEmpty || savedUrl.contains("100.x.y.z")) ? defaultUrl : savedUrl;
+
+    final savedToken = prefs.getString("auth_token") ?? "";
+    _token = savedToken.isEmpty ? defaultAuthToken : savedToken;
   }
 
   Future<void> saveConnectionSettings(String url, String token) async {
