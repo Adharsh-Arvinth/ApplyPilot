@@ -11,34 +11,34 @@ import 'package:flutter/material.dart';
 /// - Compact controls, table-style list rows, no repetitive cards-in-cards
 class AppleMusicTheme {
   // 1. Dark Surfaces & Foundations
-  static const Color background = Color(0xFF0A0A0C);
-  static const Color surface = Color(0xFF141418);
-  static const Color surfaceElevated = Color(0xFF1C1C24);
-  static const Color surfaceSubtle = Color(0xFF0E0E12);
-  static const Color frostedGlass = Color(0xCC141418);
-  static const Color hairline = Color(0x1FFFFFFF);
-  static const Color hairlineProminent = Color(0x2EFFFFFF);
+  static const Color background = Color(0xFF0E0F0E);
+  static const Color surface = Color(0xFF161816);
+  static const Color surfaceElevated = Color(0xFF1C201D);
+  static const Color surfaceSubtle = Color(0xFF121412);
+  static const Color frostedGlass = Color(0xCC161816);
+  static const Color hairline = Color(0xFF262926);
+  static const Color hairlineProminent = Color(0xFF353935);
 
   // 2. High-Fidelity Typography
-  static const Color textPrimary = Color(0xFFF5F5F7);
-  static const Color textSecondary = Color(0xFF8E8E93);
-  static const Color textTertiary = Color(0xFF636366);
+  static const Color textPrimary = Color(0xFFECEEEC);
+  static const Color textSecondary = Color(0xFFA0A69F);
+  static const Color textTertiary = Color(0xFF6E736E);
 
   // 3. Restrained Semantic Color System
-  static const Color emerald = Color(0xFF30D158); // Successful operations, confirmed
-  static const Color emeraldSubtle = Color(0x1F30D158);
+  static const Color emerald = Color(0xFF7FD1A8); // Signature Accent & Successful operations
+  static const Color emeraldSubtle = Color(0x1F7FD1A8);
 
-  static const Color coral = Color(0xFFFF453A); // Critical errors, pause, rejection
-  static const Color coralSubtle = Color(0x1FFF453A);
+  static const Color coral = Color(0xFFF87171); // Critical errors, pause, rejection
+  static const Color coralSubtle = Color(0x1FF87171);
 
-  static const Color violet = Color(0xFFBF5AF2); // Gemini AI intelligence, copilot
-  static const Color violetSubtle = Color(0x1FBF5AF2);
+  static const Color violet = Color(0xFFA78BFA); // Gemini AI intelligence, copilot
+  static const Color violetSubtle = Color(0x1FA78BFA);
 
-  static const Color blue = Color(0xFF0A84FF); // Discovery, links, telemetry
-  static const Color blueSubtle = Color(0x1F0A84FF);
+  static const Color blue = Color(0xFF60A5FA); // Discovery, links, telemetry
+  static const Color blueSubtle = Color(0x1F60A5FA);
 
-  static const Color amber = Color(0xFFFF9F0A); // Pending approval, waiting, warnings
-  static const Color amberSubtle = Color(0x1FFFF9F0A);
+  static const Color amber = Color(0xFFFBBF24); // Pending approval, waiting, warnings
+  static const Color amberSubtle = Color(0x1FFBBF24);
 
   // 4. Geometry & Radii
   static const double radiusControl = 8.0;

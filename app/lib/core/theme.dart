@@ -61,41 +61,41 @@ class AppColors {
   static const Color errorLight = Color(0xFFBA1A1A);
   static const Color blueLight = Color(0xFF1D4E89);
 
-  // Dark Theme Palette (Apple Music Refined Editorial Foundation)
-  static const Color canvasDark = Color(0xFF0A0A0C);
-  static const Color surfaceDark = Color(0xFF141418);
-  static const Color surfaceSubtleDark = Color(0xFF1C1C24);
-  static const Color borderHairlineDark = Color(0x1FFFFFFF);
-  static const Color textPrimaryDark = Color(0xFFF5F5F7);
-  static const Color textSecondaryDark = Color(0xFF8E8E93);
-  static const Color textMutedDark = Color(0xFF636366);
-  static const Color accentDark = Color(0xFF30D158);
-  static const Color accentOnAccentDark = Color(0xFF000000);
-  static const Color brassDark = Color(0xFFFFD60A);
-  static const Color successDark = Color(0xFF30D158);
-  static const Color warningDark = Color(0xFFFF9F0A);
-  static const Color errorDark = Color(0xFFFF453A);
-  static const Color blueDark = Color(0xFF0A84FF);
+  // Dark Theme Palette (Signature Editorial Dark Foundation)
+  static const Color canvasDark = Color(0xFF0E0F0E);
+  static const Color surfaceDark = Color(0xFF161816);
+  static const Color surfaceSubtleDark = Color(0xFF1C201D);
+  static const Color borderHairlineDark = Color(0xFF262926);
+  static const Color textPrimaryDark = Color(0xFFECEEEC);
+  static const Color textSecondaryDark = Color(0xFFA0A69F);
+  static const Color textMutedDark = Color(0xFF6E736E);
+  static const Color accentDark = Color(0xFF7FD1A8);
+  static const Color accentOnAccentDark = Color(0xFF0E0F0E);
+  static const Color brassDark = Color(0xFFFBBF24);
+  static const Color successDark = Color(0xFF7FD1A8);
+  static const Color warningDark = Color(0xFFFBBF24);
+  static const Color errorDark = Color(0xFFF87171);
+  static const Color blueDark = Color(0xFF60A5FA);
 
-  // Semantic Colorful Palette (Apple Music System Colors)
+  // Semantic Colorful Palette
   // Emerald: Successful applications & positive progress
-  static const Color emeraldLight = Color(0xFF30D158);
-  static const Color emeraldDark = Color(0xFF30D158);
+  static const Color emeraldLight = Color(0xFF2D6A4F);
+  static const Color emeraldDark = Color(0xFF7FD1A8);
   // Blue: Job discovery & general information
-  static const Color semanticBlueLight = Color(0xFF0A84FF);
-  static const Color semanticBlueDark = Color(0xFF0A84FF);
+  static const Color semanticBlueLight = Color(0xFF1D4E89);
+  static const Color semanticBlueDark = Color(0xFF60A5FA);
   // Violet: AI operations & resume intelligence
-  static const Color violetLight = Color(0xFFBF5AF2);
-  static const Color violetDark = Color(0xFFBF5AF2);
+  static const Color violetLight = Color(0xFF6A4C93);
+  static const Color violetDark = Color(0xFFA78BFA);
   // Amber: Pending approvals & attention required
-  static const Color amberLight = Color(0xFFFF9F0A);
-  static const Color amberDark = Color(0xFFFF9F0A);
+  static const Color amberLight = Color(0xFFD4A373);
+  static const Color amberDark = Color(0xFFFBBF24);
   // Coral: Errors, failed applications & warnings
-  static const Color coralLight = Color(0xFFFF453A);
-  static const Color coralDark = Color(0xFFFF453A);
+  static const Color coralLight = Color(0xFFE76F51);
+  static const Color coralDark = Color(0xFFF87171);
   // Teal: Interviews & career milestones
-  static const Color tealLight = Color(0xFF64D2FF);
-  static const Color tealDark = Color(0xFF64D2FF);
+  static const Color tealLight = Color(0xFF0081A7);
+  static const Color tealDark = Color(0xFF2DD4BF);
 
   static Color getSemanticColor(String type, bool isDark) {
     switch (type.toLowerCase()) {
