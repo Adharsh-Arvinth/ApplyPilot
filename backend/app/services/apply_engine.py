@@ -338,7 +338,52 @@ class AutoApplyEngine:
                     tag = await inp.evaluate("el => el.tagName.toLowerCase()")
                     resolved = AnswerService.resolve_answer(db, label_text)
 
-                    if tag == "select":
+                    is_react_select = False
+                    if tag == "input":
+                        try:
+                            is_react_select = await inp.evaluate("el => el.closest('.select-shell, [class*=\"select__control\"], [id*=\"react-select\"]') !== null")
+                        except Exception:
+                            is_react_select = False
+
+                    if is_react_select:
+                        if resolved:
+                            ans_val, _ = resolved
+                            try:
+                                await inp.click()
+                                await page.wait_for_timeout(200)
+                                opts = await page.query_selector_all(".select__option, [class*='select__option']")
+                                clicked = False
+                                for o in opts:
+                                    ot = (await o.inner_text()).strip()
+                                    if ans_val.lower() == ot.lower() or ans_val.lower() in ot.lower() or ot.lower() in ans_val.lower():
+                                        await o.click()
+                                        clicked = True
+                                        logger.info(f"Clicked React-Select option [{ot}] for [{label_text[:30]}]")
+                                        break
+                                if not clicked:
+                                    await inp.fill(ans_val)
+                                    await page.wait_for_timeout(200)
+                                    await page.keyboard.press("Enter")
+                                    logger.info(f"Typed and pressed Enter [{ans_val}] for [{label_text[:30]}]")
+                            except Exception as sel_err:
+                                logger.warning(f"Failed to select React-Select option: {sel_err}")
+                        elif is_required:
+                            opt_texts = []
+                            try:
+                                await inp.click()
+                                await page.wait_for_timeout(250)
+                                opts = await page.query_selector_all(".select__option, [class*='select__option']")
+                                opt_texts = [(await o.inner_text()).strip() for o in opts if (await o.inner_text()).strip()]
+                                await page.keyboard.press("Escape")
+                            except Exception:
+                                pass
+                            unresolved_fields.append({
+                                "label": label_text,
+                                "type": "select",
+                                "options": opt_texts,
+                                "element": inp
+                            })
+                    elif tag == "select":
                         # Extract all available options from the dropdown
                         options_data = await inp.evaluate("""el => {
                             return Array.from(el.options || []).map(o => ({

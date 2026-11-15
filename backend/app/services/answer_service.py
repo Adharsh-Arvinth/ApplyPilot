@@ -517,7 +517,7 @@ class AnswerService:
             return "Company career page", "always_use"
 
         # Standalone Location fields (Must not shadow complex sentences)
-        if re.search(r'^\s*(what\s+is\s+your\s+)?country(\s+of\s+residence|\s+of\s+citizenship)?\s*$|which\s+country\s+do\s+you\s+reside', clean_key):
+        if re.search(r'^\s*(what\s+is\s+your\s+)?country(\s+of\s+residence|\s+of\s+citizenship)?\s*$|(in\s+)?which\s+country\s+do\s+you\s+(reside|work|live|currently\s+work|currently\s+live)', clean_key):
             return "India", "always_use"
         if re.search(r'^\s*(what\s+is\s+your\s+)?city\s*$|current\s+city|which\s+city', clean_key):
             return "Bengaluru", "always_use"
