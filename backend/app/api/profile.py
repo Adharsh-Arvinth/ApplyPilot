@@ -3,6 +3,7 @@ import json
 import secrets
 from pathlib import Path
 from typing import List, Optional
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from pypdf import PdfReader
 from sqlalchemy.orm import Session
@@ -70,6 +71,11 @@ def _format_profile_out(p: Profile) -> dict:
         "paused_at": p.paused_at,
         "pause_details": getattr(p, "pause_details", "") or "",
         "go_live": p.go_live,
+        "gemini_auto_answer_enabled": bool(getattr(p, "gemini_auto_answer_enabled", True)),
+        "gemini_min_confidence": float(getattr(p, "gemini_min_confidence", 0.85) or 0.85),
+        "gemini_sensitive_categories": json.loads(getattr(p, "gemini_sensitive_categories_json", '["consent_legal", "work_auth_visa", "salary_notice_relocation", "demographics_identity", "criminal_background", "legal_attestation", "ask_each_time"]') or "[]"),
+        "gemini_daily_cap": int(getattr(p, "gemini_daily_cap", 30) or 30),
+        "gemini_answers_today": int(getattr(p, "gemini_answers_today", 0) or 0),
         "proof_points_text": p.proof_points_text,
         "updated_at": p.updated_at
     }
@@ -108,6 +114,8 @@ def update_profile(update: ProfileUpdate, db: Session = Depends(get_db)):
             profile.excluded_companies_json = json.dumps(val)
         elif field == "widget_preferences":
             profile.widget_preferences_json = json.dumps(val)
+        elif field == "gemini_sensitive_categories":
+            profile.gemini_sensitive_categories_json = json.dumps(val)
         elif hasattr(profile, field):
             setattr(profile, field, val)
 
@@ -288,3 +296,59 @@ def seed_candidate_records_endpoint(db: Session = Depends(get_db)):
     from backend.app.services.answer_service import seed_candidate_records
     count = seed_candidate_records(db)
     return {"status": "success", "records_seeded": count}
+
+class GeminiSettingsUpdate(BaseModel):
+    gemini_auto_answer_enabled: Optional[bool] = None
+    gemini_min_confidence: Optional[float] = None
+    gemini_sensitive_categories: Optional[List[str]] = None
+    gemini_daily_cap: Optional[int] = None
+
+@router.get("/gemini-settings", summary="Get Gemini Auto-Answer Settings")
+def get_gemini_settings(db: Session = Depends(get_db)):
+    profile = db.query(Profile).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not initialized.")
+    
+    from backend.app.services.gemini_service import GeminiService
+    tripped, remaining = GeminiService.is_circuit_breaker_active()
+    
+    categories = ["consent_legal", "work_auth_visa", "salary_notice_relocation", "demographics_identity", "criminal_background", "legal_attestation", "ask_each_time"]
+    try:
+        if profile.gemini_sensitive_categories_json:
+            categories = json.loads(profile.gemini_sensitive_categories_json)
+    except Exception:
+        pass
+        
+    answers_today = getattr(profile, "gemini_answers_today", 0) or 0
+    saved_minutes = answers_today * 2
+    
+    return {
+        "gemini_auto_answer_enabled": bool(getattr(profile, "gemini_auto_answer_enabled", True)),
+        "gemini_min_confidence": float(getattr(profile, "gemini_min_confidence", 0.85) or 0.85),
+        "gemini_sensitive_categories": categories,
+        "gemini_daily_cap": int(getattr(profile, "gemini_daily_cap", 30) or 30),
+        "gemini_answers_today": answers_today,
+        "saved_minutes": saved_minutes,
+        "circuit_breaker_active": tripped,
+        "circuit_breaker_remaining_seconds": int(remaining),
+        "model_name": getattr(settings, "GEMINI_MODEL", "gemini-2.0-flash"),
+        "go_live": profile.go_live
+    }
+
+@router.post("/gemini-settings", summary="Update Gemini Auto-Answer Settings")
+def update_gemini_settings(payload: GeminiSettingsUpdate, db: Session = Depends(get_db)):
+    profile = db.query(Profile).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not initialized.")
+        
+    if payload.gemini_auto_answer_enabled is not None:
+        profile.gemini_auto_answer_enabled = payload.gemini_auto_answer_enabled
+    if payload.gemini_min_confidence is not None:
+        profile.gemini_min_confidence = payload.gemini_min_confidence
+    if payload.gemini_sensitive_categories is not None:
+        profile.gemini_sensitive_categories_json = json.dumps(payload.gemini_sensitive_categories)
+    if payload.gemini_daily_cap is not None:
+        profile.gemini_daily_cap = payload.gemini_daily_cap
+        
+    db.commit()
+    return get_gemini_settings(db)

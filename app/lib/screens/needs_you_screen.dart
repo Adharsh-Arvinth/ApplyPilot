@@ -21,11 +21,14 @@ class _NeedsYouScreenState extends State<NeedsYouScreen> {
   final Map<int, bool> _saveToBank = {};
   final Map<int, String> _modes = {};
   int _currentIndex = 0;
+  bool _loadingGemini = false;
+  List<dynamic> _geminiAnswers = [];
 
   @override
   void initState() {
     super.initState();
     _loadNeedsYou();
+    _loadGeminiAnswers();
   }
 
   @override
@@ -65,6 +68,126 @@ class _NeedsYouScreenState extends State<NeedsYouScreen> {
       }
     } catch (e) {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loadGeminiAnswers() async {
+    setState(() => _loadingGemini = true);
+    try {
+      final answers = await _api.getGeminiAnswers();
+      if (mounted) {
+        setState(() {
+          _geminiAnswers = answers;
+          _loadingGemini = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingGemini = false);
+    }
+  }
+
+  Future<void> _approveGeminiAnswer(int id) async {
+    HapticFeedback.lightImpact();
+    try {
+      await _api.approveGeminiAnswer(id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Answer approved and marked as 'Always Use'.")),
+        );
+      }
+      _loadGeminiAnswers();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Approval failed: $e")));
+      }
+    }
+  }
+
+  Future<void> _editGeminiAnswer(int id, String currentAnswer) async {
+    final editController = TextEditingController(text: currentAnswer);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Edit AI Answer", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        content: TextField(
+          controller: editController,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            hintText: "Enter corrected answer...",
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text("Save & Approve"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && editController.text.trim().isNotEmpty) {
+      try {
+        await _api.editGeminiAnswer(id, editController.text.trim());
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Answer updated and approved.")),
+          );
+        }
+        _loadGeminiAnswers();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Edit failed: $e")));
+        }
+      }
+    }
+  }
+
+  Future<void> _rejectGeminiAnswer(int id, String questionText) async {
+    HapticFeedback.mediumImpact();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text(
+          "Reject AI Answer?",
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.errorCoral),
+        ),
+        content: Text(
+          "This will delete the answer from the Answer Bank and flag any applications that used it.\n\nNext time this question appears, it will be sent directly to you.",
+          style: const TextStyle(fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text("Keep"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.errorCoral, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text("Reject & Delete"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await _api.rejectGeminiAnswer(id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("AI answer deleted and affected applications flagged.")),
+          );
+        }
+        _loadGeminiAnswers();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Rejection failed: $e")));
+        }
+      }
     }
   }
 
@@ -238,25 +361,315 @@ class _NeedsYouScreenState extends State<NeedsYouScreen> {
     final accentGreen = isDark ? AppColors.accentDark : AppColors.racingGreen;
     final coral = AppColors.getSemanticColor("coral", isDark);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          "Needs You Inbox",
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: primaryTextColor),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, size: 20),
-            tooltip: "Refresh Inbox",
-            onPressed: _loadNeedsYou,
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            "Needs You Inbox",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: primaryTextColor),
           ),
-        ],
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh, size: 20),
+              tooltip: "Refresh Inbox",
+              onPressed: () {
+                _loadNeedsYou();
+                _loadGeminiAnswers();
+              },
+            ),
+          ],
+          bottom: TabBar(
+            indicatorColor: accentGreen,
+            labelColor: primaryTextColor,
+            unselectedLabelColor: secondaryTextColor,
+            tabs: [
+              Tab(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text("Candidate Questions"),
+                    if (_items.isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: coral,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          "${_items.length}",
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Tab(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text("AI Answered"),
+                    if (_geminiAnswers.isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: accentGreen,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          "${_geminiAnswers.length}",
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        body: TabBarView(
+          children: [
+            // Tab 1: Candidate questions
+            _loading
+                ? Center(child: CircularProgressIndicator(strokeWidth: 2, color: accentGreen))
+                : _items.isEmpty
+                    ? _buildEmptyState(isDark, primaryTextColor, secondaryTextColor, accentGreen, cardBg, borderColor)
+                    : _buildQuestionCarousel(isDark, primaryTextColor, secondaryTextColor, accentGreen, cardBg, borderColor, coral),
+            
+            // Tab 2: AI Answered
+            _buildAiAnsweredTab(isDark, primaryTextColor, secondaryTextColor, accentGreen, cardBg, borderColor, coral),
+          ],
+        ),
       ),
-      body: _loading
-          ? Center(child: CircularProgressIndicator(strokeWidth: 2, color: accentGreen))
-          : _items.isEmpty
-              ? _buildEmptyState(isDark, primaryTextColor, secondaryTextColor, accentGreen, cardBg, borderColor)
-              : _buildQuestionCarousel(isDark, primaryTextColor, secondaryTextColor, accentGreen, cardBg, borderColor, coral),
+    );
+  }
+
+  Widget _buildAiAnsweredTab(
+    bool isDark,
+    Color primaryColor,
+    Color secondaryColor,
+    Color accentColor,
+    Color cardBg,
+    Color borderColor,
+    Color coral,
+  ) {
+    if (_loadingGemini) {
+      return Center(child: CircularProgressIndicator(strokeWidth: 2, color: accentColor));
+    }
+
+    if (_geminiAnswers.isEmpty) {
+      return Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.s24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: accentColor.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: accentColor.withOpacity(0.3)),
+                ),
+                child: Icon(Icons.auto_awesome, size: 32, color: accentColor),
+              ),
+              const SizedBox(height: AppSpacing.s16),
+              Text(
+                "No Pending AI Answers",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: primaryColor),
+              ),
+              const SizedBox(height: AppSpacing.s8),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 380),
+                child: Text(
+                  "When Gemini auto-answers unlisted form questions truthfully from your locked facts, they will appear here for your review and approval.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, height: 1.4, color: secondaryColor),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.s20),
+              OutlinedButton.icon(
+                onPressed: _loadGeminiAnswers,
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text("Refresh List"),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: primaryColor,
+                  side: BorderSide(color: borderColor),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(AppSpacing.s16),
+      itemCount: _geminiAnswers.length,
+      itemBuilder: (context, index) {
+        final item = _geminiAnswers[index] as Map<String, dynamic>;
+        final id = item["id"] as int;
+        final question = item["question"] ?? "";
+        final answer = item["answer"] ?? "";
+        final company = item["company"] ?? "Various";
+        final role = item["role"] ?? "";
+        final confidence = (item["confidence"] as num?)?.toDouble() ?? 0.95;
+        final factsUsed = (item["facts_used"] as List<dynamic>?) ?? [];
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: AppSpacing.s16),
+          padding: const EdgeInsets.all(AppSpacing.s16),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderColor),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header Row: Company/Role + Confidence Tag
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      "$company • ${role.isNotEmpty ? role : 'Form Question'}",
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: secondaryColor),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: accentColor.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: accentColor.withOpacity(0.3), width: 0.5),
+                    ),
+                    child: Text(
+                      "${(confidence * 100).toInt()}% match",
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: accentColor),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.s8),
+
+              // Question Text
+              Text(
+                question,
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: primaryColor),
+              ),
+              const SizedBox(height: AppSpacing.s12),
+
+              // Gemini Answer Box
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.s12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                    width: 0.8,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.auto_awesome, size: 13, color: accentColor),
+                        const SizedBox(width: 5),
+                        Text(
+                          "GEMINI ANSWER",
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: accentColor),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      answer,
+                      style: TextStyle(fontSize: 13, height: 1.4, color: primaryColor),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.s12),
+
+              // Facts Used Chips
+              if (factsUsed.isNotEmpty) ...[
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: factsUsed.map<Widget>((fact) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: borderColor, width: 0.5),
+                      ),
+                      child: Text(
+                        "Fact: $fact",
+                        style: TextStyle(fontSize: 10, color: secondaryColor),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: AppSpacing.s12),
+              ],
+
+              // Actions: Approve, Edit, Reject
+              Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _approveGeminiAnswer(id),
+                      icon: const Icon(Icons.check, size: 15),
+                      label: const Text("Approve · Always use", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: accentColor,
+                        foregroundColor: isDark ? AppColors.forestInk : Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton(
+                    onPressed: () => _editGeminiAnswer(id, answer),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: primaryColor,
+                      side: BorderSide(color: borderColor),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: const Text("Edit", style: TextStyle(fontSize: 12)),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton(
+                    onPressed: () => _rejectGeminiAnswer(id, question),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: coral,
+                      side: BorderSide(color: coral.withOpacity(0.5)),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: const Text("Reject", style: TextStyle(fontSize: 12)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

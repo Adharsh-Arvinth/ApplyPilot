@@ -48,6 +48,14 @@ class Profile(Base):
     pause_details = Column(Text, default="")
     go_live = Column(Boolean, default=False) # Strict safety switch
     
+    # Gemini Auto-Answer controls
+    gemini_auto_answer_enabled = Column(Boolean, default=True)
+    gemini_min_confidence = Column(Float, default=0.85)
+    gemini_sensitive_categories_json = Column(Text, default='["consent_legal", "work_auth_visa", "salary_notice_relocation", "demographics_identity", "criminal_background", "legal_attestation", "ask_each_time"]')
+    gemini_daily_cap = Column(Integer, default=30)
+    gemini_answers_today = Column(Integer, default=0)
+    gemini_last_reset_date = Column(String(32), default="")
+    
     # Verified facts and proof points (Immutable truth source)
     proof_points_text = Column(Text, default="""* 2 published patents: A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver; Acoustic Doppler Session Guard
 * Agentic Code Intelligence: hybrid code retrieval over 8,765 Python programs (embeddings + BM25 + AST), 25.59% NDCG@10 vs 5.14% baseline, 43–63 ms CPU latency
@@ -78,6 +86,10 @@ class AnswerBank(Base):
     aliases_json = Column(Text, default="[]")
     user_approved = Column(Boolean, default=True)
     application_references_json = Column(Text, default="[]")
+    confidence = Column(Float, default=1.0)
+    facts_used_json = Column(Text, default="[]")
+    company = Column(String(128), default="")
+    role = Column(String(128), default="")
     
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
@@ -206,6 +218,9 @@ class Application(Base):
     notes = Column(Text, default="")
     recruiter_info = Column(String(256), default="")
     follow_up_date = Column(DateTime, nullable=True)
+    is_ai_assisted = Column(Boolean, default=False)
+    ai_answer_ids_json = Column(Text, default="[]")
+    has_rejected_ai_answer = Column(Boolean, default=False)
     
     job = relationship("Job", back_populates="applications")
     resume_version = relationship("ResumeVersion", back_populates="applications")
@@ -222,6 +237,9 @@ class NeedsInput(Base):
     suggested_answer = Column(Text, default="")
     answer = Column(Text, default="")
     status = Column(String(32), default="pending") # pending, answered, dismissed
+    gemini_reason = Column(Text, default="")
+    gemini_confidence = Column(Float, default=0.0)
+    facts_used_json = Column(Text, default="[]")
     created_at = Column(DateTime, default=utcnow)
     answered_at = Column(DateTime, nullable=True)
 

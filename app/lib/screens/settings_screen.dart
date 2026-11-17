@@ -33,6 +33,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _goLive = false;
   int _dailyCap = 50;
 
+  bool _geminiEnabled = true;
+  double _geminiMinConfidence = 0.85;
+  int _geminiDailyCap = 30;
+  int _geminiAnswersToday = 0;
+  int _savedMinutes = 0;
+  List<String> _sensitiveCategories = [
+    "consent_legal",
+    "work_auth_visa",
+    "salary_notice_relocation",
+    "demographics_identity",
+    "criminal_background",
+    "legal_attestation",
+    "ask_each_time"
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -44,16 +59,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadProfileSettings() async {
     try {
       final p = await _api.getProfile();
+      final g = await _api.getGeminiSettings();
       if (mounted) {
         setState(() {
           _goLive = p["go_live"] == true;
           _dailyCap = (p["daily_cap"] as int?) ?? 50;
+          if (g.isNotEmpty) {
+            _geminiEnabled = g["gemini_auto_answer_enabled"] != false;
+            _geminiMinConfidence = (g["gemini_min_confidence"] as num?)?.toDouble() ?? 0.85;
+            _geminiDailyCap = (g["gemini_daily_cap"] as int?) ?? 30;
+            _geminiAnswersToday = (g["gemini_answers_today"] as int?) ?? 0;
+            _savedMinutes = (g["saved_minutes"] as int?) ?? 0;
+            if (g["gemini_sensitive_categories"] is List) {
+              _sensitiveCategories = List<String>.from(g["gemini_sensitive_categories"]);
+            }
+          }
           _loadingProfile = false;
         });
       }
     } catch (_) {
       if (mounted) setState(() => _loadingProfile = false);
     }
+  }
+
+  Future<void> _updateGeminiToggle(bool val) async {
+    setState(() => _geminiEnabled = val);
+    try {
+      await _api.updateGeminiSettings({"gemini_auto_answer_enabled": val});
+    } catch (_) {}
+  }
+
+  Future<void> _updateGeminiConfidence(double val) async {
+    setState(() => _geminiMinConfidence = val);
+    try {
+      await _api.updateGeminiSettings({"gemini_min_confidence": val});
+    } catch (_) {}
+  }
+
+  Future<void> _updateGeminiDailyCap(double val) async {
+    final cap = val.round();
+    setState(() => _geminiDailyCap = cap);
+    try {
+      await _api.updateGeminiSettings({"gemini_daily_cap": cap});
+    } catch (_) {}
   }
 
   Future<bool?> _showGoLiveConfirmationDialog() async {
@@ -358,6 +406,151 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   label: "$_dailyCap",
                   onChanged: (val) => setState(() => _dailyCap = val.round()),
                   onChangeEnd: _updateDailyCap,
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.s20),
+
+          // GEMINI AUTO-ANSWER INTELLIGENCE
+          Text(
+            "GEMINI AUTO-ANSWER INTELLIGENCE",
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: secondaryTextColor),
+          ),
+          const SizedBox(height: AppSpacing.s8),
+
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.s16),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: borderColor),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Auto-answer unlisted questions",
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: primaryTextColor),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            "Uses Gemini to answer truthfully from locked facts before Needs You.",
+                            style: TextStyle(fontSize: 11, color: secondaryTextColor),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch.adaptive(
+                      value: _geminiEnabled,
+                      activeColor: accentGreen,
+                      onChanged: _updateGeminiToggle,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.s12),
+                const Divider(height: 1),
+                const SizedBox(height: AppSpacing.s12),
+
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.s12),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: borderColor, width: 0.8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.auto_awesome, size: 18, color: accentGreen),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          "Gemini answered $_geminiAnswersToday questions today (saved ~${_savedMinutes} mins)",
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: primaryTextColor),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.s16),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      "Minimum Confidence: ${(_geminiMinConfidence * 100).toInt()}%",
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: primaryTextColor),
+                    ),
+                    Text("Range 70% – 99%", style: TextStyle(fontSize: 10, color: secondaryTextColor)),
+                  ],
+                ),
+                Slider(
+                  value: _geminiMinConfidence.clamp(0.70, 0.99),
+                  min: 0.70,
+                  max: 0.99,
+                  divisions: 29,
+                  activeColor: accentGreen,
+                  label: "${(_geminiMinConfidence * 100).toInt()}%",
+                  onChanged: (val) => setState(() => _geminiMinConfidence = val),
+                  onChangeEnd: _updateGeminiConfidence,
+                ),
+
+                const SizedBox(height: AppSpacing.s8),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text("Daily Cap: $_geminiDailyCap calls/day", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: primaryTextColor)),
+                    Text("Prevents runaway usage", style: TextStyle(fontSize: 10, color: secondaryTextColor)),
+                  ],
+                ),
+                Slider(
+                  value: _geminiDailyCap.toDouble().clamp(5, 100),
+                  min: 5,
+                  max: 100,
+                  divisions: 19,
+                  activeColor: accentGreen,
+                  label: "$_geminiDailyCap",
+                  onChanged: (val) => setState(() => _geminiDailyCap = val.round()),
+                  onChangeEnd: _updateGeminiDailyCap,
+                ),
+
+                const SizedBox(height: AppSpacing.s12),
+                Text(
+                  "SENSITIVE CATEGORIES (NEVER SENT TO GEMINI)",
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.5, color: secondaryTextColor),
+                ),
+                const SizedBox(height: AppSpacing.s8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: _sensitiveCategories.map((cat) {
+                    final label = cat.replaceAll("_", " ").split(" ").map((w) => w.isNotEmpty ? "${w[0].toUpperCase()}${w.substring(1)}" : "").join(" ");
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: borderColor, width: 0.5),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.shield_outlined, size: 11, color: secondaryTextColor),
+                          const SizedBox(width: 4),
+                          Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: primaryTextColor)),
+                        ],
+                      ),
+                    );
+                  }).toList(),
                 ),
               ],
             ),

@@ -1,11 +1,14 @@
+import re
 import json
 import logging
 import hashlib
 import time
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from google import genai
 from google.genai import types
 from backend.app.core.config import settings
+from backend.app.core.facts import LOCKED_FACTS, assert_resume_grounded, UngroundedFactError
+from backend.app.services.answer_service import normalize_question_key
 
 logger = logging.getLogger(__name__)
 
@@ -30,11 +33,405 @@ CANDIDATE PROFILE (VERIFIED TRUTH SOURCE):
 """
 
 class GeminiService:
-    PRIMARY_MODEL = "gemini-2.5-flash"
-    FALLBACK_MODEL = "gemini-flash-latest"
+    PRIMARY_MODEL = getattr(settings, "GEMINI_MODEL", "gemini-2.0-flash")
+    FALLBACK_MODEL = "gemini-1.5-flash"
     
     _client: Optional[genai.Client] = None
     _cache: Dict[str, Any] = {}
+    
+    # Circuit breaker & caching state for Gemini Auto-Answer
+    _consecutive_failures: int = 0
+    _circuit_tripped_until: Optional[float] = None
+    _question_cache: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    
+    @classmethod
+    def reset_circuit_breaker(cls) -> None:
+        """Reset circuit breaker failures and clear cooldown."""
+        cls._consecutive_failures = 0
+        cls._circuit_tripped_until = None
+
+    @classmethod
+    def is_circuit_breaker_active(cls) -> Tuple[bool, float]:
+        """Check if Gemini auto-answer is currently paused due to 5 consecutive failures."""
+        if cls._circuit_tripped_until is not None:
+            remaining = cls._circuit_tripped_until - time.time()
+            if remaining > 0:
+                return True, remaining
+            else:
+                cls._circuit_tripped_until = None
+                cls._consecutive_failures = 0
+        return False, 0.0
+
+    @classmethod
+    def record_gemini_failure(cls, reason: str = "") -> None:
+        """Record an API/parsing failure. 5 in a row pauses Gemini for 15 minutes."""
+        cls._consecutive_failures += 1
+        logger.warning(f"Gemini auto-answer failure ({cls._consecutive_failures}/5): {reason}")
+        if cls._consecutive_failures >= 5:
+            cls._circuit_tripped_until = time.time() + 900 # 15 minutes
+            logger.error("Gemini circuit breaker TRIPPED! 5 consecutive failures. Paused for 15 minutes.")
+
+    @classmethod
+    def record_gemini_success(cls) -> None:
+        """Clear consecutive failure counter upon a successful model answer/validation."""
+        cls._consecutive_failures = 0
+        cls._circuit_tripped_until = None
+
+    @classmethod
+    def is_sensitive_question(
+        cls,
+        question_text: str,
+        field_type: str = "text",
+        custom_categories: Optional[List[str]] = None,
+        bank_mode: Optional[str] = None
+    ) -> Tuple[bool, str]:
+        """
+        Evaluate whether a question falls into any sensitive category that MUST NEVER
+        be sent to Gemini and MUST ALWAYS be routed directly to Needs You.
+        """
+        if not question_text:
+            return False, ""
+
+        if bank_mode == "ask_each_time":
+            return True, "ask_each_time"
+
+        q_lower = question_text.lower().strip()
+
+        categories = {
+            "consent_legal": [
+                r"\bconsent\b", r"\bdata\s*processing\b", r"\bai\s*notetaker\b",
+                r"\bnotetaker\b", r"\bterms\b", r"\bterms\s*and\s*conditions\b",
+                r"\bterms\s*of\s*service\b", r"\bprivacy\s*policy\b",
+                r"\bbackground\s*check\b", r"\bnon-?compete\b", r"\barbitration\b",
+                r"\bagree\s*to\b", r"\bi\s*agree\b", r"\baccept\s*terms\b",
+                r"\bdisclaimer\b", r"\bcode\s*of\s*conduct\b"
+            ],
+            "work_auth_visa": [
+                r"\bwork\s*authoriz\w*", r"\bauthorized\s*to\s*work\b",
+                r"\blegally\s*authoriz\w*", r"\bvisa\b", r"\bsponsorship\b",
+                r"\brequire\s*sponsorship\b", r"\brequire\s*visa\b",
+                r"\bneed\s*sponsorship\b", r"\bimmigration\b", r"\bcitizen\b",
+                r"\bcitizenship\b", r"\bpermanent\s*resident\b", r"\bgreen\s*card\b",
+                r"\bopt\b", r"\bcpt\b", r"\bstem\s*opt\b", r"\bright\s*to\s*work\b",
+                r"\bh-?1b\b"
+            ],
+            "salary_notice_relocation": [
+                r"\bsalary\b", r"\bcompensation\b", r"\bexpected\s*(pay|salary|ctc)\b",
+                r"\bcurrent\s*(pay|salary|ctc)\b", r"\bdesired\s*(pay|salary|ctc)\b",
+                r"\bctc\b", r"\bnotice\s*period\b", r"\bhow\s*soon\s*can\s*you\s*start\b",
+                r"\bstart\s*date\b", r"\bearliest\s*start\b", r"\bavailability\s*to\s*start\b",
+                r"\brelocat\w*", r"\bwilling\s*to\s*relocate\b", r"\bopen\s*to\s*relocat\w*"
+            ],
+            "demographics_identity": [
+                r"\bgender\b", r"\bsex\b", r"\bsexual\s*orientation\b",
+                r"\brace\b", r"\bethnic\w*", r"\bhispanic\b", r"\blatino\b",
+                r"\bdisabilit\w*", r"\bveteran\b", r"\bmilitary\b", r"\bcaste\b",
+                r"\breligion\b", r"\breligious\b", r"\bpronouns?\b",
+                r"\bmedical\b", r"\bhealth\s*condition\b", r"\bmarital\s*status\b"
+            ],
+            "criminal_background": [
+                r"\bcriminal\b", r"\bconvict\w*", r"\bfelony\b", r"\bmisdemeanor\b",
+                r"\bplead\s*guilty\b", r"\bconflict\s*of\s*interest\b",
+                r"\bconflicts\s*of\s*interest\b", r"\brelative\s*(employed|working)\b",
+                r"\breference[s]?\b", r"\breference[s]?\s*contact\b"
+            ],
+            "legal_attestation": [
+                r"\bcertify\b", r"\bcertifies\b", r"\bcertifying\b", r"\bi\s*certify\b", r"\battest\w*", r"\bunder\s*penalty\b",
+                r"\bperjury\b", r"\btruthful\s*and\s*accurate\b",
+                r"\btrue\s*and\s*correct\b", r"\btrue\s*to\s*the\s*best\b",
+                r"\bsign\s*your\s*name\b", r"\belectronic\s*signature\b",
+                r"\btype\s*your\s*(full\s*)?name\b", r"\bdeclaration\b", r"\bdeclare\s*that\b"
+            ]
+        }
+
+        active_cats = custom_categories if custom_categories is not None else list(categories.keys())
+
+        for cat_key in active_cats:
+            patterns = categories.get(cat_key, [])
+            for pat in patterns:
+                if re.search(pat, q_lower):
+                    return True, cat_key
+
+        return False, ""
+
+    @classmethod
+    def get_candidate_facts_prompt(cls, question_text: str) -> str:
+        """
+        Build strictly grounded candidate facts from LOCKED_FACTS.
+        NEVER includes phone number or email unless that specific field is asked.
+        """
+        q_lower = question_text.lower()
+        include_contact = any(term in q_lower for term in ["email", "phone", "contact number", "mobile"])
+        include_links = any(term in q_lower for term in ["linkedin", "github", "portfolio", "profile url", "website"])
+
+        facts_lines = [
+            "CANDIDATE FACTS (STRICT SOURCE OF TRUTH):",
+            f"- Full Name: {LOCKED_FACTS['personal']['name']}",
+        ]
+        if include_contact:
+            facts_lines.append(f"- Email Address: {LOCKED_FACTS['personal']['email']}")
+            facts_lines.append(f"- Phone Number: {LOCKED_FACTS['personal']['phone']}")
+        if include_links:
+            facts_lines.append(f"- LinkedIn: {LOCKED_FACTS['personal']['linkedin']}")
+            facts_lines.append(f"- GitHub: {LOCKED_FACTS['personal']['github']}")
+
+        facts_lines.extend([
+            f"- Institution: {LOCKED_FACTS['education']['institution']} ({LOCKED_FACTS['education']['institution_full']})",
+            f"- Degree: {LOCKED_FACTS['education']['degree']}",
+            f"- Academic Start: {LOCKED_FACTS['education']['start_date']}",
+            f"- CGPA: {LOCKED_FACTS['education']['cgpa']}",
+            "- Expected Graduation: Unconfirmed (do NOT guess; candidate will confirm in app)",
+            "- Published Patents (exact titles only):",
+            f'  1. "{LOCKED_FACTS["patents"][0]}"',
+            f'  2. "{LOCKED_FACTS["patents"][1]}"',
+            "- Key Project:",
+            f"  * Name: {LOCKED_FACTS['projects'][0]['name']}",
+            f"  * Tech Stack: {', '.join(LOCKED_FACTS['projects'][0]['technologies'])}",
+            f"  * Corpus: {LOCKED_FACTS['projects'][0]['corpus']}",
+            f"  * Metrics: {LOCKED_FACTS['projects'][0]['metrics']}",
+            f"  * Description: {LOCKED_FACTS['projects'][0]['description']}",
+            "- Certifications:",
+            f"  1. {LOCKED_FACTS['certifications'][0]}",
+            f"  2. {LOCKED_FACTS['certifications'][1]}",
+            "- Technical Skills:",
+            f"  {', '.join(LOCKED_FACTS['skills'])}",
+            "- Work Authorization, Notice Period, Relocation: [empty - do NOT guess]"
+        ])
+        return "\n".join(facts_lines)
+
+    @classmethod
+    def validate_gemini_answer(
+        cls,
+        parsed_json: Dict[str, Any],
+        question_text: str,
+        field_type: str,
+        options: Optional[List[str]] = None,
+        min_confidence: float = 0.85,
+        max_length: Optional[int] = None
+    ) -> Tuple[bool, str]:
+        """
+        Validate Gemini structured response against strict grounding and format rules.
+        Must all pass or question goes to Needs You.
+        """
+        if not parsed_json.get("can_answer", False):
+            reason = parsed_json.get("reason_if_not") or "Gemini indicated it cannot answer from provided facts"
+            return False, f"Gemini couldn't answer: {reason}"
+
+        conf = float(parsed_json.get("confidence", 0.0))
+        if conf < min_confidence:
+            return False, f"Gemini confidence {conf:.2f} is below minimum threshold {min_confidence:.2f}"
+
+        ans = str(parsed_json.get("answer", "")).strip()
+        if not ans:
+            return False, "Gemini returned empty answer string"
+
+        facts_used = parsed_json.get("facts_used", [])
+        if not facts_used or not isinstance(facts_used, list):
+            return False, "Gemini did not cite any candidate facts (facts_used is empty)"
+
+        # Grounding validation via assert_resume_grounded
+        try:
+            assert_resume_grounded(ans)
+        except UngroundedFactError as ue:
+            return False, f"Grounding check failed: {ue}"
+        except Exception as e:
+            return False, f"Grounding validation error: {e}"
+
+        # Choice field exact option match
+        if options and (field_type in ["select", "radio", "dropdown"] or len(options) > 0):
+            matched = None
+            for opt in options:
+                if ans.lower().strip() == opt.lower().strip():
+                    matched = opt
+                    break
+            if not matched:
+                return False, f"Gemini answer '{ans}' does not match any offered option: {options}"
+
+        # Text field length & placeholder checks
+        if max_length and len(ans) > max_length:
+            return False, f"Answer length ({len(ans)} chars) exceeds field limit of {max_length}"
+
+        lower_ans = ans.lower()
+        forbidden_ai_tokens = ["as an ai", "as a language model", "i am an ai", "[insert", "[your ", "<insert", "placeholder"]
+        for token in forbidden_ai_tokens:
+            if token in lower_ans:
+                return False, f"Answer contains AI placeholder or generic token: '{token}'"
+
+        opinion_triggers = [
+            r"\btell\s*us\s*about\s*a\s*time\b",
+            r"\bdescribe\s*a\s*time\b",
+            r"\bdescribe\s*a\s*situation\b",
+            r"\bhow\s*do\s*you\s*handle\s*conflict\b",
+            r"\bwhy\s*do\s*you\s*want\s*to\s*work\b",
+            r"\bwhy\s*should\s*we\s*hire\s*you\b",
+            r"\bwhat\s*is\s*your\s*greatest\s*weakness\b",
+            r"\bwhat\s*is\s*your\s*biggest\s*weakness\b",
+            r"\bwhere\s*do\s*you\s*see\s*yourself\b",
+            r"\bleadership\s*experience\b",
+            r"\btell\s*us\s*about\s*yourself\b",
+            r"\bcover\s*letter\b",
+            r"\bdiversity\s*statement\b"
+        ]
+        q_lower = question_text.lower()
+        for ot in opinion_triggers:
+            if re.search(ot, q_lower):
+                return False, "Question requests behavioral story, subjective opinion, or cover letter not present in facts"
+
+        if re.search(r"\b([3-9]|\d{2})\+?\s*years\s*of\s*experience\b", lower_ans):
+            return False, "Answer claims years of experience candidate does not possess"
+
+        return True, ""
+
+    @classmethod
+    def auto_answer_question(
+        cls,
+        question_text: str,
+        field_type: str = "text",
+        options: Optional[List[str]] = None,
+        company: str = "",
+        role: str = "",
+        jd_excerpt: str = "",
+        min_confidence: float = 0.85,
+        max_length: Optional[int] = None,
+        custom_sensitive_categories: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """
+        Execute full Gemini auto-answer pipeline with structured JSON schema,
+        strict grounding, circuit breaker, and error recovery.
+        """
+        # 1. Sensitive Check
+        is_sens, sens_cat = cls.is_sensitive_question(
+            question_text,
+            field_type=field_type,
+            custom_categories=custom_sensitive_categories
+        )
+        if is_sens:
+            return {
+                "success": False,
+                "answer": "",
+                "confidence": 0.0,
+                "facts_used": [],
+                "reason": f"Question is categorized as sensitive ({sens_cat}); blocked from Gemini",
+                "circuit_breaker_tripped": False
+            }
+
+        # 2. Cache Check (Company + Normalized Question)
+        cache_key = ((company or "").strip().lower(), normalize_question_key(question_text))
+        if cache_key in cls._question_cache:
+            logger.info(f"Gemini auto-answer cache hit for '{question_text[:30]}' at {company}")
+            return cls._question_cache[cache_key]
+
+        # 3. Circuit Breaker Check
+        tripped, remaining = cls.is_circuit_breaker_active()
+        if tripped:
+            return {
+                "success": False,
+                "answer": "",
+                "confidence": 0.0,
+                "facts_used": [],
+                "reason": f"Gemini auto-answer paused by circuit breaker ({int(remaining)}s remaining)",
+                "circuit_breaker_tripped": True
+            }
+
+        # 4. Formulate Prompt with facts.py and strict instructions
+        candidate_facts = cls.get_candidate_facts_prompt(question_text)
+        system_instruction = (
+            "You answer job application questions for one candidate. Use ONLY the facts provided. "
+            "Never invent experience, skills, employers, dates, numbers, achievements or opinions. "
+            "If the facts don't contain what is needed, return can_answer=false. "
+            "For multiple-choice fields, return exactly one of the given options. "
+            "Keep free-text answers concise, honest, first person, and under the field's character limit."
+        )
+
+        options_str = json.dumps(options) if options else "None (free-text or unconstrained field)"
+        limit_str = f"{max_length} characters" if max_length else "No limit specified"
+
+        prompt = f"""
+{candidate_facts}
+
+JOB APPLICATION CONTEXT:
+Company: {company}
+Role: {role}
+Job Excerpt: {jd_excerpt[:500]}
+
+APPLICATION QUESTION:
+Question: "{question_text}"
+Field Type: {field_type}
+Offered Options: {options_str}
+Character Limit: {limit_str}
+
+Respond ONLY with a JSON object matching this schema:
+{{
+  "can_answer": bool,
+  "answer": string,
+  "confidence": float,
+  "facts_used": [list of strings citing the exact candidate facts used],
+  "reason_if_not": string
+}}
+"""
+        parsed_json = None
+        for attempt in range(2):
+            try:
+                response_text = cls._call_model(prompt, system_instruction, json_mode=True)
+                if not response_text:
+                    raise ValueError("Empty response from Gemini model")
+                clean_text = response_text.strip()
+                if clean_text.startswith("```json"):
+                    clean_text = clean_text[7:]
+                if clean_text.endswith("```"):
+                    clean_text = clean_text[:-3]
+                parsed_json = json.loads(clean_text.strip())
+                break
+            except Exception as e:
+                logger.warning(f"Gemini call/parse attempt {attempt + 1} failed: {e}")
+                if attempt == 0:
+                    time.sleep(1.0)
+
+        if not parsed_json:
+            cls.record_gemini_failure("Invalid or empty JSON response after retry")
+            return {
+                "success": False,
+                "answer": "",
+                "confidence": 0.0,
+                "facts_used": [],
+                "reason": "Gemini couldn't answer: Malformed response or API error",
+                "circuit_breaker_tripped": False
+            }
+
+        # 5. Strict Validation
+        ok, val_reason = cls.validate_gemini_answer(
+            parsed_json=parsed_json,
+            question_text=question_text,
+            field_type=field_type,
+            options=options,
+            min_confidence=min_confidence,
+            max_length=max_length
+        )
+
+        if not ok:
+            if not parsed_json.get("can_answer", False):
+                cls.record_gemini_success() # Handled out-of-facts properly
+            return {
+                "success": False,
+                "answer": "",
+                "confidence": float(parsed_json.get("confidence", 0.0)),
+                "facts_used": parsed_json.get("facts_used", []),
+                "reason": val_reason,
+                "circuit_breaker_tripped": False
+            }
+
+        # Successful answer!
+        cls.record_gemini_success()
+        result_payload = {
+            "success": True,
+            "answer": parsed_json.get("answer", "").strip(),
+            "confidence": float(parsed_json.get("confidence", 1.0)),
+            "facts_used": parsed_json.get("facts_used", []),
+            "reason": "",
+            "circuit_breaker_tripped": False
+        }
+        cls._question_cache[cache_key] = result_payload
+        return result_payload
     
     @classmethod
     def get_client(cls) -> Optional[genai.Client]:

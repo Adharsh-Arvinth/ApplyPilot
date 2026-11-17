@@ -8,7 +8,7 @@ import zoneinfo
 import logging
 import subprocess
 from pathlib import Path
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 from playwright.async_api import async_playwright, Page, BrowserContext
 from sqlalchemy.orm import Session
 from backend.app.core.config import settings
@@ -16,6 +16,7 @@ from backend.app.models import Job, Profile, Application, NeedsInput, RunLog, Jo
 from backend.app.services.answer_service import AnswerService, normalize_question_key, match_option_with_confidence
 from backend.app.services.tailoring_service import ResumeTailoringService
 from backend.app.services.fcm_service import PushNotificationService
+from backend.app.services.gemini_service import GeminiService
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,116 @@ class AutoApplyEngine:
         elif count >= 1:
             return 2.0
         return 1.0
+
+    @classmethod
+    async def _resolve_or_gemini(
+        cls,
+        db: Session,
+        profile: Profile,
+        q_text: str,
+        field_type: str = "text",
+        options: Optional[List[str]] = None,
+        job: Optional[Job] = None,
+        max_length: Optional[int] = None
+    ) -> Tuple[Optional[str], str, Optional[int]]:
+        """
+        Resolves an answer using Answer Bank first, then Gemini Auto-Answer.
+        Returns: (answer_text_or_None, source_or_reason, bank_entry_id_or_None)
+        """
+        # 1. Answer Bank exact or fuzzy lookup
+        ans_res = AnswerService.resolve_answer(db, q_text)
+        if ans_res:
+            return ans_res[0], "answer_bank", None
+
+        # 2. Check if Gemini auto-answer is enabled
+        gemini_enabled = getattr(profile, "gemini_auto_answer_enabled", True)
+        if not gemini_enabled:
+            return None, "Gemini auto-answer disabled in settings", None
+
+        # 3. Check daily cap
+        today_str = datetime.date.today().isoformat()
+        if getattr(profile, "gemini_last_reset_date", "") != today_str:
+            profile.gemini_last_reset_date = today_str
+            profile.gemini_answers_today = 0
+            db.commit()
+
+        answers_today = getattr(profile, "gemini_answers_today", 0) or 0
+        daily_cap = getattr(profile, "gemini_daily_cap", 30) or 30
+        if answers_today >= daily_cap:
+            return None, f"Gemini couldn't answer: Daily cap reached ({daily_cap}/day)", None
+
+        # 4. Sensitive filter check
+        sens_cats = None
+        try:
+            if profile.gemini_sensitive_categories_json:
+                sens_cats = json.loads(profile.gemini_sensitive_categories_json)
+        except Exception:
+            pass
+
+        is_sens, sens_cat = GeminiService.is_sensitive_question(
+            q_text,
+            field_type=field_type,
+            custom_categories=sens_cats
+        )
+        if is_sens:
+            return None, f"Sensitive category ({sens_cat}) - routed to candidate", None
+
+        # 5. Circuit breaker check
+        tripped, remaining = GeminiService.is_circuit_breaker_active()
+        if tripped:
+            return None, f"Gemini couldn't answer: Paused by circuit breaker ({int(remaining)}s remaining)", None
+
+        # 6. Call Gemini Auto-Answer
+        min_conf = getattr(profile, "gemini_min_confidence", 0.85) or 0.85
+        res = GeminiService.auto_answer_question(
+            question_text=q_text,
+            field_type=field_type,
+            options=options,
+            company=job.company if job else "",
+            role=job.title if job else "",
+            jd_excerpt=getattr(job, "description", "")[:500] if job and hasattr(job, "description") else "",
+            min_confidence=min_conf,
+            max_length=max_length,
+            custom_sensitive_categories=sens_cats
+        )
+
+        if res.get("success"):
+            ans = res["answer"]
+            norm_key = normalize_question_key(q_text)
+            from backend.app.models import AnswerBank
+            bank_entry = db.query(AnswerBank).filter(AnswerBank.question_key == norm_key).first()
+            if not bank_entry:
+                bank_entry = AnswerBank(
+                    question_key=norm_key,
+                    question_text=q_text,
+                    field_type=field_type,
+                    answer=ans,
+                    mode="ask me to review",
+                    category="ai_suggestion",
+                    source="gemini",
+                    is_verified=False,
+                    user_approved=False,
+                    confidence=res.get("confidence", 0.95),
+                    facts_used_json=json.dumps(res.get("facts_used", [])),
+                    company=job.company if job else "",
+                    role=job.title if job else "",
+                    usage_count=1
+                )
+                db.add(bank_entry)
+            else:
+                bank_entry.answer = ans
+                bank_entry.source = "gemini"
+                bank_entry.user_approved = False
+                bank_entry.confidence = res.get("confidence", 0.95)
+                bank_entry.facts_used_json = json.dumps(res.get("facts_used", []))
+
+            profile.gemini_answers_today = (getattr(profile, "gemini_answers_today", 0) or 0) + 1
+            db.commit()
+            db.refresh(bank_entry)
+            return ans, "gemini", bank_entry.id
+        else:
+            reason = res.get("reason") or "Gemini couldn't answer from locked facts"
+            return None, reason, None
 
     @staticmethod
     def claim_next_job(db: Session, worker_id: str, lease_duration_seconds: int = 300) -> Optional[Job]:
@@ -733,6 +844,7 @@ class AutoApplyEngine:
                 # 5. Dynamic Form Label Scanning & Answer Bank Resolution
                 inputs = await page.query_selector_all("input:not([type='hidden']):not([type='submit']):not([type='button']):not([type='checkbox']):not([type='radio']):not([type='file']), textarea, select")
                 unresolved_fields = []
+                ai_answer_ids = []
 
                 for inp in inputs:
                     input_id = await inp.get_attribute("id")
@@ -1008,14 +1120,64 @@ class AutoApplyEngine:
                                 "element": first_r
                             })
 
-                # 6. Check for unanswerable required fields -> "Needs You" (Ask to choose from the box)
-                if unresolved_fields:
-                    unresolved = unresolved_fields[0]
+                # 6. Check for unanswerable required fields -> Run Gemini Auto-Answer Step before Needs You!
+                remaining_unresolved = []
+                for field in unresolved_fields:
+                    f_lbl = field["label"] if isinstance(field, dict) else field[0]
+                    f_type = field["type"] if isinstance(field, dict) else "text"
+                    f_opts = field["options"] if isinstance(field, dict) else []
+                    f_el = field.get("element") if isinstance(field, dict) else None
+
+                    # Attempt resolution via Answer Bank or Gemini Auto-Answer
+                    gem_ans, gem_src, b_id = await AutoApplyEngine._resolve_or_gemini(
+                        db=db,
+                        profile=profile,
+                        q_text=f_lbl,
+                        field_type=f_type,
+                        options=f_opts,
+                        job=job
+                    )
+
+                    if gem_ans:
+                        if b_id:
+                            ai_answer_ids.append(b_id)
+                        logger.info(f"Resolved field [{f_lbl[:30]}] via {gem_src} with [{gem_ans[:30]}]")
+
+                        # Fill DOM element
+                        if f_el:
+                            try:
+                                if f_type in ["select", "dropdown"] and f_opts:
+                                    matched = None
+                                    for opt in f_opts:
+                                        if gem_ans.lower() == opt.lower() or gem_ans.lower() in opt.lower():
+                                            matched = opt
+                                            break
+                                    if matched:
+                                        try:
+                                            await f_el.select_option(label=matched)
+                                        except Exception:
+                                            await f_el.select_option(value=matched)
+                                elif f_type == "radio":
+                                    try:
+                                        await f_el.check(force=True)
+                                    except Exception:
+                                        pass
+                                else:
+                                    await f_el.fill(gem_ans)
+                            except Exception as fill_err:
+                                logger.warning(f"Could not fill DOM element for [{f_lbl[:30]}]: {fill_err}")
+                    else:
+                        field["gemini_reason"] = gem_src
+                        remaining_unresolved.append(field)
+
+                if remaining_unresolved:
+                    unresolved = remaining_unresolved[0]
                     first_unresolved_label = unresolved["label"] if isinstance(unresolved, dict) else unresolved[0]
                     unresolved_type = unresolved["type"] if isinstance(unresolved, dict) else "text"
                     unresolved_opts = unresolved["options"] if isinstance(unresolved, dict) else []
+                    gem_reason = unresolved.get("gemini_reason", "")
 
-                    logger.warning(f"Field '{first_unresolved_label}' requires human input for {job.company} (options: {unresolved_opts}).")
+                    logger.warning(f"Field '{first_unresolved_label}' requires human input for {job.company} (Gemini reason: {gem_reason}).")
                     
                     # Dispatch push notification to user's phone
                     PushNotificationService.send_needs_you_alert(
@@ -1025,19 +1187,24 @@ class AutoApplyEngine:
                     )
 
                     # Create NeedsInput record and halt this application
-                    AutoApplyEngine._record_transition(db, job, "needs_attention", f"Required choice unresolved: {first_unresolved_label[:60]}", "needs_input")
+                    AutoApplyEngine._record_transition(
+                        db, job, "needs_attention", 
+                        f"Required choice unresolved: {first_unresolved_label[:60]} ({gem_reason})", 
+                        "needs_input"
+                    )
                     needs = NeedsInput(
                         job_id=job.id,
                         question_text=first_unresolved_label,
                         field_type=unresolved_type,
                         options_json=json.dumps(unresolved_opts),
                         suggested_answer=unresolved_opts[0] if unresolved_opts else "",
+                        gemini_reason=gem_reason,
                         status="pending"
                     )
                     db.add(needs)
                     db.commit()
                     await browser.close()
-                    return {"status": "needs_input", "question": first_unresolved_label, "options": unresolved_opts}
+                    return {"status": "needs_input", "question": first_unresolved_label, "options": unresolved_opts, "gemini_reason": gem_reason}
 
                 # 7. Pre-submit screenshot of the real ATS form
                 form_el = await page.query_selector("form, #application_form, .application-form, #app")
@@ -1208,7 +1375,9 @@ class AutoApplyEngine:
                         status=final_app_status,
                         evidence_level=4 if has_proof else 2,
                         confirmation_text=page_text[:400] if has_proof else "",
-                        evidence_notes="Verified confirmation proof" if has_proof else "Lacks definitive confirmation text or screenshot proof"
+                        evidence_notes="Verified confirmation proof" if has_proof else "Lacks definitive confirmation text or screenshot proof",
+                        is_ai_assisted=len(ai_answer_ids) > 0,
+                        ai_answer_ids_json=json.dumps(ai_answer_ids)
                     )
                     db.add(app_record)
                     db.commit()
@@ -1224,7 +1393,9 @@ class AutoApplyEngine:
                         submitted_at=datetime.datetime.now(datetime.timezone.utc),
                         form_screenshot=str(form_screenshot),
                         confirmation_screenshot=str(form_screenshot),
-                        status="dry_run"
+                        status="dry_run",
+                        is_ai_assisted=len(ai_answer_ids) > 0,
+                        ai_answer_ids_json=json.dumps(ai_answer_ids)
                     )
                     db.add(app_record)
                     db.commit()

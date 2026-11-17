@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     APPLYPILOT_ENCRYPTION_KEY: str = "ECvqzWXsliXT4qtOZoppgQGIJcC2HuLTGEB8w2FBbnI="
     CLAUDE_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL: str = "gemini-2.0-flash"
     GROQ_API_KEY: Optional[str] = None
     OLLAMA_ENABLED: bool = False
     OLLAMA_BASE_URL: str = "http://localhost:11434"

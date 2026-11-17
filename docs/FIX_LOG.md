@@ -209,3 +209,59 @@ This log records every architectural adjustment, security lock, test result, and
   - **84 passed tests out of 84 (100% pass rate)** in 129.44s.
 - [x] Verified proof screenshots, candidate details, and tailored PDF resumes generated without hallucination.
 
+---
+
+## Section 12: CI & Test Suite Optimization
+- [x] **Flutter Test Suite CI Fix**:
+  - In `app/test/widget_test.dart`, updated `find.text('Needs You')` from `findsOneWidget` to `findsWidgets` because "Needs You" appears both in the bottom navigation bar and home screen status tiles.
+  - Resolved theme member compilation error in `app/lib/screens/needs_you_screen.dart` (`AppColors.forestInk`).
+  - Verified Flutter test suite passes 100% (6/6 tests passing in 1.4s).
+- [x] **Backend Test Suite CI Fix**:
+  - In `backend/tests/test_gemini_firebase.py`, updated model verification from hardcoded `"gemini-2.5-flash"` to dynamically assert `status["primary_model"] == settings.GEMINI_MODEL`.
+  - All 92 backend tests passed locally (84 baseline + 8 Gemini Auto-Answer tests).
+  - Updated `.github/workflows/ci.yml` setup steps for rock-solid CI runs.
+
+---
+
+## Section 13: Gemini Auto-Answer Step & Candidate Intelligence
+- [x] **Architecture & Pipeline**:
+  - Inserted Gemini Auto-Answer strictly in front of Needs You:
+    `Question found → Answer Bank lookup (exact/synonym/fuzzy >= 0.88) → SENSITIVE CHECK → Gemini call → GROUNDING VALIDATION → Fill Form or Needs You`.
+  - Created `backend/app/services/gemini_service.py`:
+    - `is_sensitive_question()`: Strict regular expression matching across 7 sensitive categories (legal/consent, work auth/visa, salary/notice/relocation, demographics/race/gender/disability, criminal history/references, signature/attestation, and "ask me each time" settings). Sensitive questions NEVER reach Gemini.
+    - `get_candidate_facts_prompt()`: Strictly constructs prompt using ONLY read-only facts from `facts.py`. Excludes personal identifiers (phone, email, resume PDF) unless the specific field requires it.
+    - `validate_gemini_answer()`: Enforces structured output (`can_answer: bool`, `answer: str`, `confidence: float`, `facts_used: list`), confidence >= 0.85, non-empty facts from `facts.py`, runs `assert_resume_grounded()`, validates exact matching for dropdown/radio choice options, limits length, rejects AI conversational tokens ("as an AI", "I think"), and blocks ungrounded behavioral claims.
+    - Circuit breaker: 5 consecutive Gemini failures automatically pauses Gemini for 15 minutes and falls back directly to Needs You.
+    - Answer Bank caching: Automatically saves validated Gemini answers as `source="gemini"`, `mode="ask me to review"`, and associates them with `Application.is_ai_assisted`.
+- [x] **Database & Migrations**:
+  - Added new columns to SQLite models with automatic migration in `backend/app/core/database.py`:
+    - `Profile`: `gemini_auto_answer_enabled`, `gemini_min_confidence`, `gemini_sensitive_categories_json`, `gemini_daily_cap`, `gemini_answers_today`, `gemini_last_reset_date`.
+    - `AnswerBank`: `confidence`, `facts_used_json`, `company`, `role`.
+    - `Application`: `is_ai_assisted`, `ai_answer_ids_json`, `has_rejected_ai_answer`.
+    - `NeedsInput`: `gemini_reason`, `gemini_confidence`, `facts_used_json`.
+- [x] **REST API Endpoints**:
+  - `GET /api/v1/profile/gemini-settings` & `POST /api/v1/profile/gemini-settings`.
+  - `GET /api/v1/needs-you/gemini-answers`: Returns unreviewed Gemini answers.
+  - `POST /api/v1/needs-you/gemini-answers/{id}/approve`: Upgrades answer to `mode="always_use"`.
+  - `POST /api/v1/needs-you/gemini-answers/{id}/edit`: Updates answer text and approves.
+  - `POST /api/v1/needs-you/gemini-answers/{id}/reject`: Deletes from Answer Bank and flags any application that used it with `has_rejected_ai_answer=True`.
+- [x] **Flutter Cockpit UI**:
+  - **Needs You Screen**: Added two-tab navigation: "Candidate Questions" and "AI Answered" with badge counts. AI Answered tab renders review cards with question, company tag, role tag, confidence percentage, grounded facts used chips, and one-tap action buttons:
+    - `Approve · Always use`
+    - `Edit`
+    - `Reject`
+  - **Settings Screen**: Added "GEMINI AUTO-ANSWER INTELLIGENCE" settings card:
+    - Master toggle switch
+    - Minimum confidence threshold slider (0.85 default)
+    - Daily AI auto-answer cap slider
+    - Editable sensitive category filter chips
+    - Live time-saved counter metric
+  - **Tracker Screen**: Added `"AI-assisted"` tag and red `"AI Rejected"` badge alerting if an application's answer was rejected.
+- [x] **Verification & Dry-Run Results**:
+  - `backend/tests/test_gemini_auto_answer.py`: 8 comprehensive unit tests passing 100%.
+  - 10-Job Real ATS Dry Run executed:
+    - Total Questions Encountered: 51
+    - Answer Bank Resolved: 50 (98.0%)
+    - Gemini / Needs You Routed: 1 (2.0%) - Cloudflare visa sponsorship sensitive question safely routed to candidate inbox with push notification.
+
+

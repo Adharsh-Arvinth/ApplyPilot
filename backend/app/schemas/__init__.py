@@ -37,6 +37,11 @@ class ProfileBase(BaseModel):
     pause_details: str = ""
     go_live: bool
     proof_points_text: str
+    gemini_auto_answer_enabled: bool = True
+    gemini_min_confidence: float = 0.85
+    gemini_sensitive_categories: List[str] = ["consent_legal", "work_auth_visa", "salary_notice_relocation", "demographics_identity", "criminal_background", "legal_attestation", "ask_each_time"]
+    gemini_daily_cap: int = 30
+    gemini_answers_today: int = 0
 
 class ProfileUpdate(BaseModel):
     full_name: Optional[str] = None
@@ -73,6 +78,11 @@ class ProfileUpdate(BaseModel):
     pause_details: Optional[str] = None
     go_live: Optional[bool] = None
     proof_points_text: Optional[str] = None
+    gemini_auto_answer_enabled: Optional[bool] = None
+    gemini_min_confidence: Optional[float] = None
+    gemini_sensitive_categories: Optional[List[str]] = None
+    gemini_daily_cap: Optional[int] = None
+    gemini_answers_today: Optional[int] = None
 
 class ProfileOut(ProfileBase):
     id: int
@@ -179,6 +189,8 @@ class ApplicationOut(BaseModel):
     notes: str = ""
     recruiter_info: str = ""
     follow_up_date: Optional[datetime.datetime] = None
+    is_ai_assisted: bool = False
+    has_rejected_ai_answer: bool = False
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -258,6 +270,7 @@ class NeedsInputOut(BaseModel):
     suggested_answer: Optional[str] = ""
     answer: Optional[str] = ""
     status: str = "pending"
+    gemini_reason: str = ""
     created_at: datetime.datetime
     model_config = ConfigDict(from_attributes=True)
 

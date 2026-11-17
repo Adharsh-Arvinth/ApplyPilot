@@ -60,6 +60,12 @@ def migrate_db():
             ("pause_reason", "VARCHAR(128) DEFAULT ''"),
             ("paused_at", "DATETIME"),
             ("pause_details", "TEXT DEFAULT ''"),
+            ("gemini_auto_answer_enabled", "BOOLEAN DEFAULT 1"),
+            ("gemini_min_confidence", "FLOAT DEFAULT 0.85"),
+            ("gemini_sensitive_categories_json", "TEXT DEFAULT '[\"consent_legal\", \"work_auth_visa\", \"salary_notice_relocation\", \"demographics_identity\", \"criminal_background\", \"legal_attestation\", \"ask_each_time\"]'"),
+            ("gemini_daily_cap", "INTEGER DEFAULT 30"),
+            ("gemini_answers_today", "INTEGER DEFAULT 0"),
+            ("gemini_last_reset_date", "VARCHAR(32) DEFAULT ''"),
         ]
         for col_name, col_def in profile_additions:
             if col_name not in profile_cols:
@@ -77,6 +83,10 @@ def migrate_db():
             ("aliases_json", "TEXT DEFAULT '[]'"),
             ("user_approved", "BOOLEAN DEFAULT 1"),
             ("application_references_json", "TEXT DEFAULT '[]'"),
+            ("confidence", "FLOAT DEFAULT 1.0"),
+            ("facts_used_json", "TEXT DEFAULT '[]'"),
+            ("company", "VARCHAR(128) DEFAULT ''"),
+            ("role", "VARCHAR(128) DEFAULT ''"),
         ]
         for col_name, col_def in bank_additions:
             if col_name not in bank_cols:
@@ -175,13 +185,39 @@ def migrate_db():
             ("confirmation_number", "VARCHAR(128) DEFAULT ''"),
             ("confirmation_text", "TEXT DEFAULT ''"),
             ("evidence_notes", "TEXT DEFAULT ''"),
+            ("is_ai_assisted", "BOOLEAN DEFAULT 0"),
+            ("ai_answer_ids_json", "TEXT DEFAULT '[]'"),
+            ("has_rejected_ai_answer", "BOOLEAN DEFAULT 0"),
         ]
         for col_name, col_def in app_additions:
             if col_name not in app_cols:
                 conn.execute(text(f"ALTER TABLE applications ADD COLUMN {col_name} {col_def};"))
         conn.commit()
 
+        # 5. Migrate needs_inputs
+        needs_cols = get_existing_cols("needs_inputs")
+        needs_additions = [
+            ("gemini_reason", "TEXT DEFAULT ''"),
+            ("gemini_confidence", "FLOAT DEFAULT 0.0"),
+            ("facts_used_json", "TEXT DEFAULT '[]'"),
+        ]
+        for col_name, col_def in needs_additions:
+            if col_name not in needs_cols:
+                conn.execute(text(f"ALTER TABLE needs_inputs ADD COLUMN {col_name} {col_def};"))
+        conn.commit()
+
     logger.info("Database schema checked & migrated successfully.")
 
 def init_db():
     migrate_db()
+    # Automatically ensure profile and initial answer bank seed exists on fresh DBs
+    db = SessionLocal()
+    try:
+        from backend.app.models import Profile
+        from backend.app.services.answer_service import AnswerService
+        if not db.query(Profile).first():
+            AnswerService.seed_initial_data(db)
+    except Exception as e:
+        logger.warning(f"Note on initial seed during init_db: {e}")
+    finally:
+        db.close()

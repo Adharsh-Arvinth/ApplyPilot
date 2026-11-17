@@ -346,6 +346,60 @@ class ApiClient {
     return {"status": "error"};
   }
 
+  // 7b. Gemini Auto-Answer Review & Settings
+  Future<List<dynamic>> getGeminiAnswers() async {
+    final res = await http.get(Uri.parse("$_baseUrl/api/v1/needs-you/gemini-answers"), headers: _headers());
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    return [];
+  }
+
+  Future<void> approveGeminiAnswer(int id) async {
+    final res = await http.post(Uri.parse("$_baseUrl/api/v1/needs-you/gemini-answers/$id/approve"), headers: _headers());
+    if (res.statusCode != 200) {
+      throw Exception("Failed to approve Gemini answer: ${res.statusCode}");
+    }
+  }
+
+  Future<void> editGeminiAnswer(int id, String newAnswer) async {
+    final res = await http.post(
+      Uri.parse("$_baseUrl/api/v1/needs-you/gemini-answers/$id/edit"),
+      headers: _headers(),
+      body: jsonEncode({"answer": newAnswer}),
+    );
+    if (res.statusCode != 200) {
+      throw Exception("Failed to edit Gemini answer: ${res.statusCode}");
+    }
+  }
+
+  Future<void> rejectGeminiAnswer(int id) async {
+    final res = await http.post(Uri.parse("$_baseUrl/api/v1/needs-you/gemini-answers/$id/reject"), headers: _headers());
+    if (res.statusCode != 200) {
+      throw Exception("Failed to reject Gemini answer: ${res.statusCode}");
+    }
+  }
+
+  Future<Map<String, dynamic>> getGeminiSettings() async {
+    final res = await http.get(Uri.parse("$_baseUrl/api/v1/profile/gemini-settings"), headers: _headers());
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    return {};
+  }
+
+  Future<Map<String, dynamic>> updateGeminiSettings(Map<String, dynamic> data) async {
+    final res = await http.post(
+      Uri.parse("$_baseUrl/api/v1/profile/gemini-settings"),
+      headers: _headers(),
+      body: jsonEncode(data),
+    );
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    return {};
+  }
+
   // 8. Stats & Logs
   Future<Map<String, dynamic>> getStats() async {
     try {

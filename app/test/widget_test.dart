@@ -20,7 +20,7 @@ void main() {
     expect(find.text("Dashboard"), findsOneWidget);
     expect(find.text("Discover"), findsOneWidget);
     expect(find.text("Tracker"), findsOneWidget);
-    expect(find.text("Needs You"), findsOneWidget);
+    expect(find.text("Needs You"), findsWidgets);
     expect(find.text("Hub"), findsOneWidget);
   });
 

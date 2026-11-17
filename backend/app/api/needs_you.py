@@ -235,3 +235,107 @@ def reject_needs_you(
         "company": company_name,
         "job_id": item.job_id
     }
+
+class GeminiAnswerEdit(BaseModel):
+    answer: str
+
+@router.get("/gemini-answers", summary="List Pending Gemini-Answered Questions")
+def list_gemini_answers(db: Session = Depends(get_db)):
+    """Get list of Gemini auto-answered questions awaiting candidate review."""
+    entries = db.query(AnswerBank).filter(
+        AnswerBank.source == "gemini",
+        AnswerBank.user_approved == False
+    ).order_by(AnswerBank.updated_at.desc()).all()
+    
+    results = []
+    for e in entries:
+        try:
+            facts = json.loads(e.facts_used_json) if e.facts_used_json else []
+        except Exception:
+            facts = []
+        results.append({
+            "id": e.id,
+            "question": e.question_text,
+            "answer": e.answer,
+            "company": e.company or "Various",
+            "role": e.role or "",
+            "confidence": getattr(e, "confidence", 0.95) or 0.95,
+            "facts_used": facts,
+            "field_type": e.field_type or "text",
+            "created_at": e.updated_at.isoformat() if e.updated_at else datetime.datetime.now(datetime.timezone.utc).isoformat()
+        })
+    return results
+
+@router.post("/gemini-answers/{answer_id}/approve", summary="Approve Gemini Answer")
+def approve_gemini_answer(answer_id: int, db: Session = Depends(get_db)):
+    """Candidate approves Gemini answer: becomes 'always_use' and eligible for auto-reuse."""
+    entry = db.query(AnswerBank).filter(AnswerBank.id == answer_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Gemini answer entry not found.")
+        
+    entry.user_approved = True
+    entry.mode = "always_use"
+    entry.is_verified = True
+    db.add(RunLog(
+        event_type="gemini_answer",
+        message=f"Candidate approved Gemini answer for '{entry.question_text[:30]}'. Marked as 'always use'.",
+        level="info"
+    ))
+    db.commit()
+    return {"status": "approved", "id": answer_id, "mode": "always_use"}
+
+@router.post("/gemini-answers/{answer_id}/edit", summary="Edit & Approve Gemini Answer")
+def edit_gemini_answer(answer_id: int, payload: GeminiAnswerEdit, db: Session = Depends(get_db)):
+    """Candidate edits and approves Gemini answer: becomes 'always_use'."""
+    entry = db.query(AnswerBank).filter(AnswerBank.id == answer_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Gemini answer entry not found.")
+        
+    new_ans = payload.answer.strip()
+    if not new_ans:
+        raise HTTPException(status_code=400, detail="Answer cannot be empty.")
+        
+    entry.answer = new_ans
+    entry.user_approved = True
+    entry.mode = "always_use"
+    entry.is_verified = True
+    db.add(RunLog(
+        event_type="gemini_answer",
+        message=f"Candidate edited and approved Gemini answer for '{entry.question_text[:30]}'.",
+        level="info"
+    ))
+    db.commit()
+    return {"status": "edited_and_approved", "id": answer_id, "answer": new_ans, "mode": "always_use"}
+
+@router.post("/gemini-answers/{answer_id}/reject", summary="Reject & Delete Gemini Answer")
+def reject_gemini_answer(answer_id: int, db: Session = Depends(get_db)):
+    """Candidate rejects Gemini answer: deleted from bank, flags all applications that used it."""
+    from backend.app.models import Application
+    entry = db.query(AnswerBank).filter(AnswerBank.id == answer_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Gemini answer entry not found.")
+        
+    affected_apps = db.query(Application).filter(
+        Application.ai_answer_ids_json.contains(str(answer_id))
+    ).all()
+    if not affected_apps and entry.company:
+        from backend.app.models import Job
+        affected_apps = db.query(Application).join(Job).filter(
+            Job.company == entry.company,
+            Application.is_ai_assisted == True
+        ).all()
+        
+    for app in affected_apps:
+        app.has_rejected_ai_answer = True
+        warning_note = f" [AI Answer Rejected by User: '{entry.question_text[:30]}']"
+        if warning_note not in (app.notes or ""):
+            app.notes = (app.notes or "") + warning_note
+
+    db.add(RunLog(
+        event_type="gemini_answer",
+        message=f"Candidate rejected Gemini answer for '{entry.question_text[:30]}'. Deleted from bank, flagged {len(affected_apps)} application(s).",
+        level="warn"
+    ))
+    db.delete(entry)
+    db.commit()
+    return {"status": "rejected_and_deleted", "id": answer_id, "affected_applications": len(affected_apps)}

@@ -691,6 +691,8 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
         final latestAppSt = latestApp != null ? (latestApp["status"] ?? "").toString().toLowerCase() : "";
         final isDryRun = status == "dry_run" || latestAppSt == "dry_run";
         final isLiveApplied = status == "submitted" || latestAppSt == "submitted";
+        final isAiAssisted = latestApp != null && (latestApp["is_ai_assisted"] == true);
+        final hasRejectedAi = latestApp != null && (latestApp["has_rejected_ai_answer"] == true);
         final hasProof = latestApp != null && (
           (latestApp["confirmation_screenshot"] != null && latestApp["confirmation_screenshot"].toString().isNotEmpty) ||
           (latestApp["submission_evidence"] != null && latestApp["submission_evidence"].toString().isNotEmpty)
@@ -747,6 +749,46 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
                     Row(
                       children: [
                         _buildStatusIndicator(status, isDryRun, isLiveApplied, hasProof, isDark),
+                        if (isAiAssisted) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                                width: 0.5,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.auto_awesome, size: 9, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
+                                const SizedBox(width: 2.5),
+                                Text(
+                                  "AI-assisted",
+                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        if (hasRejectedAi) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF450A0A) : const Color(0xFFFEF2F2),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: isDark ? const Color(0xFF991B1B) : const Color(0xFFFCA5A5), width: 0.5),
+                            ),
+                            child: const Text(
+                              "AI Rejected",
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFFDC2626)),
+                            ),
+                          ),
+                        ],
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(

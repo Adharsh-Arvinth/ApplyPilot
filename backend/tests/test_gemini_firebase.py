@@ -35,7 +35,7 @@ def test_gemini_service_status():
     status = GeminiService.get_model_status()
     assert isinstance(status, dict)
     assert status["service"] == "Gemini AI"
-    assert status["primary_model"] == "gemini-2.5-flash"
+    assert status["primary_model"] == settings.GEMINI_MODEL
     assert "capabilities" in status
     assert len(status["capabilities"]) >= 5
 
