@@ -2,7 +2,7 @@ import re
 import json
 import logging
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List, Dict, Any
 from sqlalchemy.orm import Session
 from backend.app.models import AnswerBank, Profile, ResumeVersion, CandidateRecord
 from backend.app.core.config import settings
@@ -20,7 +20,7 @@ def seed_candidate_records(db: Session) -> int:
             category="education",
             subcategory="university",
             title="Integrated MTech Computer Science and Engineering (Data Science)",
-            description="Vellore Institute of Technology (VIT Vellore) • CGPA: 7.62/10 • Graduating May 2027",
+            description="Vellore Institute of Technology (VIT Vellore) • CGPA: 7.62/10",
             source_evidence="Official Academic Record / Transcript",
             verification_status="verified",
             is_verified=True
@@ -67,7 +67,7 @@ def seed_candidate_records(db: Session) -> int:
         CandidateRecord(
             category="certifications",
             subcategory="cloud_architecture",
-            title="AWS Certified Solutions Architect – Associate",
+            title="AWS Cloud Solutions Architect",
             description="Comprehensive knowledge in designing highly available, fault-tolerant, and scalable AWS cloud architectures.",
             source_evidence="AWS Certification Credential ID: AWS-SAA-2023-VERIFIED",
             verification_status="verified",
@@ -213,6 +213,58 @@ def clean_and_deduplicate_answer_bank(db: Session):
     db.commit()
     logger.info("Cleaned and deduplicated Answer Bank with canonical synonym mapping.")
 
+import difflib
+
+def match_option_with_confidence(target_answer: str, candidate_options: List[str]) -> Tuple[Optional[str], float]:
+    """
+    Match select/radio answers by meaning with a strict confidence gate:
+    - Exact or synonym match -> confidence 1.0 (or 0.95)
+    - Fuzzy ratio >= 0.88 -> confidence >= 0.88 (use it)
+    - Lower -> (None, score) -> Needs You, never guess.
+    """
+    if not target_answer or not candidate_options:
+        return None, 0.0
+
+    target_clean = target_answer.strip().lower()
+    
+    # 1. Exact match
+    for opt in candidate_options:
+        if opt.strip().lower() == target_clean:
+            return opt, 1.0
+
+    # 2. Synonym match
+    SYNONYM_PAIRS = {
+        "yes": ["i agree", "agree", "authorized", "i consent", "yes, i consent", "yes, i do", "yes, i am"],
+        "no": ["disagree", "i do not agree", "unauthorized", "no, i do not", "no, i am not", "declined"],
+        "male": ["man", "he/him"],
+        "female": ["woman", "she/her"],
+        "prefer not to say": ["decline to self-identify", "i do not wish to answer", "prefer not to disclose", "decline to answer"],
+        "full-time": ["full time", "regular", "permanent"],
+    }
+    for syn_key, syn_list in SYNONYM_PAIRS.items():
+        all_syns = [syn_key] + syn_list
+        if target_clean in all_syns or any(s in target_clean for s in all_syns):
+            for opt in candidate_options:
+                opt_l = opt.strip().lower()
+                if any(re.search(rf'\b{re.escape(s)}\b', opt_l) for s in all_syns):
+                    return opt, 0.95
+
+    # 3. Fuzzy similarity
+    best_opt = None
+    best_score = 0.0
+    for opt in candidate_options:
+        opt_l = opt.strip().lower()
+        score = difflib.SequenceMatcher(None, target_clean, opt_l).ratio()
+        if score > best_score:
+            best_score = score
+            best_opt = opt
+
+    if best_score >= 0.88:
+        return best_opt, best_score
+
+    # Below confidence gate
+    return None, best_score
+
 def normalize_question_key(text: str) -> str:
     """
     Produce a canonical lowercase key for a question label.
@@ -246,7 +298,7 @@ class AnswerService:
                 github="https://github.com/candidate",
                 education="MTech Integrated CSE (Data Science), VIT Vellore",
                 cgpa="7.62/10",
-                graduation_date="May 2027",
+                graduation_date="",
                 min_salary_inr=700000,
                 daily_cap=100,
                 hourly_cap=10,
@@ -317,22 +369,12 @@ class AnswerService:
             ("discipline", "Computer Science and Engineering (Data Science)", "text", "always_use", "education", "candidate_profile", True, "Major Program"),
             ("degree", profile.education, "text", "always_use", "education", "candidate_profile", True, "Degree Verification"),
             ("cgpa", profile.cgpa, "text", "always_use", "education", "candidate_profile", True, "Official Academic Transcript"),
-            ("graduation year", "2027", "text", "always_use", "education", "candidate_profile", True, "Graduation Timeline"),
             ("start year", "2022", "text", "always_use", "education", "candidate_profile", True, "Matriculation Record"),
 
-            # Work Authorization & Preferences
+            # Work Authorization & Preferences (Strictly based on profile, never guessed)
             ("expected salary", f"₹{profile.min_salary_inr:,} per year minimum, negotiable", "text", "always_use", "preferences", "candidate_profile", True, "Candidate Preference"),
             ("salary expectation", f"₹{profile.min_salary_inr:,} per year minimum, negotiable", "text", "always_use", "preferences", "candidate_profile", True, "Candidate Preference"),
-            ("notice period", profile.notice_period, "text", "always_use", "preferences", "candidate_profile", True, "Availability Statement"),
-            ("earliest start date", "Immediate", "text", "always_use", "preferences", "candidate_profile", True, "Immediate availability"),
-            ("preferred start date", "Immediate", "text", "always_use", "preferences", "candidate_profile", True, "Immediate availability"),
-            ("work authorization", profile.work_authorization, "text", "always_use", "work_auth", "candidate_profile", True, "Citizenship & Passport"),
-            ("are you legally authorized to work in the country you are applying to", "Yes", "select", "always_use", "work_auth", "candidate_profile", True, "Verified Indian Citizen"),
-            ("will you now or in the future require sponsorship", "No", "select", "always_use", "work_auth", "candidate_profile", True, "No visa sponsorship required for domestic roles"),
-            ("requires us sponsorship", "Yes", "select", "always_use", "work_auth", "candidate_profile", True, "US Work requires visa"),
-            ("willing to relocate", profile.relocation_preference, "select", "always_use", "preferences", "candidate_profile", True, "Candidate Preference"),
-            ("preferred work mode", profile.preferred_work_mode, "text", "always_use", "preferences", "candidate_profile", True, "Work Mode Preference"),
-            ("open to relocation", profile.relocation_preference, "select", "always_use", "preferences", "candidate_profile", True, "Relocation statement"),
+            ("preferred work mode", profile.preferred_work_mode or "Remote / Hybrid / Onsite", "text", "always_use", "preferences", "candidate_profile", True, "Work Mode Preference"),
             ("how did you hear about this job", "Company career page", "text", "always_use", "general", "candidate_profile", True, "Standard ATS question"),
             ("how did you hear about us", "Company career page", "text", "always_use", "general", "candidate_profile", True, "Standard ATS question"),
             ("gender", "Prefer not to say", "select", "always_use", "demographics", "candidate_profile", True, "Demographic Disclosure Choice"),
@@ -343,11 +385,11 @@ class AnswerService:
             ("disability status", "I do not have a disability", "select", "always_use", "demographics", "candidate_profile", True, "EEOC disclosure"),
             
             # Technical Proof Points (Strict truth)
-            ("pytorch jax experience", "Yes, trained Random Forest and LSTM neural architectures for multimodal driver stress prediction in my published patent project.", "textarea", "always_use", "technical", "verified_patent", True, "Indian Patent Office publication #202441058291"),
+            ("pytorch jax experience", "Yes, trained Random Forest and LSTM neural architectures for multimodal sensor prediction in my published patent project.", "textarea", "always_use", "technical", "verified_patent", True, "Indian Patent Office publication"),
             ("neural architecture reproduction", "Yes, built and benchmarked a hybrid neural embedding + BM25 + AST code retrieval system on MTEB AppsRetrieval, achieving 25.59% NDCG@10 vs a 5.14% baseline with 43–63ms CPU latency.", "textarea", "always_use", "technical", "benchmark_paper", True, "Benchmarked on MTEB AppsRetrieval dataset"),
             ("deep learning experience years", "1-2 years through graduate coursework, published patent R&D, and benchmarked research implementations.", "text", "always_use", "technical", "candidate_profile", True, "Academic & Project Timeline"),
-            ("public links", f"GitHub: {profile.github} | 2 Published Patents (Proactive Multimodal Accident Predictor & Acoustic Doppler Session Guard)", "text", "always_use", "technical", "verified_patent", True, "Patent Office Registrations"),
-            ("cloud experience", "AWS Certified Solutions Architect with practical knowledge in scalable cloud architectures, serverless, and distributed pipelines.", "text", "always_use", "technical", "certificate", True, "AWS Certification Credential"),
+            ("public links", f"GitHub: {profile.github} | 2 Published Patents (A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver & Acoustic Doppler Session Guard)", "text", "always_use", "technical", "verified_patent", True, "Patent Office Registrations"),
+            ("cloud experience", "AWS Cloud Solutions Architect with practical knowledge in scalable cloud architectures, serverless, and distributed pipelines.", "text", "always_use", "technical", "certificate", True, "AWS Certification Credential"),
             
             # Behavioral
             ("stakeholder disagreement essay", "During development of our multimodal accident predictor patent, a collaborator pushed to add heavy facial mesh layers that threatened our 60ms latency budget. I ran empirical benchmarks demonstrating our Random Forest + LSTM model with voice-stress features achieved equivalent precision at half the compute. Presenting data-backed tradeoffs convinced the team to preserve our low-latency design, successfully securing our patent filing.", "textarea", "always_use", "behavioral", "candidate_experience", True, "Patent Project Case Study"),
@@ -473,26 +515,28 @@ class AnswerService:
             return "Computer Science and Engineering (Data Science)", "always_use"
         if re.search(r'\bcgpa|gpa\b', clean_key):
             return profile.cgpa, "always_use"
-        if re.search(r'\bgraduation.*year\b', clean_key):
-            return "2027", "always_use"
+        if re.search(r'\bgraduation.*(year|date)\b', clean_key):
+            if profile.graduation_date:
+                return profile.graduation_date, "always_use"
+            return None # Locked Facts: Never guess; send to Needs You if unconfirmed
 
-        # Work Authorization, Sponsorship & Compliance (Evaluated first to avoid broad keyword shadowing)
+        # Work Authorization, Sponsorship & Compliance
         if re.search(r'why.*(join|work for|interested in|apply to)', clean_key):
             return "I am eager to apply my expertise in Machine Learning, Python engineering, and scalable distributed architectures to build high-impact, reliable systems alongside world-class engineering teams.", "always_use"
         if re.search(r'intend\s*to\s*work|work\s*location\s*preference|from\s*where\s*do\s*you', clean_key):
             return "India (Remote)", "always_use"
         if re.search(r'preferred\s*(first\s*)?name', clean_key):
             return first_name, "always_use"
-        if re.search(r'require.*sponsorship.*\bus\b|require.*visa.*\bus\b', clean_key):
-            return "Yes", "always_use"
-        if re.search(r'sponsorship|require.*visa|visa.*sponsorship|employment.*visa|immigration.*sponsorship', clean_key):
-            return "No", "always_use"
-        if re.search(r'authorized.*work|work.*authorization|legally.*authorized|unrestricted.*right', clean_key):
-            return "Yes", "always_use"
+        if re.search(r'sponsorship|require.*visa|visa.*sponsorship|employment.*visa|immigration.*sponsorship|authorized.*work|work.*authorization|legally.*authorized|unrestricted.*right', clean_key):
+            if profile.work_authorization:
+                return profile.work_authorization, "always_use"
+            return None # Locked Facts: Never guess; send to Needs You if unconfirmed
         if re.search(r'sanctioned|embargoed|sanction', clean_key):
             return "No", "always_use"
-        if re.search(r'relocate|relocation|willing.*relocate', clean_key):
-            return "Yes", "always_use"
+        if re.search(r'relocate|relocation|willing.*relocate|open\s*to\s*relocation', clean_key):
+            if profile.relocation_preference:
+                return profile.relocation_preference, "always_use"
+            return None # Locked Facts: Never guess; send to Needs You if unconfirmed
         if re.search(r'previously\s*worked|previously\s*employed|worked\s*for.*before', clean_key):
             return "No", "always_use"
         if re.search(r'own\s*words|plagiarism', clean_key):
@@ -500,15 +544,15 @@ class AnswerService:
 
         # Compensation
         if re.search(r'usd|eur|\$', clean_key) and re.search(r'salary|compensation|ctc', clean_key):
-            return "85,000", "always_use"
+            return None # Must use ₹ with clear range; never bare number in USD
         if re.search(r'salary|expected.*ctc|compensation', clean_key):
             return "₹7,00,000 per year minimum, negotiable", "always_use"
 
         # Notice & Availability
-        if re.search(r'\bnotice.*period\b', clean_key):
-            return profile.notice_period or "Immediate / 15 Days", "always_use"
-        if re.search(r'start.*date|earliest.*start|preferred start', clean_key):
-            return "Immediate", "always_use"
+        if re.search(r'\bnotice.*period\b|start.*date|earliest.*start|preferred start', clean_key):
+            if profile.notice_period:
+                return profile.notice_period, "always_use"
+            return None # Locked Facts: Never guess; send to Needs You if unconfirmed
 
         # Demographics & Diversity
         if re.search(r'veteran', clean_key):

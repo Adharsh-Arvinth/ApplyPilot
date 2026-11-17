@@ -28,6 +28,7 @@ def test_phase4_dry_run_application():
             profile = db.query(Profile).first()
             profile.go_live = False # Ensure dry-run
             profile.daily_cap = 100 # Ensure cap is open
+            profile.hourly_cap = 500 # Ensure hourly cap is open for tests
             db.commit()
 
             # Clear previous Elastic application to test fresh dry run

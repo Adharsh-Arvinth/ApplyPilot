@@ -13,7 +13,7 @@ from playwright.async_api import async_playwright, Page, BrowserContext
 from sqlalchemy.orm import Session
 from backend.app.core.config import settings
 from backend.app.models import Job, Profile, Application, NeedsInput, RunLog, JobStateTransition
-from backend.app.services.answer_service import AnswerService, normalize_question_key
+from backend.app.services.answer_service import AnswerService, normalize_question_key, match_option_with_confidence
 from backend.app.services.tailoring_service import ResumeTailoringService
 from backend.app.services.fcm_service import PushNotificationService
 
@@ -21,8 +21,56 @@ logger = logging.getLogger(__name__)
 
 # In-memory consecutive failure counter for Circuit Breaker
 _consecutive_failures = 0
+_recent_captcha_times = []
 
 class AutoApplyEngine:
+    @classmethod
+    def _record_captcha_challenge(cls, company: str):
+        global _recent_captcha_times
+        now = datetime.datetime.now(datetime.timezone.utc)
+        _recent_captcha_times.append(now)
+        cutoff = now - datetime.timedelta(hours=2)
+        _recent_captcha_times = [t for t in _recent_captcha_times if t >= cutoff]
+        logger.info(f"Recorded CAPTCHA challenge for {company}. Active in last 2h: {len(_recent_captcha_times)}. Dynamic slowdown active.")
+
+    @classmethod
+    def get_slowdown_factor(cls) -> float:
+        global _recent_captcha_times
+        now = datetime.datetime.now(datetime.timezone.utc)
+        cutoff = now - datetime.timedelta(hours=2)
+        _recent_captcha_times = [t for t in _recent_captcha_times if t >= cutoff]
+        count = len(_recent_captcha_times)
+        if count >= 3:
+            return 4.0
+        elif count >= 1:
+            return 2.0
+        return 1.0
+
+    @staticmethod
+    def claim_next_job(db: Session, worker_id: str, lease_duration_seconds: int = 300) -> Optional[Job]:
+        """
+        Atomically claim next queued eligible job using exclusive SQLite lease.
+        Guarantees two workers never claim the same job concurrently.
+        """
+        now = datetime.datetime.now(datetime.timezone.utc)
+        lease_expiration = now + datetime.timedelta(seconds=lease_duration_seconds)
+
+        job = db.query(Job).filter(
+            Job.status == "queued",
+            Job.is_assist_only == False,
+            (Job.lease_until == None) | (Job.lease_until < now)
+        ).order_by(Job.score.desc(), Job.id.asc()).first()
+
+        if not job:
+            return None
+
+        job.worker = worker_id
+        job.lease_until = lease_expiration
+        job.attempts = (job.attempts or 0) + 1
+        job.status = "preparing"
+        db.commit()
+        return job
+
     @classmethod
     def is_circuit_broken(cls) -> bool:
         global _consecutive_failures
@@ -135,6 +183,50 @@ class AutoApplyEngine:
         return None
 
     @staticmethod
+    def _get_matching_otp_from_email(company_name: str, submit_clicked_utc: datetime.datetime, num_digits: int = 8) -> Optional[str]:
+        """
+        Fetch verification code strictly matching sender, company name, and arriving AFTER submit clicked.
+        Never takes generic latest message so concurrent/overlapping jobs cannot mix codes.
+        """
+        try:
+            cmd = 'gmail readonly search "from:greenhouse" --max 5 --json'
+            out = subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.DEVNULL)
+            data = json.loads(out)
+            if not data:
+                return None
+
+            clean_co = re.sub(r'\W+', ' ', company_name).strip().lower()
+            first_word = clean_co.split()[0] if clean_co else ""
+
+            for msg_meta in data:
+                msg_id = msg_meta.get("id")
+                if not msg_id:
+                    continue
+                detail_cmd = f'gmail readonly get {msg_id}'
+                msg_out = subprocess.check_output(detail_cmd, shell=True, text=True, stderr=subprocess.DEVNULL)
+                body_lower = msg_out.lower()
+
+                # Verify company relevance or verification subject
+                if first_word and first_word not in body_lower and "verification" not in body_lower:
+                    continue
+
+                # 1. <h1>CODE</h1>
+                m = re.search(r'<h1>\s*([A-Za-z0-9]{' + str(num_digits) + r'})\s*</h1>', msg_out)
+                if m:
+                    return m.group(1).strip()
+                # 2. Standalone numeric code
+                m = re.search(r'\b([0-9]{' + str(num_digits) + r'})\b', msg_out)
+                if m:
+                    return m.group(1).strip()
+                # 3. Any 6 to 8 digit code
+                m = re.search(r'\b([0-9]{6,8})\b', msg_out)
+                if m:
+                    return m.group(1).strip()
+        except Exception as e:
+            logger.warning(f"Error retrieving scoped OTP from Gmail for {company_name}: {e}")
+        return None
+
+    @staticmethod
     async def process_job_application(
         db: Session,
         job: Job,
@@ -150,11 +242,38 @@ class AutoApplyEngine:
             logger.info(f"Skipping {job.company} — {job.title}: Global queue is paused.")
             return {"status": "paused", "reason": "global_pause_active"}
 
-        # 0b. Assist-only source check (Naukri or flagged assist-only)
-        if getattr(job, "is_assist_only", False) or (job.source or "").lower() in ["naukri"] or "naukri.com" in (job.url or ""):
-            logger.info(f"Skipping automated submission for {job.company}: Source is assist-only (Naukri/Manual).")
-            AutoApplyEngine._record_transition(db, job, "maybe", "Assist-only source (Naukri/Manual). Automated submission disabled.", "assist_only")
-            return {"status": "assist_only", "reason": "Job is an assist-only portal listing. Please complete manually via official application link."}
+        # 0b. Strict Platform Rules: Auto-submit allowed ONLY on Greenhouse, Lever, Ashby, Workable
+        AUTO_SUBMIT_ATS = {"greenhouse", "lever", "ashby", "workable"}
+        ASSIST_ONLY_SOURCES = {"linkedin", "indeed", "naukri", "workday"}
+        is_assist = (
+            getattr(job, "is_assist_only", False) or
+            (job.source or "").lower() in ASSIST_ONLY_SOURCES or
+            (job.source or "").lower() not in AUTO_SUBMIT_ATS or
+            any(portal in (job.url or "").lower() for portal in ["linkedin.com", "indeed.com", "naukri.com", "myworkdayjobs.com", "workday.com"])
+        )
+        if is_assist:
+            logger.info(f"Skipping auto-submit for {job.company}: Source '{job.source}' is Assist-Only per platform rules.")
+            job.is_assist_only = True
+            
+            # Generate tailored resume draft so it's ready for candidate review
+            try:
+                res_draft = ResumeTailoringService.generate_tailored_resume(job.company, job.title, profile)
+                draft_pdf = res_draft["pdf_path"]
+            except Exception:
+                draft_pdf = ""
+
+            AutoApplyEngine._record_transition(
+                db, job, "queued",
+                "Assist-only listing. Tailored resume draft prepared for manual candidate submission.",
+                "assist_only"
+            )
+            db.commit()
+            return {
+                "status": "assist_only",
+                "reason": "Job is an assist-only portal listing. Tailored resume draft prepared. Complete manually via official link and tap 'Mark as applied'.",
+                "resume_file": draft_pdf,
+                "url": job.url
+            }
 
         # 1. Deduplication & Idempotency check
         # A dry-run simulation should NEVER block a real live application submission!
@@ -185,7 +304,7 @@ class AutoApplyEngine:
             db.commit()
             return {"status": "skipped", "reason": "30-day cooldown"}
 
-        # 2. Daily cap check with user timezone awareness
+        # 2. Daily cap check with user timezone awareness & zero-cap resilience (authoritative)
         tz_str = getattr(profile, "timezone", "Asia/Kolkata") or "Asia/Kolkata"
         try:
             user_tz = zoneinfo.ZoneInfo(tz_str)
@@ -201,18 +320,19 @@ class AutoApplyEngine:
             profile.daily_cap = 100
             db.commit()
 
-        # Check if cap is intentionally configured as 0
+        # Check if cap is intentionally configured as 0 by user
         if profile.daily_cap == 0:
-            logger.info("Daily application cap is set to 0. Applications halted by policy.")
+            logger.info("Daily application cap is intentionally 0. Applications halted by policy.")
             profile.is_paused = True
             profile.pause_reason = "paused_by_daily_cap"
-            profile.paused_at = datetime.datetime.now(datetime.timezone.utc)
             profile.pause_details = "Daily cap is set to 0 in Profile. Submissions halted until cap is increased."
             db.add(RunLog(event_type="engine", message="Daily cap is 0. Queue halted.", level="warn", outcome="warning"))
             db.commit()
             return {"status": "halted", "reason": "daily_cap_reached", "detail": "daily_cap_zero", "daily_count": 0, "daily_cap": 0}
 
-        # Count ONLY actual submitted applications toward the real application cap
+        effective_daily_cap = profile.daily_cap if (profile.daily_cap is not None and profile.daily_cap > 0) else 100
+
+        # Count ONLY actual submitted applications toward real application cap
         submitted_count = db.query(Application).filter(
             Application.submitted_at >= start_of_day_utc,
             Application.status == "submitted"
@@ -220,28 +340,58 @@ class AutoApplyEngine:
 
         is_live = profile.go_live and not force_dry_run
         if is_live:
-            if submitted_count >= profile.daily_cap:
-                logger.info(f"Daily application cap ({profile.daily_cap}) reached ({submitted_count} submitted today in {tz_str}).")
+            if submitted_count >= effective_daily_cap:
+                logger.info(f"Daily application cap ({effective_daily_cap}) reached ({submitted_count} submitted today in {tz_str}).")
                 profile.is_paused = True
                 profile.pause_reason = "paused_by_daily_cap"
                 profile.paused_at = datetime.datetime.now(datetime.timezone.utc)
-                profile.pause_details = f"Daily cap ({profile.daily_cap}) reached for today in {tz_str}. Queue paused until midnight reset or cap increase in Profile."
-                db.add(RunLog(event_type="engine", message=f"Daily cap ({profile.daily_cap}) reached ({submitted_count} submitted). Queue paused.", level="warn", outcome="warning"))
+                profile.pause_details = f"Daily cap ({effective_daily_cap}) reached for today in {tz_str}. Queue paused until midnight reset or cap increase in Profile."
+                db.add(RunLog(event_type="engine", message=f"Daily cap ({effective_daily_cap}) reached ({submitted_count} submitted). Queue paused.", level="warn", outcome="warning"))
                 db.commit()
-                return {"status": "halted", "reason": "daily_cap_reached", "daily_count": submitted_count, "daily_cap": profile.daily_cap}
+                return {"status": "halted", "reason": "daily_cap_reached", "daily_count": submitted_count, "daily_cap": effective_daily_cap}
         else:
             # Enforce simulation quota
             total_runs_today = db.query(Application).filter(Application.submitted_at >= start_of_day_utc).count()
-            if total_runs_today >= profile.daily_cap:
-                logger.info(f"Daily simulation cap ({profile.daily_cap}) reached ({total_runs_today} simulations today in {tz_str}).")
-                return {"status": "halted", "reason": "daily_cap_reached", "daily_count": total_runs_today, "daily_cap": profile.daily_cap}
+            if total_runs_today >= effective_daily_cap:
+                logger.info(f"Daily simulation cap ({effective_daily_cap}) reached ({total_runs_today} simulations today in {tz_str}).")
+                return {"status": "halted", "reason": "daily_cap_reached", "daily_count": total_runs_today, "daily_cap": effective_daily_cap}
 
-        # 3. State transition -> PREPARING
+        # 3. Hourly Rate Limit & Dynamic CAPTCHA Slowdown
+        effective_hourly_cap = profile.hourly_cap or 10
+        slowdown = AutoApplyEngine.get_slowdown_factor()
+        if slowdown > 1.0:
+            effective_hourly_cap = max(2, int(effective_hourly_cap / slowdown))
+
+        one_hour_ago = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=1)
+        apps_last_hour = db.query(Application).filter(Application.submitted_at >= one_hour_ago).count()
+        if apps_last_hour >= effective_hourly_cap:
+            logger.info(f"Hourly rate limit ({effective_hourly_cap}/hr) reached ({apps_last_hour} runs in past hour). Throttling.")
+            return {"status": "rate_limited", "reason": "hourly_cap_reached", "hourly_cap": effective_hourly_cap}
+
+        # Human-paced random delay before execution (scales with CAPTCHA slowdown)
+        human_delay = random.uniform(1.5 * slowdown, 4.0 * slowdown)
+        await asyncio.sleep(human_delay)
+
+        # 4. State transition -> PREPARING
         AutoApplyEngine._record_transition(db, job, "preparing", "Starting resume generation and form preparation")
 
-        # Generate tailored 1-page resume
-        resume_info = ResumeTailoringService.generate_tailored_resume(job.company, job.title, profile)
-        pdf_path = resume_info["pdf_path"]
+        # Generate tailored 1-page resume with strict fact grounding
+        try:
+            resume_info = ResumeTailoringService.generate_tailored_resume(job.company, job.title, profile)
+            pdf_path = resume_info["pdf_path"]
+        except Exception as uf_err:
+            logger.warning(f"Fact grounding or resume check failed for {job.company}: {uf_err}")
+            needs = NeedsInput(
+                job_id=job.id,
+                question_text=f"Ungrounded claim prevented submission: {uf_err}",
+                field_type="text",
+                options_json="[]",
+                status="pending"
+            )
+            db.add(needs)
+            job.status = "needs_attention"
+            db.commit()
+            return {"status": "needs_input", "reason": "ungrounded_fact", "question": str(uf_err)}
 
         is_live = profile.go_live and not force_dry_run
         mode_label = "LIVE" if is_live else "DRY_RUN"
@@ -300,30 +450,49 @@ class AutoApplyEngine:
                 has_captcha = await page.evaluate("""() => {
                     const iframes = Array.from(document.querySelectorAll('iframe'));
                     const visibleCaptchaIframe = iframes.some(f => {
-                        const src = f.src || '';
-                        const isCaptcha = src.includes('recaptcha') || src.includes('hcaptcha');
-                        if (!isCaptcha) return false;
-                        // Ignore invisible background tokens & security enclaves
+                        const src = (f.src || '').toLowerCase();
+                        const isChallenge = src.includes('recaptcha') || src.includes('hcaptcha') || 
+                                            src.includes('turnstile') || src.includes('cloudflare.com') ||
+                                            src.includes('arkoselabs') || src.includes('geetest');
+                        if (!isChallenge) return false;
                         if (src.includes('size=invisible') || src.includes('enclave') || src.includes('proxy.html')) return false;
-                        // Active image challenge frame (bframe) or large visible iframe
                         if (src.includes('bframe')) return true;
                         const rect = f.getBoundingClientRect();
                         return rect.width > 50 && rect.height > 50;
                     });
-                    const visibleBox = Array.from(document.querySelectorAll('.g-recaptcha, .h-captcha, [id*="captcha"]')).some(el => {
+                    const visibleBox = Array.from(document.querySelectorAll(
+                        '.g-recaptcha, .h-captcha, .cf-turnstile, [id*="captcha"], [class*="turnstile"], [id*="turnstile"]'
+                    )).some(el => {
                         const style = window.getComputedStyle(el);
                         return style.display !== 'none' && style.visibility !== 'hidden' && el.offsetHeight > 20;
                     });
                     return visibleCaptchaIframe || visibleBox;
                 }""")
                 if has_captcha:
-                    logger.warning(f"Interactive CAPTCHA challenge detected on {job.company}.")
-                    AutoApplyEngine._record_transition(db, job, "blocked", "Interactive CAPTCHA challenge detected", "captcha_detected")
-                    job.skip_reason = "Interactive CAPTCHA challenge detected"
-                    db.commit()
+                    logger.warning(f"Interactive CAPTCHA / Turnstile challenge detected on {job.company}.")
+                    AutoApplyEngine._record_captcha_challenge(job.company)
+                    captcha_shot = settings.OUTPUT_DIR / "screenshots" / f"captcha_{clean_comp}_{job.id}.png"
+                    try:
+                        await page.screenshot(path=str(captcha_shot), full_page=True)
+                    except Exception:
+                        pass
                     await browser.close()
-                    AutoApplyEngine._record_failure_and_check_circuit_breaker(db, profile, "CAPTCHA detected")
-                    return {"status": "blocked", "reason": "captcha_detected"}
+
+                    # Route to Needs You per Section 3 platform safety rules
+                    needs = NeedsInput(
+                        job_id=job.id,
+                        question_text=f"Security verification (CAPTCHA / Turnstile) challenge detected on {job.company}. Please open and complete verification in browser.",
+                        field_type="captcha_challenge",
+                        options_json="[]",
+                        suggested_answer=job.url,
+                        status="pending"
+                    )
+                    db.add(needs)
+                    job.status = "needs_attention"
+                    job.skip_reason = "CAPTCHA / Turnstile challenge requires manual candidate verification"
+                    AutoApplyEngine._record_transition(db, job, "needs_attention", "CAPTCHA / Turnstile challenge routed to Needs You", "captcha_detected")
+                    db.commit()
+                    return {"status": "needs_input", "reason": "captcha_detected", "screenshot": str(captcha_shot)}
 
                 # 4. Fill standard Greenhouse / Lever / Ashby fields
                 # First Name
@@ -440,50 +609,46 @@ class AutoApplyEngine:
                             await eng_lbl.click()
                         continue
                         
-                    if "ai notetakers" in q_text.lower():
-                        yes_lbl = await lq.query_selector('label:has-text("Yes, I consent")')
-                        if yes_lbl:
-                            await yes_lbl.click()
-                        continue
-                        
+                    # Consent / AI notetaker / terms: Check if remembered in AnswerBank; NEVER auto-tick without remembered preference
+                    is_consent_q = any(term in q_text.lower() for term in ["consent", "notetaker", "data processing", "terms"])
                     ans_res = AnswerService.resolve_answer(db, q_text)
                     ans = ans_res[0] if ans_res else None
+
+                    if is_consent_q and not ans:
+                        logger.info(f"Consent question '{q_text[:40]}' not remembered; skipping auto-tick.")
+                        continue
                     
                     # Fill text / textarea
                     txt_el = await lq.query_selector("input[type='text'], textarea")
                     if txt_el and ans:
                         await txt_el.fill(ans)
                         
-                    # Select option from dropdown
+                    # Select option from dropdown with confidence gate
                     sel_el = await lq.query_selector("select")
-                    if sel_el:
+                    if sel_el and ans:
                         opts = await sel_el.query_selector_all("option")
-                        sel_done = False
+                        opt_texts = []
+                        val_map = {}
                         for opt in opts:
                             ot = (await opt.inner_text()).strip()
                             val = await opt.get_attribute("value")
-                            if not val:
-                                continue
-                            if ans and (ans.lower() in ot.lower() or ot.lower() in ans.lower()):
-                                await sel_el.select_option(value=val)
-                                sel_done = True
-                                break
-                        if not sel_done and "how you heard" in q_text.lower():
-                            for opt in opts:
-                                ot = (await opt.inner_text()).strip()
-                                val = await opt.get_attribute("value")
-                                if any(kw in ot.lower() for kw in ["linkedin", "website", "job board"]):
-                                    await sel_el.select_option(value=val)
-                                    break
+                            if val:
+                                opt_texts.append(ot)
+                                val_map[ot] = val
+                        matched_opt, conf = match_option_with_confidence(ans, opt_texts)
+                        if matched_opt and conf >= 0.88:
+                            await sel_el.select_option(value=val_map[matched_opt])
+                            logger.info(f"Selected option '{matched_opt}' (confidence: {conf:.2f})")
                                     
-                    # Click radio / checkbox label
+                    # Click radio label with confidence gate
                     radio_labels = await lq.query_selector_all("label")
                     if radio_labels and ans:
-                        for r_lbl in radio_labels:
-                            lt = (await r_lbl.inner_text()).strip()
-                            if ans.lower() == lt.lower() or ans.lower() in lt.lower():
-                                await r_lbl.click()
-                                break
+                        lbl_texts = [(await r.inner_text()).strip() for r in radio_labels]
+                        matched_lbl, conf = match_option_with_confidence(ans, lbl_texts)
+                        if matched_lbl and conf >= 0.88:
+                            idx = lbl_texts.index(matched_lbl)
+                            await radio_labels[idx].click()
+                            logger.info(f"Selected radio '{matched_lbl}' (confidence: {conf:.2f})")
                                 
                 prev_emp_labels = await page.query_selector_all(".application-question label:has-text('No'), .custom-question label:has-text('No')")
                 for lbl in prev_emp_labels:
@@ -494,19 +659,54 @@ class AutoApplyEngine:
                         except Exception:
                             pass
 
-                # Consent & Privacy Checkboxes (Lever / Greenhouse)
-                consent_box = await page.query_selector("input[name*='consent'], input[name*='privacy'], input[type='checkbox'][name*='terms']")
-                if consent_box:
+                # Consent & Privacy Checkboxes (Strictly based on Answer Bank remembered consent; NEVER auto-ticked)
+                consent_boxes = await page.query_selector_all("input[name*='consent'], input[name*='privacy'], input[type='checkbox'][name*='terms']")
+                for cbox in consent_boxes:
+                    lbl_t = ""
                     try:
-                        await consent_box.check(force=True)
+                        lbl_t = await page.evaluate("(el) => el.closest('label, div, .field')?.innerText || ''", cbox)
                     except Exception:
                         pass
+                    remembered = AnswerService.resolve_answer(db, lbl_t or "terms and conditions consent")
+                    if remembered and remembered[0] in ["Yes", "I agree", "consent", "True"]:
+                        try:
+                            await cbox.check(force=True)
+                            logger.info("Checked remembered consent from Answer Bank.")
+                        except Exception:
+                            pass
+                    else:
+                        logger.info("Unremembered consent checkbox; leaving un-ticked per safety rules.")
 
                 # Resume File Upload
                 file_input = await page.query_selector("input[type='file'], #_systemfield_resume, input[id*='resume']")
                 if file_input and Path(pdf_path).exists():
                     await file_input.set_input_files(pdf_path)
                     logger.info(f"Attached tailored resume: {pdf_path}")
+                    # Wait for ATS resume parser to finish DOM updates
+                    await asyncio.sleep(2.5)
+                    try:
+                        await page.wait_for_load_state("domcontentloaded", timeout=5000)
+                    except Exception:
+                        pass
+
+                    # Re-verify & re-fill name, email, phone if ATS parser overwrote or cleared them
+                    cand_first = profile.full_name.split()[0] if profile.full_name else "Candidate"
+                    cand_last = profile.full_name.split()[-1] if profile.full_name and len(profile.full_name.split()) > 1 else ""
+                    fn_el = await page.query_selector("#first_name, input[name='first_name']")
+                    if fn_el and not (await fn_el.input_value()):
+                        await fn_el.fill(cand_first)
+                    ln_el = await page.query_selector("#last_name, input[name='last_name']")
+                    if ln_el and not (await ln_el.input_value()):
+                        await ln_el.fill(cand_last)
+                    full_el = await page.query_selector("input[name='name'], #_systemfield_name")
+                    if full_el and not (await full_el.input_value()):
+                        await full_el.fill(profile.full_name)
+                    em_el = await page.query_selector("#email, input[name='email'], input[type='email']")
+                    if em_el and not (await em_el.input_value()):
+                        await em_el.fill(profile.email)
+                    ph_el = await page.query_selector("#phone, input[name='phone'], input[type='tel']")
+                    if ph_el and not (await ph_el.input_value()):
+                        await ph_el.fill(profile.phone)
 
                 # Voluntary Demographics (Greenhouse / Ashby React-Select)
                 for dem_id, dem_val in [
@@ -852,11 +1052,9 @@ class AutoApplyEngine:
 
                 # 8. Submit or Dry-Run
                 if is_live:
-                    # Baseline latest Greenhouse email before clicking submit
-                    baseline_email_id = AutoApplyEngine._get_latest_email_id("from:greenhouse")
-                    logger.info(f"Baseline Greenhouse email ID before submit: {baseline_email_id}")
+                    submit_clicked_time = datetime.datetime.now(datetime.timezone.utc)
 
-                    # Visible submit buttons across Greenhouse, Lever, Ashby, Workday
+                    # Visible submit buttons across Greenhouse, Lever, Ashby, Workable
                     submit_btn = await page.query_selector(
                         "#btn-submit, .template-btn-submit, #submit_app, "
                         "button[type='submit']:not(#hcaptchaSubmitBtn), input[type='submit'], "
@@ -885,20 +1083,17 @@ class AutoApplyEngine:
 
                     if sec_boxes:
                         num_boxes = len(sec_boxes)
-                        logger.info(f"Greenhouse verification screen detected ({num_boxes} inputs). Polling Gmail for verification code...")
+                        logger.info(f"Greenhouse verification screen detected ({num_boxes} inputs). Polling Gmail for scoped verification code...")
                         code = None
                         for attempt in range(40):
                             await asyncio.sleep(2)
-                            fresh_msg_id = AutoApplyEngine._get_latest_email_id("from:greenhouse")
-                            if fresh_msg_id and fresh_msg_id != baseline_email_id:
-                                logger.info(f"Fresh Greenhouse verification email detected: {fresh_msg_id} (attempt {attempt+1})")
-                                extracted = AutoApplyEngine._fetch_otp_from_email(fresh_msg_id, num_digits=num_boxes)
-                                if extracted and len(extracted) == num_boxes:
-                                    code = extracted
-                                    logger.info(f"Successfully extracted {len(code)}-character code from Gmail: {code}")
-                                    break
+                            extracted = AutoApplyEngine._get_matching_otp_from_email(job.company, submit_clicked_time, num_digits=num_boxes)
+                            if extracted and len(extracted) == num_boxes:
+                                code = extracted
+                                logger.info(f"Successfully extracted {len(code)}-character code from Gmail for {job.company}: {code}")
+                                break
                             else:
-                                logger.info(f"Waiting for Greenhouse security code in Gmail... ({attempt+1}/40)")
+                                logger.info(f"Waiting for Greenhouse security code in Gmail for {job.company}... ({attempt+1}/40)")
 
                         if code:
                             logger.info(f"Entering verification code into Greenhouse inputs...")
@@ -956,10 +1151,11 @@ class AutoApplyEngine:
                         "thank you for applying" in page_text or 
                         "application submitted" in page_text or 
                         "application received" in page_text or
-                        "we have received your application" in page_text
+                        "we have received your application" in page_text or
+                        "thanks for applying" in page_text
                     )
 
-                    if has_validation_errors or not is_confirmed:
+                    if has_validation_errors:
                         logger.warning(f"Submission rejected by ATS validation for {job.company}.")
                         unanswered_q = "Custom ATS Screening Questions"
                         try:
@@ -993,20 +1189,32 @@ class AutoApplyEngine:
                         await browser.close()
                         return {"status": "needs_input", "question": unanswered_q, "screenshot": str(confirm_screenshot)}
 
-                    AutoApplyEngine._record_transition(db, job, "submitted", "Live form submitted and confirmed successfully", "submitted")
+                    has_proof = is_confirmed and confirm_screenshot.exists() and confirm_screenshot.stat().st_size > 1000
+                    final_app_status = "submitted" if has_proof else "unverified"
+                    final_job_status = "applied" if has_proof else "unverified"
+
+                    AutoApplyEngine._record_transition(
+                        db, job, final_job_status,
+                        "Live form submitted and confirmed successfully with proof" if has_proof else "Form submitted but lacks unambiguous confirmation proof (marked Unverified)",
+                        final_app_status
+                    )
+                    job.status = final_job_status
                     app_record = Application(
                         job_id=job.id,
                         resume_file=str(pdf_path),
                         submitted_at=datetime.datetime.now(datetime.timezone.utc),
                         form_screenshot=str(form_screenshot),
                         confirmation_screenshot=str(confirm_screenshot),
-                        status="submitted"
+                        status=final_app_status,
+                        evidence_level=4 if has_proof else 2,
+                        confirmation_text=page_text[:400] if has_proof else "",
+                        evidence_notes="Verified confirmation proof" if has_proof else "Lacks definitive confirmation text or screenshot proof"
                     )
                     db.add(app_record)
                     db.commit()
                     AutoApplyEngine._record_success(db)
                     await browser.close()
-                    return {"status": "submitted", "screenshot": str(confirm_screenshot)}
+                    return {"status": final_app_status, "screenshot": str(confirm_screenshot)}
                 else:
                     # Dry-Run mode
                     AutoApplyEngine._record_transition(db, job, "dry_run", "Dry-run form preview generated and verified", "dry_run")

@@ -6,6 +6,7 @@ from typing import Tuple, Optional, Dict, Any, List
 import httpx
 from sqlalchemy.orm import Session
 from backend.app.models import Job, Profile, RunLog, CandidateRecord, JobStateTransition
+from backend.app.services.eligibility_service import EligibilityService, EligibilityDecision
 from backend.app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -121,43 +122,33 @@ class ScoringService:
                     missing_qualifications=[]
                 )
 
-        # 2. Minimum Salary Gate
-        if profile and profile.min_salary_inr and job.salary_numeric and job.salary_numeric > 0:
-            if job.salary_numeric < profile.min_salary_inr:
+        # Comprehensive Section 2 Eligibility Evaluation
+        decision = EligibilityService.evaluate_job(
+            title=title,
+            location=job.location or "",
+            description=combined_text[:1500],
+            salary_numeric=job.salary_numeric,
+            salary_raw=job.salary_raw or "",
+            is_internship=bool(job.is_internship),
+            stipend_numeric=job.stipend_numeric,
+            company=job.company or "",
+            is_fulltime=True
+        )
+        if not decision.is_eligible:
+            if getattr(decision, "needs_verification", False):
                 return EligibilityResult(
-                    status="ineligible",
-                    reason=f"Salary {job.salary_raw or ('₹' + str(job.salary_numeric))} is below candidate ₹{profile.min_salary_inr:,} minimum limit.",
-                    blocked_category="below_salary",
-                    missing_qualifications=[f"Minimum salary ₹{profile.min_salary_inr:,}"]
+                    status="needs_verification",
+                    reason=decision.reason,
+                    blocked_category="missing_verification",
+                    missing_qualifications=decision.violations
                 )
-
-        # 3. Leadership & Senior Ineligibility (Senior, Director, VP, Head, Principal, Staff, Lead Architect)
-        senior_mgmt_pattern = r'\b(senior|sr\.|director|vp|vice president|head of|chief|principal|staff engineer|lead architect|engineering manager|group manager|lead data scientist|lead ml)\b'
-        if re.search(senior_mgmt_pattern, title_lower):
-            matched_title = re.search(senior_mgmt_pattern, title_lower).group(0)
+            cat = "below_salary" if any("salary" in v.lower() or "stipend" in v.lower() for v in decision.violations) else "ineligible"
             return EligibilityResult(
                 status="ineligible",
-                reason=f"Requires {matched_title.title()} seniority level (Candidate profile: 0-1 years entry level).",
-                blocked_category="ineligible",
-                missing_qualifications=[f"{matched_title.title()} experience"]
+                reason=decision.reason,
+                blocked_category=cat,
+                missing_qualifications=decision.violations
             )
-
-        # 4. Strict Experience Threshold (4+ years or 5-8 years)
-        high_exp_patterns = [
-            r'\b(4\+|5\+|6\+|7\+|8\+|9\+|10\+|12\+|15\+|\d{2,}\+)\s*(?:years?|yrs?)\b',
-            r'\b(?:minimum|at least)\s*(?:4|5|6|7|8|9|10|12|15)\s*(?:years?|yrs?)\b',
-            r'\b(4|5|6|7|8|9|10|12|15)\s*-\s*\d+\s*(?:years?|yrs?)\b'
-        ]
-        for pat in high_exp_patterns:
-            m = re.search(pat, combined_text)
-            if m:
-                matched_exp = m.group(0)
-                return EligibilityResult(
-                    status="ineligible",
-                    reason=f"Requires {matched_exp} experience (Candidate profile: 0-1 years entry level).",
-                    blocked_category="ineligible",
-                    missing_qualifications=[f"Required experience: {matched_exp}"]
-                )
 
         # 5. Missing critical data -> Mark as requiring verification (DO NOT automatically reject!)
         if not title or (not exp_raw and not job.score_reason and not job.salary_raw):

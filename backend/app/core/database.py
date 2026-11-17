@@ -120,11 +120,23 @@ def migrate_db():
             ("interview_prep_notes", "TEXT DEFAULT ''"),
             ("company_research_notes", "TEXT DEFAULT ''"),
             ("blocked_reason", "TEXT DEFAULT ''"),
+            ("normalized_title", "VARCHAR(256) DEFAULT ''"),
+            ("worker", "VARCHAR(64)"),
+            ("lease_until", "DATETIME"),
+            ("attempts", "INTEGER DEFAULT 0"),
         ]
         for col_name, col_def in job_additions:
             if col_name not in job_cols:
                 conn.execute(text(f"ALTER TABLE jobs ADD COLUMN {col_name} {col_def};"))
         conn.commit()
+
+        # Idempotency & repost de-duplication indices
+        try:
+            conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_jobs_idempotency ON jobs (company, normalized_title, location, url);"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_jobs_reposts ON jobs (company, normalized_title, location);"))
+            conn.commit()
+        except Exception as idx_err:
+            logger.warning(f"Note on index creation: {idx_err}")
 
         # 4. Migrate run_logs
         log_cols = get_existing_cols("run_logs")

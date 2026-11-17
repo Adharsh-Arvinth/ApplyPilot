@@ -81,6 +81,18 @@ def get_profile(db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Profile not initialized.")
     return _format_profile_out(profile)
 
+@router.get("/facts", summary="Get Read-Only Locked Facts (Source of Truth)")
+def get_locked_facts():
+    """Return immutable locked candidate facts from facts.py."""
+    from backend.app.core.facts import LOCKED_FACTS
+    def _convert(obj):
+        if isinstance(obj, (dict, type(LOCKED_FACTS))):
+            return {k: _convert(v) for k, v in obj.items()}
+        elif isinstance(obj, (list, tuple)):
+            return [_convert(x) for x in obj]
+        return obj
+    return _convert(LOCKED_FACTS)
+
 @router.put("", response_model=ProfileOut)
 def update_profile(update: ProfileUpdate, db: Session = Depends(get_db)):
     profile = db.query(Profile).first()

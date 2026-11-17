@@ -114,6 +114,16 @@ class ApiClient {
     return jsonDecode(res.body);
   }
 
+  Future<Map<String, dynamic>> getLockedFacts() async {
+    try {
+      final res = await http.get(Uri.parse("$_baseUrl/api/v1/profile/facts"), headers: _headers()).timeout(const Duration(seconds: 4));
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body) as Map<String, dynamic>;
+      }
+    } catch (_) {}
+    return {};
+  }
+
   Future<Map<String, dynamic>> rotateToken() async {
     final res = await http.post(Uri.parse("$_baseUrl/api/v1/profile/rotate-token"), headers: _headers());
     if (res.statusCode == 200) {
@@ -217,6 +227,14 @@ class ApiClient {
       headers: _headers(),
       body: jsonEncode({"action": action}),
     );
+  }
+
+  Future<void> approveJob(int jobId) async {
+    await updateJobStatus(jobId, {"status": "queued"});
+  }
+
+  Future<void> skipJob(int jobId, {String reason = "Skipped by candidate"}) async {
+    await updateJobStatus(jobId, {"status": "skipped", "skip_reason": reason});
   }
 
   Future<Map<String, dynamic>> triggerDiscovery() async {

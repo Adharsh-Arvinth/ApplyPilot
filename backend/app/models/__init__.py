@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, ForeignKey, Index
 from sqlalchemy.orm import relationship
 from backend.app.core.database import Base
 
@@ -17,10 +17,10 @@ class Profile(Base):
     github = Column(String(256), default="https://github.com/candidate")
     education = Column(String(256), default="MTech Integrated CSE (Data Science), VIT Vellore")
     cgpa = Column(String(32), default="7.62/10")
-    graduation_date = Column(String(64), default="May 2027")
-    notice_period = Column(String(64), default="Immediate / Negotiable for college schedule")
-    work_authorization = Column(String(64), default="Indian citizen, no sponsorship needed in India")
-    relocation_preference = Column(String(64), default="Yes")
+    graduation_date = Column(String(64), default=None)
+    notice_period = Column(String(64), default=None)
+    work_authorization = Column(String(64), default=None)
+    relocation_preference = Column(String(64), default=None)
     preferred_work_mode = Column(String(64), default="Remote / Hybrid / Onsite")
     
     # Target roles, locations & excluded companies (JSON stringified)
@@ -49,10 +49,10 @@ class Profile(Base):
     go_live = Column(Boolean, default=False) # Strict safety switch
     
     # Verified facts and proof points (Immutable truth source)
-    proof_points_text = Column(Text, default="""* 2 published patents: Proactive Multimodal Fusion-Based Accident Predictor for a Driver (OpenCV + MediaPipe, MFCC/pitch/amplitude voice-stress features, Random Forest + LSTM, GenAI safety reports); Acoustic Doppler Session Guard (FFT proximity detection, dual-band spectral veto, auto-lock in 10.5 s)
-* Agentic Code Intelligence: code retrieval over 8,765 Python programs (embeddings + BM25 + AST), 25.59% NDCG@10 vs 5.14% baseline, 43–63 ms CPU latency
+    proof_points_text = Column(Text, default="""* 2 published patents: A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver; Acoustic Doppler Session Guard
+* Agentic Code Intelligence: hybrid code retrieval over 8,765 Python programs (embeddings + BM25 + AST), 25.59% NDCG@10 vs 5.14% baseline, 43–63 ms CPU latency
 * Certifications: AWS Cloud Solutions Architect; Generative AI for Data Analysts
-* Education: Integrated MTech CSE (Data Science), VIT Vellore (2022-2027), CGPA 7.62/10""")
+* Education: MTech Integrated CSE (Data Science), VIT Vellore (Started Sep 2022), CGPA 7.62/10""")
 
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
@@ -106,6 +106,7 @@ class Job(Base):
     source = Column(String(64), nullable=False) # greenhouse, lever, ashby, workable, naukri, linkedin
     company = Column(String(128), index=True, nullable=False)
     title = Column(String(256), nullable=False)
+    normalized_title = Column(String(256), index=True, default="")
     url = Column(String(512), unique=True, index=True, nullable=False)
     location = Column(String(128), default="India")
     work_mode = Column(String(32), default="remote") # remote, hybrid, onsite
@@ -113,6 +114,11 @@ class Job(Base):
     salary_raw = Column(String(128), default="")
     salary_numeric = Column(Integer, default=0)
     posted_at = Column(DateTime, default=utcnow)
+    
+    # Worker Lease & Concurrency Control
+    worker = Column(String(64), nullable=True, default=None)
+    lease_until = Column(DateTime, nullable=True, default=None)
+    attempts = Column(Integer, default=0)
     
     score = Column(Float, default=0.0) # 1.0 to 5.0 (Composite Fit)
     score_reason = Column(Text, default="")
@@ -166,6 +172,11 @@ class Job(Base):
     
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+    __table_args__ = (
+        Index("ix_jobs_idempotency", "company", "normalized_title", "location", "url", unique=True),
+        Index("ix_jobs_reposts", "company", "normalized_title", "location"),
+    )
 
     applications = relationship("Application", back_populates="job", cascade="all, delete-orphan")
     needs_inputs = relationship("NeedsInput", back_populates="job", cascade="all, delete-orphan")

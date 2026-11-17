@@ -355,83 +355,95 @@ class KiteAppShell extends StatelessWidget {
   }
 
   Widget _buildMobileBottomBar(BuildContext context) {
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          decoration: const BoxDecoration(
-            color: Color(0xD90A0A0C),
-            border: Border(top: BorderSide(color: Color(0x1FFFFFFF), width: 0.8)),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: List.generate(items.length, (idx) {
-                  final item = items[idx];
-                  final isSelected = currentIndex == idx;
-                  const activeColor = Color(0xFF30D158);
-                  const inactiveColor = Color(0xFF8E8E93);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surfaceColor = isDark ? const Color(0xFF161816) : const Color(0xFFFFFFFF);
+    final borderColor = isDark ? const Color(0xFF262926) : const Color(0xFFE3E3DE);
+    final activeColor = isDark ? const Color(0xFF7FD1A8) : const Color(0xFF2F6F4F);
+    final inactiveColor = isDark ? const Color(0xFF8A908A) : const Color(0xFF6E736E);
 
-                  return InkWell(
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      onNavigationChanged(idx);
-                    },
-                    borderRadius: BorderRadius.circular(12),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              Icon(
-                                isSelected ? item.activeIcon : item.icon,
-                                size: 22,
-                                color: isSelected ? activeColor : inactiveColor,
-                              ),
-                              if (item.badgeCount > 0)
-                                Positioned(
-                                  top: -4,
-                                  right: -8,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFFFF453A),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Text(
-                                      item.badgeCount > 9 ? "9+" : "${item.badgeCount}",
-                                      style: const TextStyle(
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.white,
-                                      ),
+    return Container(
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        border: Border(top: BorderSide(color: borderColor, width: 1.0)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: List.generate(items.length, (idx) {
+              final item = items[idx];
+              final isSelected = currentIndex == idx;
+
+              return InkWell(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  onNavigationChanged(idx);
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Icon(
+                              isSelected ? item.activeIcon : item.icon,
+                              size: 20,
+                              color: isSelected ? activeColor : inactiveColor,
+                            ),
+                            if (item.badgeCount > 0)
+                              Positioned(
+                                top: -3,
+                                right: -7,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFE5736B),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Text(
+                                    item.badgeCount > 9 ? "9+" : "${item.badgeCount}",
+                                    style: const TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
                                     ),
                                   ),
                                 ),
-                            ],
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          item.label,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                            color: isSelected ? activeColor : inactiveColor,
                           ),
-                          const SizedBox(height: 3),
-                          Text(
-                            item.label,
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                              color: isSelected ? activeColor : inactiveColor,
-                            ),
+                        ),
+                        const SizedBox(height: 2),
+                        // Small accent indicator dot
+                        Container(
+                          width: 4,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isSelected ? activeColor : Colors.transparent,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  );
-                }),
-              ),
-            ),
+                  ),
+                ),
+              );
+            }),
           ),
         ),
       ),

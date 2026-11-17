@@ -4,15 +4,17 @@ import datetime
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from playwright.sync_api import sync_playwright
+import pypdf
+
 from backend.app.core.config import settings
+from backend.app.core.facts import LOCKED_FACTS, assert_resume_grounded, UngroundedFactError
 from backend.app.models import Profile
 
 COMMON_TECH_KEYWORDS = [
     "Python", "FastAPI", "SQL", "PostgreSQL", "Machine Learning", "Deep Learning",
-    "OpenCV", "MediaPipe", "PyTorch", "TensorFlow", "Scikit-Learn", "AWS",
-    "Docker", "Linux", "Git", "REST API", "Pandas", "NumPy", "NLP", "LLM",
-    "Generative AI", "Data Analysis", "Computer Vision", "AST Parsing", "BM25",
-    "Neural Embeddings", "Microservices", "Java", "C++", "Kubernetes", "Kafka"
+    "OpenCV", "MediaPipe", "PyTorch", "Scikit-Learn", "AWS", "Docker", "Linux",
+    "Git", "REST API", "Pandas", "NumPy", "NLP", "LLM", "Generative AI",
+    "Data Analysis", "AST Parsing", "BM25", "Neural Embeddings", "Distributed Systems"
 ]
 
 class ResumeTailoringService:
@@ -20,22 +22,14 @@ class ResumeTailoringService:
     def analyze_keywords(role: str, description: str = "") -> Dict[str, Any]:
         """
         Analyze keyword presence and identify matches vs missing qualifications.
-        Strictly based on candidate's verified skill inventory.
+        Strictly based on candidate's locked skill inventory in facts.py.
         """
         combined = f"{role} {description}".lower()
-        
-        # Candidate's verified skill set (Immutable ground truth)
-        candidate_verified_skills = {
-            "python", "sql", "fastapi", "machine learning", "deep learning",
-            "opencv", "mediapipe", "scikit-learn", "aws", "linux", "git",
-            "rest api", "pandas", "numpy", "nlp", "generative ai",
-            "data analysis", "computer vision", "ast parsing", "bm25",
-            "neural embeddings", "java", "docker", "postgresql", "sqlite"
-        }
+        candidate_verified_skills = {s.lower() for s in LOCKED_FACTS["skills"]}
 
         matched = []
         missing = []
-        
+
         for kw in COMMON_TECH_KEYWORDS:
             kw_lower = kw.lower()
             if kw_lower in combined:
@@ -62,118 +56,51 @@ class ResumeTailoringService:
         job_description: str = ""
     ) -> Dict[str, Any]:
         """
-        Generate a tailored, ATS-compliant 1-page executive resume for a target company and role.
-        Dynamically binds to the candidate's active Profile record with verified proof points (Zero fabrication).
-        Ensures immaculate vertical spacing, balanced margins, and guaranteed single-page PDF rendering.
+        Generate a tailored, ATS-compliant 1-page A4 executive resume.
+        Adheres strictly to LOCKED_FACTS (Section 1) and Section 6 formatting:
+        - Single column, selectable real text, no tables, icons or images.
+        - Standard headings: Education, Skills, Projects, Patents, Certifications.
+        - A4 page size, 10-10.5 pt body, ~0.75 in (19mm) margins, standard font (Arial, Calibri).
+        - Grounded verification with assert_resume_grounded().
+        - Validated with pypdf: strictly fails if page count exceeds 1 page.
         """
         clean_company = re.sub(r'\W+', '_', company).strip('_')
         clean_role = re.sub(r'\W+', '_', role).strip('_')
-        
-        cand_name = profile.full_name if profile and profile.full_name else "Adharsh Arvinth"
+
+        cand_name = LOCKED_FACTS["personal"]["name"]
         clean_name = re.sub(r'\W+', '_', cand_name).strip('_')
         filename_base = f"{clean_name}_{clean_company}_{clean_role}"
 
         html_out = settings.OUTPUT_DIR / "resumes" / f"{filename_base}.html"
         pdf_out = settings.OUTPUT_DIR / "resumes" / f"{filename_base}.pdf"
+        html_out.parent.mkdir(parents=True, exist_ok=True)
 
         # Keyword analysis
         kw_analysis = ResumeTailoringService.analyze_keywords(role, job_description)
 
-        # Highlight projects and dynamic executive summary based on role keywords
-        role_lower = role.lower()
-        highlight_agentic = any(k in role_lower for k in ["code", "software", "python", "backend", "system", "search", "nlp", "llm", "agent", "infrastructure"])
-        highlight_cv = any(k in role_lower for k in ["vision", "driver", "multimodal", "camera", "media", "sensor", "automotive", "perception"])
-        highlight_data = any(k in role_lower for k in ["data", "analyst", "analytics", "business", "science", "statistic", "finance"])
+        # Personal Contact details from LOCKED_FACTS
+        email_val = LOCKED_FACTS["personal"]["email"]
+        phone_val = LOCKED_FACTS["personal"]["phone"]
+        linkedin_val = LOCKED_FACTS["personal"]["linkedin"]
+        github_val = LOCKED_FACTS["personal"]["github"]
+        location_val = LOCKED_FACTS["personal"]["location"]
 
-        # Role-targeted Professional Summary
-        if highlight_agentic:
-            summary_text = (
-                f"Software & Systems Engineer pursuing Integrated MTech CSE (Data Science) at VIT Vellore. "
-                f"Author of benchmarked AI code retrieval architecture indexing 8,765 Python programs delivering 25.59% NDCG@10 with ultra-fast 43–63ms CPU latency. "
-                f"Published patent inventor with deep engineering skills in Python, FastAPI, Linux systems, PostgreSQL, and AWS cloud infrastructure."
-            )
-        elif highlight_cv:
-            summary_text = (
-                f"Computer Vision & Deep Learning Researcher pursuing Integrated MTech CSE (Data Science) at VIT Vellore. "
-                f"Lead inventor on published patent for real-time multimodal driver safety telemetry using OpenCV and MediaPipe. "
-                f"Proven expertise in spatial-temporal neural networks (LSTM, Random Forest), latency-budget optimization, and automated Generative AI diagnostics."
-            )
-        elif highlight_data:
-            summary_text = (
-                f"Data Scientist & Analytics Engineer pursuing Integrated MTech CSE (Data Science) at VIT Vellore (CGPA 7.62/10). "
-                f"Published patent inventor experienced in statistical inference, dense neural embeddings, and high-dimensional predictive pipelines. "
-                f"Strong foundations in Python, SQL analytics, data modeling, Scikit-learn, and cloud automation on AWS."
-            )
-        else:
-            summary_text = (
-                f"Machine Learning & Systems Researcher pursuing Integrated MTech CSE (Data Science) at VIT Vellore. "
-                f"Lead inventor on published patents spanning multimodal driver safety telemetry and acoustic proximity sensing. "
-                f"Developer of benchmarked AI code intelligence architectures delivering 25.59% NDCG@10 with 43–63ms latency. Expertise in Python, PyTorch, OpenCV, and AWS."
-            )
+        # Education
+        institution_val = LOCKED_FACTS["education"]["institution_full"]
+        degree_val = LOCKED_FACTS["education"]["degree"]
+        cgpa_val = LOCKED_FACTS["education"]["cgpa"]
+        start_date_val = LOCKED_FACTS["education"]["start_date"]
 
-        block_accident = """
-<div class="entry-header">
-  <span>Proactive Multimodal Fusion-Based Driver Accident Predictor System</span>
-  <span>Patent Published</span>
-</div>
-<div class="entry-sub">
-  <span class="tech-stack">Technologies: Python, OpenCV, MediaPipe, Random Forest, LSTM, Generative AI</span>
-  <span>Lead Inventor</span>
-</div>
-<ul>
-  <li>Invented a real-time safety architecture fusing driver facial landmark telemetry, cabin acoustic stress signals (MFCC, pitch, amplitude), and GPS road topography.</li>
-  <li>Deployed OpenCV and MediaPipe for ultra-low latency eye-blink and head-pose tracking; trained Random Forest and LSTM temporal models for predictive intervention.</li>
-  <li>Integrated Generative AI to automate post-trip diagnostic summaries and deliver personalized driving safety audits.</li>
-</ul>"""
+        # Graduation date: Only display if confirmed in profile; otherwise omit
+        grad_date_str = ""
+        if profile and profile.graduation_date:
+            grad_date_str = f" &bull; Expected: {profile.graduation_date}"
 
-        block_agentic = """
-<div class="entry-header">
-  <span>Agentic Code Intelligence — High-Precision AI Code Retrieval</span>
-  <span>Benchmarked Implementation</span>
-</div>
-<div class="entry-sub">
-  <span class="tech-stack">Technologies: Python, Dense Neural Embeddings, BM25, Abstract Syntax Tree (AST) Parsing</span>
-  <span>Independent R&D</span>
-</div>
-<ul>
-  <li>Engineered a hybrid semantic code retrieval architecture indexing 8,765 Python programs using dense vector embeddings, BM25 text rank, and structural AST parsing.</li>
-  <li>Benchmarked on MTEB AppsRetrieval: achieved <strong>25.59% NDCG@10</strong> (vs. 5.14% baseline) with <strong>43–63 ms single-threaded CPU latency</strong>.</li>
-</ul>"""
+        # Standard Sections in strict required order:
+        # 1. Education, 2. Skills, 3. Projects, 4. Patents, 5. Certifications
 
-        block_doppler = """
-<div class="entry-header">
-  <span>Acoustic Doppler Session Guard — Motion-Aware Security Lock</span>
-  <span>Patent Published</span>
-</div>
-<div class="entry-sub">
-  <span class="tech-stack">Technologies: Python, Fast Fourier Transform (FFT), Acoustic Signal Processing</span>
-  <span>Co-Inventor</span>
-</div>
-<ul>
-  <li>Developed an FFT-based ultrasonic proximity detection system identifying user departure motion patterns in ambient office environments.</li>
-  <li>Engineered a dual-band spectral veto filter rejecting environmental noise, triggering automated system lock within 10.5 seconds of physical departure.</li>
-</ul>"""
+        skills_list = ", ".join(LOCKED_FACTS["skills"])
 
-        changes_applied = []
-        if highlight_agentic:
-            projects_html = block_agentic + block_accident + block_doppler
-            changes_applied.append(f"Prioritized Agentic Code Intelligence benchmark for {role} at {company}")
-        elif highlight_cv:
-            projects_html = block_accident + block_agentic + block_doppler
-            changes_applied.append(f"Prioritized Multimodal Driver Accident Predictor patent for {role} at {company}")
-        else:
-            projects_html = block_agentic + block_accident + block_doppler
-            changes_applied.append(f"Aligned core research implementations & patents for {role} at {company}")
-
-        email_val = profile.email if (profile and profile.email) else "adharsharvinth2108@gmail.com"
-        phone_val = profile.phone if (profile and profile.phone) else "+91 7397161512"
-        linkedin_val = profile.linkedin if (profile and profile.linkedin) else "https://linkedin.com/in/Adharsh-Arvinth"
-        github_val = profile.github if (profile and profile.github) else "https://github.com/Adharsh-Arvinth"
-        education_val = profile.education if profile else "Integrated MTech in Computer Science & Engineering (Spec. in Data Science)"
-        cgpa_val = profile.cgpa if profile else "7.62 / 10.0"
-        grad_val = profile.graduation_date if profile else "May 2027"
-
-        # Guaranteed 1-page executive ATS template
         html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -181,102 +108,78 @@ class ResumeTailoringService:
 <title>{cand_name} - Resume ({company})</title>
 <style>
   @page {{
-    size: letter;
-    margin: 0.45in;
+    size: A4;
+    margin: 19mm;
   }}
   * {{
     box-sizing: border-box;
-  }}
-  body {{
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    color: #1A202C;
-    line-height: 1.38;
-    font-size: 9.3pt;
     margin: 0;
     padding: 0;
   }}
+  body {{
+    font-family: Arial, Calibri, sans-serif;
+    color: #111111;
+    line-height: 1.35;
+    font-size: 10pt;
+    background: #FFFFFF;
+  }}
   .header {{
     text-align: center;
-    margin-bottom: 8px;
-    border-bottom: 2px solid #1B4332;
+    margin-bottom: 12px;
+    border-bottom: 1.5px solid #111111;
     padding-bottom: 6px;
   }}
   h1 {{
-    font-size: 18pt;
-    font-weight: 700;
-    margin: 0 0 3px 0;
-    color: #1B4332;
-    letter-spacing: 0.6px;
+    font-size: 16pt;
+    font-weight: bold;
     text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+    color: #111111;
   }}
   .contact-bar {{
-    font-size: 8.8pt;
-    color: #4A5568;
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    flex-wrap: wrap;
+    font-size: 9.5pt;
+    color: #333333;
   }}
   .contact-bar a {{
-    color: #1B4332;
+    color: #111111;
     text-decoration: none;
-    font-weight: 600;
-  }}
-  .summary {{
-    font-size: 8.8pt;
-    color: #2D3748;
-    margin-bottom: 8px;
-    text-align: justify;
-    line-height: 1.42;
   }}
   h2 {{
-    font-size: 10.2pt;
-    font-weight: 700;
+    font-size: 11pt;
+    font-weight: bold;
     text-transform: uppercase;
-    color: #1B4332;
-    border-bottom: 1px solid #CBD5E0;
-    margin: 8px 0 5px 0;
+    color: #111111;
+    border-bottom: 1px solid #CCCCCC;
+    margin-top: 10px;
+    margin-bottom: 5px;
     padding-bottom: 2px;
-    letter-spacing: 0.5px;
   }}
-  .entry-header {{
+  .item-title {{
+    font-weight: bold;
+    font-size: 10pt;
     display: flex;
     justify-content: space-between;
-    font-weight: 700;
-    font-size: 9.3pt;
-    color: #2D3748;
   }}
-  .entry-sub {{
+  .item-sub {{
+    font-size: 9.5pt;
+    color: #444444;
+    margin-bottom: 3px;
     display: flex;
     justify-content: space-between;
-    font-size: 8.6pt;
-    color: #4A5568;
-    margin-bottom: 2px;
-  }}
-  .tech-stack {{
-    font-style: italic;
-    color: #2B6CB0;
   }}
   ul {{
-    margin: 2px 0 5px 16px;
-    padding: 0;
+    margin-left: 18px;
+    margin-bottom: 6px;
   }}
   li {{
-    margin-bottom: 2.5px;
-    color: #2D3748;
+    font-size: 10pt;
+    margin-bottom: 2px;
   }}
-  li strong {{
-    color: #1A202C;
-  }}
-  .skills-block {{
-    font-size: 8.8pt;
-    line-height: 1.45;
-  }}
-  .skills-block p {{
-    margin: 2.5px 0;
-  }}
-  .skills-block strong {{
-    color: #1B4332;
+  p.skills-content {{
+    font-size: 10pt;
+    line-height: 1.35;
+    margin-bottom: 4px;
   }}
 </style>
 </head>
@@ -287,64 +190,109 @@ class ResumeTailoringService:
   <div class="contact-bar">
     <span>{email_val}</span> &bull; 
     <span>{phone_val}</span> &bull; 
-    <span>Vellore, Tamil Nadu, India</span> &bull; 
+    <span>{location_val}</span> &bull; 
     <a href="{linkedin_val}">LinkedIn</a> &bull; 
     <a href="{github_val}">GitHub</a>
   </div>
 </div>
 
-<div class="summary">
-  {summary_text}
-</div>
-
 <h2>Education</h2>
-<div class="entry-header">
-  <span>Vellore Institute of Technology (VIT)</span>
+<div class="item-title">
+  <span>{institution_val}</span>
   <span>Vellore, Tamil Nadu, India</span>
 </div>
-<div class="entry-sub">
-  <span>{education_val}</span>
-  <span>Expected: {grad_val}</span>
+<div class="item-sub">
+  <span>{degree_val} (Started {start_date_val}{grad_date_str})</span>
+  <span>Academic Standing: CGPA {cgpa_val}</span>
+</div>
+
+<h2>Skills</h2>
+<p class="skills-content">{skills_list}</p>
+
+<h2>Projects</h2>
+<div class="item-title">
+  <span>Agentic Code Intelligence</span>
+  <span>Benchmarked System</span>
+</div>
+<div class="item-sub">
+  <span>Technologies: Python, Neural Embeddings, BM25, Abstract Syntax Tree (AST) Parsing</span>
 </div>
 <ul>
-  <li>Academic Standing: <strong>CGPA {cgpa_val}</strong></li>
-  <li>Key Coursework: Machine Learning, Deep Learning, Distributed Systems, Data Structures & Algorithms, Natural Language Processing, Statistical Inference, Cloud Architecture.</li>
+  <li>Engineered a hybrid code retrieval architecture indexing 8,765 Python programs using embeddings, BM25, and AST parsing.</li>
+  <li>Achieved <strong>25.59% NDCG@10</strong> vs 5.14% baseline with <strong>43–63 ms CPU latency</strong>.</li>
 </ul>
 
-<h2>Published Patents & Core Research Implementations</h2>
-{projects_html}
+<h2>Patents</h2>
+<ul>
+  <li><strong>A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver</strong> &mdash; Published Patent</li>
+  <li><strong>Acoustic Doppler Session Guard</strong> &mdash; Published Patent</li>
+</ul>
 
-<h2>Technical Skills & Certifications</h2>
-<div class="skills-block">
-  <p><strong>Languages & Frameworks:</strong> Python (Expert), SQL (PostgreSQL, SQLite), Java, FastAPI, PyTorch, Scikit-learn, OpenCV, MediaPipe, Pandas, NumPy</p>
-  <p><strong>Cloud, Systems & Tools:</strong> AWS (Solutions Architect Associate), Linux/Bash, Docker, Git, RESTful APIs, CI/CD, Microservices Architecture</p>
-  <p><strong>Certifications:</strong> AWS Certified Solutions Architect – Associate; Generative AI for Data Analysts</p>
-</div>
+<h2>Certifications</h2>
+<ul>
+  <li>AWS Cloud Solutions Architect</li>
+  <li>Generative AI for Data Analysts</li>
+</ul>
 
 </body>
 </html>"""
+
+        # Verify strict fact grounding before proceeding
+        assert_resume_grounded(html_content, profile.graduation_date if profile else None)
 
         # Write HTML
         with open(html_out, "w", encoding="utf-8") as f:
             f.write(html_content)
 
-        # Render PDF via Playwright
-        try:
+        # Remove stale PDF if exists
+        if pdf_out.exists():
+            try:
+                pdf_out.unlink()
+            except Exception:
+                pass
+
+        # Render PDF via Playwright in a dedicated worker thread
+        # (guarantees no conflict with existing asyncio event loops)
+        def _render_pdf_worker(html_str: str, target_pdf: Path):
             with sync_playwright() as p:
                 browser = p.chromium.launch(headless=True)
                 page = browser.new_page()
-                page.set_content(html_content)
+                page.set_content(html_str)
                 page.pdf(
-                    path=str(pdf_out),
-                    format="Letter",
+                    path=str(target_pdf),
+                    format="A4",
                     print_background=True,
-                    margin={"top": "0.45in", "bottom": "0.45in", "left": "0.45in", "right": "0.45in"}
+                    margin={"top": "19mm", "bottom": "19mm", "left": "19mm", "right": "19mm"}
                 )
                 browser.close()
+
+        from concurrent.futures import ThreadPoolExecutor
+        try:
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(_render_pdf_worker, html_content, pdf_out)
+                future.result(timeout=30)
         except Exception as e:
             if not pdf_out.exists():
-                with open(pdf_out, "wb") as f:
-                    f.write(b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj\n3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R>>endobj\nxref\n0 4\n0000000000 65535 f \n0000000009 00000 n \n0000000052 00000 n \n0000000108 00000 n \ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n185\n%%EOF\n")
+                raise RuntimeError(f"Playwright PDF generation failed: {e}")
+
+        # Section 6 Validation: Extract text and strictly enforce single-page constraint
+        if pdf_out.exists():
+            reader = pypdf.PdfReader(str(pdf_out))
+            num_pages = len(reader.pages)
+            if num_pages != 1:
+                raise ValueError(f"Resume build failed: rendered {num_pages} pages instead of exactly 1 A4 page.")
+            
+            # Verify reading order of standard headings (case-insensitive)
+            pdf_text_upper = "".join(page.extract_text() for page in reader.pages).upper()
+            headings = ["EDUCATION", "SKILLS", "PROJECTS", "PATENTS", "CERTIFICATIONS"]
+            last_idx = -1
+            for h in headings:
+                idx = pdf_text_upper.find(h)
+                if idx == -1:
+                    raise ValueError(f"Resume heading '{h}' missing from generated PDF text.")
+                if idx < last_idx:
+                    raise ValueError(f"Resume heading '{h}' out of standard reading order.")
+                last_idx = idx
 
         return {
             "html_path": str(html_out),
@@ -356,5 +304,5 @@ class ResumeTailoringService:
             "keyword_coverage_percent": kw_analysis["coverage_percent"],
             "matched_keywords": kw_analysis["matched_keywords"],
             "missing_qualifications": kw_analysis["missing_qualifications"],
-            "changes_applied": changes_applied
+            "changes_applied": [f"Generated grounded 1-page A4 resume for {role} at {company}"]
         }

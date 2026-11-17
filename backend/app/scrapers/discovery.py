@@ -13,10 +13,11 @@ from backend.app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+from backend.app.services.eligibility_service import SeniorityGuard, LocationGuard
+
 ALLOWED_LOCATIONS = [
     "india", "bangalore", "bengaluru", "chennai", "hyderabad",
-    "pune", "coimbatore", "mumbai", "delhi", "gurgaon", "noida", "remote",
-    "united states", "san francisco", "new york", "london", "singapore"
+    "pune", "coimbatore", "mumbai", "delhi", "gurgaon", "noida", "remote"
 ]
 
 TARGET_TITLE_KEYWORDS = [
@@ -26,25 +27,31 @@ TARGET_TITLE_KEYWORDS = [
     "intern", "associate", "graduate", "engineer", "analyst"
 ]
 
-DISALLOWED_EXPERIENCE = [
-    r'\b(4\+|5\+|6\+|7\+|8\+|10\+)\s*(?:years?|yrs?)\b',
-    r'\b(?:director|vp|vice president|head of|chief|principal|staff engineer|lead architect|engineering manager|group manager)\b'
-]
+def normalize_job_title(title: str) -> str:
+    if not title:
+        return ""
+    t = title.lower()
+    t = re.sub(r'\(.*?\)', '', t)
+    t = re.sub(r'\b(i{1,3}|iv|v|1|2|3|4|5)\b', '', t)
+    t = re.sub(r'[-–—/|:,]', ' ', t)
+    t = re.sub(r'\s+', ' ', t).strip()
+    return t
 
 class JobDiscoveryService:
     @staticmethod
     def is_eligible_location(location_str: str) -> bool:
-        if not location_str:
-            return True
-        loc = location_str.lower()
-        return any(term in loc for term in ALLOWED_LOCATIONS)
+        ok, _ = LocationGuard.check_location(location_str)
+        return ok
 
     @staticmethod
     def is_target_title(title_str: str) -> bool:
+        ok_sen, _ = SeniorityGuard.check_title(title_str)
+        if not ok_sen:
+            return False
+        ok_exp, _ = SeniorityGuard.check_experience(title_str)
+        if not ok_exp:
+            return False
         t = title_str.lower()
-        for dis in DISALLOWED_EXPERIENCE:
-            if re.search(dis, t):
-                return False
         return any(term in t for term in TARGET_TITLE_KEYWORDS)
 
     @staticmethod
@@ -551,12 +558,15 @@ class JobDiscoveryService:
                 except Exception as e:
                     logger.warning(f"Error fetching Indeed Easy Apply for {role}: {e}")
 
-        # 2. Ingest verified pool merged with live jobs
-        test_fixtures = JobDiscoveryService.get_test_verified_fixtures()
+        # 2. Ingest pool: live jobs only by default (fixtures only when explicitly enabled in test mode)
+        test_fixtures = JobDiscoveryService.get_test_verified_fixtures() if include_fixtures else []
         pool = live_jobs + test_fixtures
 
         new_count = 0
         seen_urls = set()
+
+        AUTO_SUBMIT_ATS = {"greenhouse", "lever", "ashby", "workable"}
+        ASSIST_ONLY_SOURCES = {"linkedin", "indeed", "naukri", "workday"}
 
         for raw_job in pool:
             url = raw_job["url"]
@@ -569,15 +579,29 @@ class JobDiscoveryService:
                 continue
 
             company_name = raw_job["company"]
-            work_mode = JobDiscoveryService.classify_work_mode(raw_job["title"], raw_job["location"])
-            is_assist_only = bool(raw_job.get("is_assist_only", False))
+            norm_title = normalize_job_title(raw_job["title"])
+            loc_val = raw_job.get("location", "India")
+
+            # Deduplicate reposts by company + normalized_title + location
+            existing_repost = db.query(Job).filter(
+                Job.company == company_name,
+                Job.normalized_title == norm_title,
+                Job.location == loc_val
+            ).first()
+            if existing_repost:
+                logger.info(f"Skipping repost: {company_name} - {raw_job['title']} already exists as Job #{existing_repost.id}")
+                continue
+
+            work_mode = JobDiscoveryService.classify_work_mode(raw_job["title"], loc_val)
             source_lower = (raw_job.get("source") or "").lower()
 
-            # Flag non-Easy Apply portal jobs as assist-only
-            if source_lower in ["naukri"] or "naukri.com" in url:
-                is_assist_only = True
-            elif raw_job.get("is_assist_only") is True:
-                is_assist_only = True
+            # Strict Platform Rule: LinkedIn, Indeed, Naukri, Workday & non-ATS are ASSIST-ONLY
+            is_assist_only = (
+                bool(raw_job.get("is_assist_only", False)) or
+                source_lower in ASSIST_ONLY_SOURCES or
+                source_lower not in AUTO_SUBMIT_ATS or
+                any(portal in url.lower() for portal in ["linkedin.com", "indeed.com", "naukri.com", "myworkdayjobs.com", "workday.com"])
+            )
 
             is_internship = raw_job.get("is_internship", False) or "intern" in raw_job["title"].lower()
             salary_num = raw_job.get("salary_numeric", 0)
@@ -692,6 +716,7 @@ class JobDiscoveryService:
                 source=raw_job["source"],
                 company=company_name,
                 title=raw_job["title"],
+                normalized_title=norm_title,
                 url=url,
                 location=raw_job["location"],
                 work_mode=work_mode,
@@ -701,6 +726,7 @@ class JobDiscoveryService:
                 stipend_numeric=stipend_num,
                 salary_raw=raw_job.get("salary_raw", ""),
                 salary_numeric=salary_num,
+                posted_at=raw_job.get("posted_at") or datetime.datetime.now(datetime.timezone.utc),
                 last_verified_at=datetime.datetime.now(datetime.timezone.utc),
                 status=initial_status,
                 notes="Portal listing (Assist-Only). Manual completion required." if is_assist_only else ""

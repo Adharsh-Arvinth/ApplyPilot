@@ -19,24 +19,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _saving = false;
   bool _uploading = false;
 
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _linkedinController = TextEditingController();
-  final TextEditingController _githubController = TextEditingController();
-  final TextEditingController _educationController = TextEditingController();
-  final TextEditingController _cgpaController = TextEditingController();
+  Map<String, dynamic> _lockedFacts = {};
+
   final TextEditingController _gradController = TextEditingController();
   final TextEditingController _noticeController = TextEditingController();
   final TextEditingController _workAuthController = TextEditingController();
   final TextEditingController _salaryController = TextEditingController();
-  final TextEditingController _proofPointsController = TextEditingController();
 
   List<String> _targetRoles = [];
   List<String> _locations = [];
   List<String> _excludedCompanies = [];
-  List<dynamic> _candidateRecords = [];
-  String _selectedRecordCategory = "all";
 
   final TextEditingController _newRoleController = TextEditingController();
   final TextEditingController _newLocController = TextEditingController();
@@ -45,8 +37,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _loadProfile();
-    _loadCandidateRecords();
+    _loadProfileData();
+  }
+
+  @override
+  void dispose() {
+    _gradController.dispose();
+    _noticeController.dispose();
+    _workAuthController.dispose();
+    _salaryController.dispose();
+    _newRoleController.dispose();
+    _newLocController.dispose();
+    _newExcludedController.dispose();
+    super.dispose();
   }
 
   String _formatIndianCurrency(int val) {
@@ -59,55 +62,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return "₹$formatted,$last3";
   }
 
-  Future<void> _loadCandidateRecords() async {
-    try {
-      final records = await _api.fetchCandidateRecords();
-      if (mounted) {
-        setState(() {
-          _candidateRecords = records;
-        });
-      }
-    } catch (_) {}
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    _phoneController.dispose();
-    _linkedinController.dispose();
-    _githubController.dispose();
-    _educationController.dispose();
-    _cgpaController.dispose();
-    _gradController.dispose();
-    _noticeController.dispose();
-    _workAuthController.dispose();
-    _salaryController.dispose();
-    _proofPointsController.dispose();
-    _newRoleController.dispose();
-    _newLocController.dispose();
-    _newExcludedController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadProfile() async {
+  Future<void> _loadProfileData() async {
     setState(() => _loading = true);
     try {
-      final p = await _api.getProfile();
+      final pFuture = _api.getProfile();
+      final factsFuture = _api.getLockedFacts();
+      final results = await Future.wait([pFuture, factsFuture]);
+
+      final p = results[0] as Map<String, dynamic>;
+      final facts = results[1] as Map<String, dynamic>;
+
       if (mounted) {
         setState(() {
-          _nameController.text = p["full_name"] ?? "";
-          _emailController.text = p["email"] ?? "";
-          _phoneController.text = p["phone"] ?? "";
-          _linkedinController.text = p["linkedin"] ?? "";
-          _githubController.text = p["github"] ?? "";
-          _educationController.text = p["education"] ?? "";
-          _cgpaController.text = p["cgpa"] ?? "";
+          _lockedFacts = facts;
           _gradController.text = p["graduation_date"] ?? "";
           _noticeController.text = p["notice_period"] ?? "";
           _workAuthController.text = p["work_authorization"] ?? "";
           _salaryController.text = (p["min_salary_inr"] ?? 700000).toString();
-          _proofPointsController.text = p["proof_points_text"] ?? "";
 
           _targetRoles = List<String>.from(p["target_roles"] ?? []);
           _locations = List<String>.from(p["locations"] ?? []);
@@ -124,26 +95,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
     HapticFeedback.mediumImpact();
     setState(() => _saving = true);
     try {
+      final salary = int.tryParse(_salaryController.text.trim()) ?? 700000;
       await _api.updateProfile({
-        "full_name": _nameController.text.trim(),
-        "email": _emailController.text.trim(),
-        "phone": _phoneController.text.trim(),
-        "linkedin": _linkedinController.text.trim(),
-        "github": _githubController.text.trim(),
-        "education": _educationController.text.trim(),
-        "cgpa": _cgpaController.text.trim(),
         "graduation_date": _gradController.text.trim(),
         "notice_period": _noticeController.text.trim(),
         "work_authorization": _workAuthController.text.trim(),
-        "min_salary_inr": int.tryParse(_salaryController.text.trim()) ?? 700000,
-        "proof_points_text": _proofPointsController.text.trim(),
+        "min_salary_inr": salary < 700000 ? 700000 : salary,
         "target_roles": _targetRoles,
         "locations": _locations,
         "excluded_companies": _excludedCompanies,
       });
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Candidate Profile saved successfully.")));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Profile preferences saved successfully.")),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Save failed: $e")));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Failed to save profile: $e")),
+        );
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -151,182 +124,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _pickAndUploadResume() async {
     try {
-      final files = await FilePicker.pickFiles(
+      final file = await FilePicker.pickFile(
         type: FileType.custom,
-        allowedExtensions: ['pdf', 'txt'],
+        allowedExtensions: ['pdf'],
       );
 
-      if (files != null && files.isNotEmpty) {
-        final file = files.first;
+      if (file != null) {
+        setState(() => _uploading = true);
         final bytes = await file.readAsBytes();
-        if (bytes.isNotEmpty) {
-          setState(() => _uploading = true);
-          final res = await _api.uploadResume(bytes, file.name);
-          setState(() => _uploading = false);
+        await _api.uploadResume(bytes, file.name);
+
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Resume uploaded! Extracted: ${res['message']}")),
+            const SnackBar(content: Text("Master resume uploaded and parsed.")),
           );
-          _loadProfile();
         }
+        _loadProfileData();
       }
     } catch (e) {
-      setState(() => _uploading = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Upload error: $e")));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Upload error: $e")),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
     }
   }
 
-  void _openAddEditRecordModal({Map<String, dynamic>? record}) {
-    final isEditing = record != null;
-    final catController = TextEditingController(text: record?["category"] ?? "education");
-    final subcatController = TextEditingController(text: record?["subcategory"] ?? "university");
-    final titleController = TextEditingController(text: record?["title"] ?? "");
-    final descController = TextEditingController(text: record?["description"] ?? "");
-    final evidenceController = TextEditingController(text: record?["source_evidence"] ?? "");
-    String status = record?["verification_status"] ?? "verified";
-
-    showModalBottomSheet(
+  Future<void> _pickGraduationDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
       context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.card))),
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setModalState) {
-            final isDark = Theme.of(ctx).brightness == Brightness.dark;
-            final primaryTextColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
-            final secondaryTextColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
-            final cardBg = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
-            final accentGreen = isDark ? AppColors.accentDark : AppColors.racingGreen;
-
-            return Padding(
-              padding: EdgeInsets.only(
-                left: AppSpacing.s20,
-                right: AppSpacing.s20,
-                top: AppSpacing.s20,
-                bottom: MediaQuery.of(ctx).viewInsets.bottom + AppSpacing.s24,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          isEditing ? "Edit Candidate Record" : "Add Verifiable Proof Point",
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: primaryTextColor),
-                        ),
-                        const Spacer(),
-                        IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.s12),
-                    DropdownButtonFormField<String>(
-                      value: catController.text,
-                      decoration: const InputDecoration(labelText: "Category"),
-                      items: const [
-                        DropdownMenuItem(value: "education", child: Text("Education")),
-                        DropdownMenuItem(value: "patents", child: Text("Patents")),
-                        DropdownMenuItem(value: "projects", child: Text("Projects / Benchmarks")),
-                        DropdownMenuItem(value: "certifications", child: Text("Certifications")),
-                        DropdownMenuItem(value: "technical_skills", child: Text("Technical Skills")),
-                        DropdownMenuItem(value: "work_experience", child: Text("Work Experience")),
-                        DropdownMenuItem(value: "achievements", child: Text("Achievements")),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) setModalState(() => catController.text = val);
-                      },
-                    ),
-                    const SizedBox(height: AppSpacing.s12),
-                    TextField(
-                      controller: subcatController,
-                      decoration: const InputDecoration(
-                        labelText: "Subcategory / Tag (e.g. university, published_patent, system_benchmark)",
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.s12),
-                    TextField(
-                      controller: titleController,
-                      decoration: const InputDecoration(labelText: "Title / Name"),
-                    ),
-                    const SizedBox(height: AppSpacing.s12),
-                    TextField(
-                      controller: descController,
-                      maxLines: 3,
-                      decoration: const InputDecoration(labelText: "Description & Specific Facts"),
-                    ),
-                    const SizedBox(height: AppSpacing.s12),
-                    TextField(
-                      controller: evidenceController,
-                      decoration: const InputDecoration(labelText: "Verification Evidence / Credential Link / Patent #"),
-                    ),
-                    const SizedBox(height: AppSpacing.s16),
-                    DropdownButtonFormField<String>(
-                      value: status,
-                      decoration: const InputDecoration(labelText: "Verification Status"),
-                      items: const [
-                        DropdownMenuItem(value: "verified", child: Text("Verified Ground Truth")),
-                        DropdownMenuItem(value: "pending_verification", child: Text("Pending Verification")),
-                        DropdownMenuItem(value: "unverified", child: Text("Unverified")),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) setModalState(() => status = val);
-                      },
-                    ),
-                    const SizedBox(height: AppSpacing.s20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: accentGreen,
-                          foregroundColor: AppColors.pureWhite,
-                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s14),
-                        ),
-                        onPressed: () async {
-                          final payload = {
-                            "category": catController.text,
-                            "subcategory": subcatController.text.trim(),
-                            "title": titleController.text.trim(),
-                            "description": descController.text.trim(),
-                            "source_evidence": evidenceController.text.trim(),
-                            "verification_status": status,
-                            "is_verified": status == "verified",
-                          };
-                          Navigator.pop(ctx);
-                          if (isEditing) {
-                            await _api.updateCandidateRecord(record["id"] as int, payload);
-                          } else {
-                            await _api.createCandidateRecord(payload);
-                          }
-                          _loadCandidateRecords();
-                        },
-                        child: Text(isEditing ? "Update Record" : "Save Verifiable Record", style: const TextStyle(fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
+      initialDate: DateTime(now.year + 1, 5),
+      firstDate: DateTime(2023),
+      lastDate: DateTime(2035),
+      helpText: "CONFIRM EXPECTED GRADUATION DATE",
     );
-  }
-
-  Future<void> _deleteRecord(int id) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text("Delete Record?"),
-        content: const Text("Are you sure you want to remove this proof point?"),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Delete", style: TextStyle(color: AppColors.errorLight))),
-        ],
-      ),
-    );
-    if (confirmed == true) {
-      await _api.deleteCandidateRecord(id);
-      _loadCandidateRecords();
+    if (picked != null) {
+      final months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      setState(() {
+        _gradController.text = "${months[picked.month - 1]} ${picked.year}";
+      });
     }
   }
 
@@ -338,17 +177,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final cardBg = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
     final borderColor = isDark ? AppColors.borderHairlineDark : AppColors.borderHairlineLight;
     final accentGreen = isDark ? AppColors.accentDark : AppColors.racingGreen;
-    final brassColor = isDark ? AppColors.brassDark : AppColors.mutedBrass;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
           "Candidate Profile",
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: primaryTextColor),
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: primaryTextColor),
         ),
         actions: [
           IconButton(
-            icon: _saving ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.check),
+            icon: _saving
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.check, size: 20),
             tooltip: "Save Profile",
             onPressed: _saving ? null : _saveProfile,
           ),
@@ -359,355 +199,338 @@ class _ProfileScreenState extends State<ProfileScreen> {
           : ListView(
               padding: const EdgeInsets.all(AppSpacing.s16),
               children: [
-                // 1. Master Resume Upload Card
+                // 1. LOCKED FACTS CARD AT THE TOP (PADLOCK ICON + TWO-COLUMN GRID)
+                _buildLockedFactsCard(isDark, primaryTextColor, secondaryTextColor, accentGreen, cardBg, borderColor),
+
+                const SizedBox(height: AppSpacing.s20),
+
+                // 2. MASTER RESUME UPLOAD CARD
                 Container(
-                  padding: const EdgeInsets.all(AppSpacing.s20),
+                  padding: const EdgeInsets.all(AppSpacing.s16),
                   decoration: BoxDecoration(
                     color: cardBg,
-                    borderRadius: BorderRadius.circular(AppRadii.card),
+                    borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: borderColor),
                   ),
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(AppSpacing.s12),
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
                           color: accentGreen.withOpacity(0.1),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(Icons.upload_file_outlined, color: accentGreen, size: 28),
+                        child: Icon(Icons.upload_file_outlined, color: accentGreen, size: 22),
                       ),
                       const SizedBox(width: AppSpacing.s16),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text("Master Resume Document", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: primaryTextColor)),
+                            Text("Master Resume PDF", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: primaryTextColor)),
                             const SizedBox(height: 2),
-                            Text("Upload your latest PDF resume. PyPDF extracts facts automatically.", style: TextStyle(fontSize: 11, color: secondaryTextColor)),
+                            Text("Single-column, text-selectable A4 resume.", style: TextStyle(fontSize: 11, color: secondaryTextColor)),
                           ],
                         ),
                       ),
-                      ElevatedButton(
+                      OutlinedButton(
                         onPressed: _uploading ? null : _pickAndUploadResume,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: accentGreen,
-                          foregroundColor: AppColors.pureWhite,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: primaryColorOrAccent(primaryTextColor, accentGreen),
+                          side: BorderSide(color: borderColor),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
                         child: _uploading
-                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.pureWhite))
-                            : const Text("Upload PDF", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Text("Upload PDF", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
                       ),
                     ],
                   ),
                 ),
 
-                const SizedBox(height: AppSpacing.s16),
+                const SizedBox(height: AppSpacing.s20),
 
-                // 2. Personal Information
-                _buildSectionHeader("Personal and contact details", secondaryTextColor),
-                const SizedBox(height: AppSpacing.s8),
-                _buildCard(cardBg, borderColor, [
-                  _buildTextField("Full Name", _nameController),
-                  const SizedBox(height: AppSpacing.s12),
-                  _buildTextField("Primary Email", _emailController),
-                  const SizedBox(height: AppSpacing.s12),
-                  _buildTextField("Mobile Number", _phoneController),
-                  const SizedBox(height: AppSpacing.s12),
-                  _buildTextField("LinkedIn Profile URL", _linkedinController),
-                  const SizedBox(height: AppSpacing.s12),
-                  _buildTextField("GitHub Profile URL", _githubController),
-                ]),
-
-                const SizedBox(height: AppSpacing.s16),
-
-                // 3. Education & Credentials
-                _buildSectionHeader("Academic and work authorization", secondaryTextColor),
-                const SizedBox(height: AppSpacing.s8),
-                _buildCard(cardBg, borderColor, [
-                  _buildTextField("Highest Degree & Discipline", _educationController),
-                  const SizedBox(height: AppSpacing.s12),
-                  Row(
-                    children: [
-                      Expanded(child: _buildTextField("CGPA / GPA", _cgpaController)),
-                      const SizedBox(width: AppSpacing.s12),
-                      Expanded(child: _buildTextField("Graduation Date", _gradController)),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.s12),
-                  _buildTextField("Notice Period / Availability", _noticeController),
-                  const SizedBox(height: AppSpacing.s12),
-                  _buildTextField("Work Authorization", _workAuthController),
-                  const SizedBox(height: AppSpacing.s12),
-                  _buildTextField(
-                    "Minimum Salary Expectation (INR)",
-                    _salaryController,
-                    keyboardType: TextInputType.number,
-                    prefixText: "₹ ",
-                    helperText: "Annual Floor: ${_formatIndianCurrency(int.tryParse(_salaryController.text.trim()) ?? 700000)} (₹7 LPA standard)",
-                  ),
-                ]),
-
-                const SizedBox(height: AppSpacing.s16),
-
-                // 4. Target Roles & Locations
-                _buildSectionHeader("Career criteria and target roles", secondaryTextColor),
-                const SizedBox(height: AppSpacing.s8),
-                _buildCard(cardBg, borderColor, [
-                  Text("Target Roles", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primaryTextColor)),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: _targetRoles.map((r) => Chip(
-                      label: Text(r, style: const TextStyle(fontSize: 11)),
-                      onDeleted: () => setState(() => _targetRoles.remove(r)),
-                      visualDensity: VisualDensity.compact,
-                    )).toList(),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(child: TextField(controller: _newRoleController, decoration: const InputDecoration(hintText: "Add role (e.g. AI Engineer)"))),
-                      IconButton(
-                        icon: const Icon(Icons.add_circle, color: AppColors.racingGreen),
-                        onPressed: () {
-                          if (_newRoleController.text.trim().isNotEmpty) {
-                            setState(() {
-                              _targetRoles.add(_newRoleController.text.trim());
-                              _newRoleController.clear();
-                            });
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.s16),
-
-                  Text("Target Locations", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primaryTextColor)),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: _locations.map((l) => Chip(
-                      label: Text(l, style: const TextStyle(fontSize: 11)),
-                      onDeleted: () => setState(() => _locations.remove(l)),
-                      visualDensity: VisualDensity.compact,
-                    )).toList(),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(child: TextField(controller: _newLocController, decoration: const InputDecoration(hintText: "Add location (e.g. Bangalore)"))),
-                      IconButton(
-                        icon: const Icon(Icons.add_circle, color: AppColors.racingGreen),
-                        onPressed: () {
-                          if (_newLocController.text.trim().isNotEmpty) {
-                            setState(() {
-                              _locations.add(_newLocController.text.trim());
-                              _newLocController.clear();
-                            });
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.s16),
-
-                  Text("Excluded Companies", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: primaryTextColor)),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: _excludedCompanies.map((c) => Chip(
-                      label: Text(c, style: const TextStyle(fontSize: 11, color: AppColors.errorLight)),
-                      backgroundColor: AppColors.errorLight.withOpacity(0.08),
-                      onDeleted: () => setState(() => _excludedCompanies.remove(c)),
-                      visualDensity: VisualDensity.compact,
-                    )).toList(),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(child: TextField(controller: _newExcludedController, decoration: const InputDecoration(hintText: "Add company to blacklist..."))),
-                      IconButton(
-                        icon: const Icon(Icons.add_circle, color: AppColors.errorLight),
-                        onPressed: () {
-                          if (_newExcludedController.text.trim().isNotEmpty) {
-                            setState(() {
-                              _excludedCompanies.add(_newExcludedController.text.trim());
-                              _newExcludedController.clear();
-                            });
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                ]),
-
-                const SizedBox(height: AppSpacing.s16),
-
-                // 5. Facts the AI can use
-                Row(
-                  children: [
-                    _buildSectionHeader("Facts available for AI tailoring", secondaryTextColor),
-                    const Spacer(),
-                    TextButton.icon(
-                      style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
-                      icon: const Icon(Icons.add, size: 16, color: AppColors.racingGreen),
-                      label: const Text("Add Fact", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.racingGreen)),
-                      onPressed: () => _openAddEditRecordModal(),
-                    ),
-                  ],
+                // 3. EDITABLE CANDIDATE PREFERENCES
+                Text(
+                  "EDITABLE PREFERENCES",
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: secondaryTextColor),
                 ),
                 const SizedBox(height: AppSpacing.s8),
 
-                // Category Filter Chips
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      "all", "education", "patents", "projects", "certifications", "technical_skills", "achievements"
-                    ].map((cat) {
-                      final isSel = _selectedRecordCategory == cat;
-                      final label = cat == "all"
-                          ? "All (${_candidateRecords.length})"
-                          : "${cat[0].toUpperCase()}${cat.substring(1).replaceAll('_', ' ')}";
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: ChoiceChip(
-                          label: Text(label, style: TextStyle(fontSize: 11, color: isSel ? AppColors.pureWhite : primaryTextColor)),
-                          selected: isSel,
-                          selectedColor: accentGreen,
-                          backgroundColor: cardBg,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
-                          visualDensity: VisualDensity.compact,
-                          onSelected: (val) {
-                            if (val) setState(() => _selectedRecordCategory = cat);
-                          },
-                        ),
-                      );
-                    }).toList(),
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.s16),
+                  decoration: BoxDecoration(
+                    color: cardBg,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: borderColor),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.s10),
-
-                // Render Filtered Records
-                ..._candidateRecords.where((r) {
-                  if (_selectedRecordCategory == "all") return true;
-                  return r["category"] == _selectedRecordCategory;
-                }).map((record) {
-                  final isVerified = record["is_verified"] == true;
-                  final subcat = record["subcategory"] ?? "";
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: AppSpacing.s10),
-                    padding: const EdgeInsets.all(AppSpacing.s14),
-                    decoration: BoxDecoration(
-                      color: cardBg,
-                      borderRadius: BorderRadius.circular(AppRadii.card),
-                      border: Border.all(color: isVerified ? brassColor.withOpacity(0.35) : borderColor),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: (isVerified ? AppColors.successEmerald : AppColors.mutedBrass).withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(AppRadii.badge),
-                              ),
-                              child: Text(
-                                subcat.toString().replaceAll('_', ' ').toUpperCase(),
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                  color: isVerified ? AppColors.successEmerald : brassColor,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.s8),
-                            if (isVerified)
-                              const Icon(Icons.verified, size: 14, color: AppColors.successEmerald),
-                            const Spacer(),
-                            IconButton(
-                              icon: const Icon(Icons.edit_outlined, size: 16),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              color: secondaryTextColor,
-                              onPressed: () => _openAddEditRecordModal(record: record),
-                            ),
-                            const SizedBox(width: AppSpacing.s10),
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline, size: 16),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              color: AppColors.errorLight,
-                              onPressed: () => _deleteRecord(record["id"] as int),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.s8),
-                        Text(
-                          record["title"] ?? "",
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: primaryTextColor),
-                        ),
-                        if ((record["description"] ?? "").toString().isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            record["description"] ?? "",
-                            style: TextStyle(fontSize: 12, height: 1.35, color: secondaryTextColor),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Graduation Date Picker
+                      Text("Expected Graduation Date", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: primaryTextColor)),
+                      const SizedBox(height: 6),
+                      InkWell(
+                        onTap: _pickGraduationDate,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF1C1F1C) : const Color(0xFFF3F4F1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: borderColor),
                           ),
-                        ],
-                        if ((record["source_evidence"] ?? "").toString().isNotEmpty) ...[
-                          const SizedBox(height: 6),
-                          Row(
+                          child: Row(
                             children: [
-                              Icon(Icons.link, size: 12, color: brassColor),
-                              const SizedBox(width: 4),
+                              Icon(Icons.calendar_today_outlined, size: 16, color: accentGreen),
+                              const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
-                                  "Evidence: ${record['source_evidence']}",
-                                  style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: brassColor),
+                                  _gradController.text.isEmpty ? "Tap to confirm expected graduation (e.g. May 2027)" : _gradController.text,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: _gradController.text.isEmpty ? FontWeight.w400 : FontWeight.w600,
+                                    color: _gradController.text.isEmpty ? secondaryTextColor : primaryTextColor,
+                                  ),
                                 ),
                               ),
+                              Icon(Icons.arrow_drop_down, color: secondaryTextColor),
                             ],
                           ),
-                        ],
-                      ],
-                    ),
-                  );
-                }),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.s16),
 
-                const SizedBox(height: AppSpacing.s16),
+                      // Notice Period
+                      Text("Notice Period / Earliest Start", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: primaryTextColor)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _noticeController,
+                        decoration: InputDecoration(
+                          hintText: "e.g. Immediate, 15 Days, 1 Month",
+                          filled: true,
+                          fillColor: isDark ? const Color(0xFF1C1F1C) : const Color(0xFFF3F4F1),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: borderColor)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: borderColor)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: accentGreen, width: 1.5)),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        children: ["Immediate", "15 Days", "30 Days", "Negotiable"].map((opt) {
+                          return ActionChip(
+                            label: Text(opt, style: TextStyle(fontSize: 11, color: primaryTextColor)),
+                            backgroundColor: isDark ? const Color(0xFF1C1F1C) : const Color(0xFFF3F4F1),
+                            side: BorderSide(color: borderColor),
+                            onPressed: () {
+                              HapticFeedback.selectionClick();
+                              setState(() => _noticeController.text = opt);
+                            },
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: AppSpacing.s16),
 
-                // 6. Immutable Verified Proof Points Text
-                _buildSectionHeader("Proof points baseline (ground truth)", secondaryTextColor),
-                const SizedBox(height: AppSpacing.s8),
-                _buildCard(cardBg, borderColor, [
-                  Text("Ground Truth Prompt Ingestion (Immutable Baseline)", style: TextStyle(fontSize: 11, color: secondaryTextColor)),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: _proofPointsController,
-                    maxLines: 5,
-                    decoration: const InputDecoration(
-                      hintText: "List published patents, benchmarked research implementations, and verified certifications...",
-                    ),
+                      // Work Authorization
+                      Text("Work Authorization", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: primaryTextColor)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _workAuthController,
+                        decoration: InputDecoration(
+                          hintText: "e.g. Citizen of India, No sponsorship required",
+                          filled: true,
+                          fillColor: isDark ? const Color(0xFF1C1F1C) : const Color(0xFFF3F4F1),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: borderColor)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: borderColor)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: accentGreen, width: 1.5)),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        children: ["Citizen of India", "Authorized to work in India", "Requires sponsorship"].map((opt) {
+                          return ActionChip(
+                            label: Text(opt, style: TextStyle(fontSize: 11, color: primaryTextColor)),
+                            backgroundColor: isDark ? const Color(0xFF1C1F1C) : const Color(0xFFF3F4F1),
+                            side: BorderSide(color: borderColor),
+                            onPressed: () {
+                              HapticFeedback.selectionClick();
+                              setState(() => _workAuthController.text = opt);
+                            },
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: AppSpacing.s16),
+
+                      // Minimum Salary (₹ Floor)
+                      Text("Minimum Salary Expectation (INR)", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: primaryTextColor)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _salaryController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          prefixText: "₹ ",
+                          helperText: "Floor: ${_formatIndianCurrency(int.tryParse(_salaryController.text.trim()) ?? 700000)} (Minimum ₹7 LPA per eligibility rules)",
+                          filled: true,
+                          fillColor: isDark ? const Color(0xFF1C1F1C) : const Color(0xFFF3F4F1),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: borderColor)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: borderColor)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: accentGreen, width: 1.5)),
+                        ),
+                      ),
+                    ],
                   ),
-                ]),
+                ),
+
+                const SizedBox(height: AppSpacing.s20),
+
+                // 4. CAREER CRITERIA: TARGET ROLES & LOCATIONS
+                Text(
+                  "TARGET ROLES & LOCATIONS",
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: secondaryTextColor),
+                ),
+                const SizedBox(height: AppSpacing.s8),
+
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.s16),
+                  decoration: BoxDecoration(
+                    color: cardBg,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Target Roles (0-2 Years / Fresher)", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: primaryTextColor)),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: _targetRoles.map((r) => Chip(
+                          label: Text(r, style: TextStyle(fontSize: 11, color: primaryTextColor)),
+                          backgroundColor: isDark ? const Color(0xFF1C1F1C) : const Color(0xFFF3F4F1),
+                          side: BorderSide(color: borderColor),
+                          onDeleted: () => setState(() => _targetRoles.remove(r)),
+                          visualDensity: VisualDensity.compact,
+                        )).toList(),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _newRoleController,
+                              decoration: const InputDecoration(hintText: "Add role (e.g. AI Engineer, Software Engineer)"),
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.add_circle, color: accentGreen),
+                            onPressed: () {
+                              if (_newRoleController.text.trim().isNotEmpty) {
+                                setState(() {
+                                  _targetRoles.add(_newRoleController.text.trim());
+                                  _newRoleController.clear();
+                                });
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.s16),
+
+                      Text("Target Locations (India Only)", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: primaryTextColor)),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: _locations.map((l) => Chip(
+                          label: Text(l, style: TextStyle(fontSize: 11, color: primaryTextColor)),
+                          backgroundColor: isDark ? const Color(0xFF1C1F1C) : const Color(0xFFF3F4F1),
+                          side: BorderSide(color: borderColor),
+                          onDeleted: () => setState(() => _locations.remove(l)),
+                          visualDensity: VisualDensity.compact,
+                        )).toList(),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _newLocController,
+                              decoration: const InputDecoration(hintText: "Add location (e.g. Bangalore, Remote-India)"),
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.add_circle, color: accentGreen),
+                            onPressed: () {
+                              if (_newLocController.text.trim().isNotEmpty) {
+                                setState(() {
+                                  _locations.add(_newLocController.text.trim());
+                                  _newLocController.clear();
+                                });
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.s16),
+
+                      Text("Excluded Companies (Blacklist)", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: primaryTextColor)),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: _excludedCompanies.map((c) => Chip(
+                          label: Text(c, style: const TextStyle(fontSize: 11, color: AppColors.errorLight)),
+                          backgroundColor: AppColors.errorLight.withOpacity(0.08),
+                          side: BorderSide(color: AppColors.errorLight.withOpacity(0.3)),
+                          onDeleted: () => setState(() => _excludedCompanies.remove(c)),
+                          visualDensity: VisualDensity.compact,
+                        )).toList(),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _newExcludedController,
+                              decoration: const InputDecoration(hintText: "Add company to blacklist..."),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.add_circle, color: AppColors.errorLight),
+                            onPressed: () {
+                              if (_newExcludedController.text.trim().isNotEmpty) {
+                                setState(() {
+                                  _excludedCompanies.add(_newExcludedController.text.trim());
+                                  _newExcludedController.clear();
+                                });
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
 
                 const SizedBox(height: AppSpacing.s24),
+
+                // Save Profile Button
                 ElevatedButton(
                   onPressed: _saving ? null : _saveProfile,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: accentGreen,
-                    foregroundColor: AppColors.pureWhite,
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.s16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
+                    foregroundColor: isDark ? const Color(0xFF0E0F0E) : Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    elevation: 0,
                   ),
-                  child: const Text("Save Complete Profile", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  child: _saving
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text("Save Preferences", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                 ),
                 const SizedBox(height: AppSpacing.s24),
               ],
@@ -715,55 +538,172 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildSectionHeader(String title, Color color) {
-    return Text(
-      title,
-      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: color),
-    );
+  Color primaryColorOrAccent(Color primary, Color accent) {
+    return primary;
   }
 
-  Widget _buildCard(Color cardBg, Color borderColor, List<Widget> children) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+  Widget _buildLockedFactsCard(
+    bool isDark,
+    Color primaryColor,
+    Color secondaryColor,
+    Color accentColor,
+    Color cardBg,
+    Color borderColor,
+  ) {
+    final candidate = (_lockedFacts["candidate"] as Map<String, dynamic>?) ?? {};
+    final education = (_lockedFacts["education"] as Map<String, dynamic>?) ?? {};
+    final patents = (_lockedFacts["patents"] as List<dynamic>?) ?? [];
+    final project = (_lockedFacts["project"] as Map<String, dynamic>?) ?? {};
+    final certs = (_lockedFacts["certifications"] as List<dynamic>?) ?? [];
+
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.s16),
       decoration: BoxDecoration(
-        color: isDark ? HallmarkConsole.panel : cardBg,
-        borderRadius: BorderRadius.circular(HallmarkConsole.radiusPanel),
-        border: Border.all(color: isDark ? HallmarkConsole.rule : borderColor, width: HallmarkConsole.ruleWidth),
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor, width: 1.0),
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
+      padding: const EdgeInsets.all(AppSpacing.s20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with Padlock
+          Row(
+            children: [
+              Icon(Icons.lock_outline, size: 20, color: accentColor),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Locked Ground Truth Facts",
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: primaryColor),
+                    ),
+                    Text(
+                      "Single source of truth · Edit via facts.py on your PC",
+                      style: TextStyle(fontSize: 11, color: secondaryColor),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: accentColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: accentColor.withOpacity(0.3)),
+                ),
+                child: Text(
+                  "READ-ONLY",
+                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: accentColor),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s16),
+          const Divider(height: 1),
+          const SizedBox(height: AppSpacing.s16),
+
+          // Two-Column Grid for Personal Facts
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _buildFactItem("CANDIDATE", candidate["name"] ?? "Adharsh Arvinth", primaryColor, secondaryColor)),
+              const SizedBox(width: AppSpacing.s12),
+              Expanded(child: _buildFactItem("PHONE", candidate["phone"] ?? "+91 7397161512", primaryColor, secondaryColor)),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _buildFactItem("PRIMARY EMAIL", candidate["email"] ?? "adharsharvinth2108@gmail.com", primaryColor, secondaryColor)),
+              const SizedBox(width: AppSpacing.s12),
+              Expanded(child: _buildFactItem("DEGREE & CGPA", "${education['degree'] ?? 'MTech CSE'} • ${education['cgpa'] ?? '7.62/10'}", primaryColor, secondaryColor)),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _buildFactItem("INSTITUTION", education["institution"] ?? "Vellore Institute of Technology (VIT)", primaryColor, secondaryColor)),
+              const SizedBox(width: AppSpacing.s12),
+              Expanded(child: _buildFactItem("ATTENDANCE", "Sep 2022 – Present", primaryColor, secondaryColor)),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s16),
+          const Divider(height: 1),
+          const SizedBox(height: AppSpacing.s12),
+
+          // Verified Patents
+          Text("PUBLISHED PATENTS (EXACT TITLES)", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: secondaryColor)),
+          const SizedBox(height: 6),
+          if (patents.isNotEmpty) ...patents.map((p) {
+            final title = p is Map ? (p["title"] ?? "") : p.toString();
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.verified, size: 13, color: accentColor),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: primaryColor))),
+                ],
+              ),
+            );
+          }) else ...[
+            Text("• A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver", style: TextStyle(fontSize: 12, color: primaryColor)),
+            const SizedBox(height: 2),
+            Text("• Acoustic Doppler Session Guard", style: TextStyle(fontSize: 12, color: primaryColor)),
+          ],
+
+          const SizedBox(height: AppSpacing.s12),
+
+          // Verified Project
+          Text("SYSTEM BENCHMARK PROJECT", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: secondaryColor)),
+          const SizedBox(height: 4),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.analytics_outlined, size: 14, color: accentColor),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  "${project['name'] ?? 'Agentic Code Intelligence'}: 8,765 Python programs; 25.59% NDCG@10 vs 5.14% baseline; 43–63 ms CPU latency",
+                  style: TextStyle(fontSize: 12, height: 1.35, color: primaryColor),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: AppSpacing.s12),
+
+          // Verified Certifications
+          Text("CERTIFICATIONS", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: secondaryColor)),
+          const SizedBox(height: 4),
+          if (certs.isNotEmpty) ...certs.map((c) {
+            final title = c is Map ? (c["title"] ?? "") : c.toString();
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: Text("• $title", style: TextStyle(fontSize: 12, color: primaryColor)),
+            );
+          }) else ...[
+            Text("• AWS Cloud Solutions Architect", style: TextStyle(fontSize: 12, color: primaryColor)),
+            Text("• Generative AI for Data Analysts", style: TextStyle(fontSize: 12, color: primaryColor)),
+          ],
+        ],
+      ),
     );
   }
 
-  Widget _buildTextField(
-    String label,
-    TextEditingController controller, {
-    TextInputType keyboardType = TextInputType.text,
-    String? helperText,
-    String? prefixText,
-  }) {
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixText: prefixText,
-        helperText: helperText,
-        filled: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12, vertical: AppSpacing.s12),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadii.control),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadii.control),
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadii.control),
-          borderSide: const BorderSide(color: AppColors.accentDark, width: 1.5),
-        ),
-      ),
+  Widget _buildFactItem(String label, String value, Color primary, Color secondary) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: secondary)),
+        const SizedBox(height: 2),
+        Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: primary)),
+      ],
     );
   }
 }

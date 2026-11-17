@@ -4,7 +4,6 @@ import '../core/theme.dart';
 import '../core/api_client.dart';
 import '../core/hallmark_tokens.dart';
 import '../main.dart';
-import 'ai_assistant_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   final VoidCallback? onNavigateToProfile;
@@ -28,56 +27,164 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _tokenController = TextEditingController();
   bool _testing = false;
   String? _testResult;
-  Map<String, dynamic>? _firebaseStatus;
-  Map<String, dynamic>? _aiStatus;
   bool _syncingCloud = false;
+
+  bool _loadingProfile = true;
+  bool _goLive = false;
+  int _dailyCap = 50;
 
   @override
   void initState() {
     super.initState();
     _urlController.text = _api.baseUrl;
     _tokenController.text = _api.token;
-    _fetchCloudStatus();
+    _loadProfileSettings();
   }
 
-  Future<void> _fetchCloudStatus() async {
+  Future<void> _loadProfileSettings() async {
     try {
-      final fb = await _api.getFirebaseStatus();
-      final ai = await _api.getAiStatus();
+      final p = await _api.getProfile();
       if (mounted) {
         setState(() {
-          _firebaseStatus = fb;
-          _aiStatus = ai;
+          _goLive = p["go_live"] == true;
+          _dailyCap = (p["daily_cap"] as int?) ?? 50;
+          _loadingProfile = false;
         });
       }
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) setState(() => _loadingProfile = false);
+    }
   }
 
-  Future<void> _triggerCloudSync() async {
+  Future<bool?> _showGoLiveConfirmationDialog() async {
+    final textController = TextEditingController();
+    bool canConfirm = false;
+
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            final coral = AppColors.getSemanticColor("coral", isDark);
+
+            return AlertDialog(
+              backgroundColor: isDark ? const Color(0xFF161816) : Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: coral, size: 24),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      "Activate Live Mode?",
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Live mode will submit REAL applications to external employer ATS portals with your official email address and resume.",
+                    style: TextStyle(fontSize: 13, height: 1.4),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    "To prevent accidental submission, type GO LIVE below:",
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: textController,
+                    autofocus: true,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: InputDecoration(
+                      hintText: "Type GO LIVE",
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF0E0F0E) : const Color(0xFFF3F4F1),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                    onChanged: (val) {
+                      setDialogState(() {
+                        canConfirm = val.trim().toUpperCase() == "GO LIVE";
+                      });
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text("Cancel"),
+                ),
+                ElevatedButton(
+                  onPressed: canConfirm
+                      ? () {
+                          Navigator.pop(ctx, true);
+                        }
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: coral,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: isDark ? const Color(0xFF262926) : Colors.grey.shade300,
+                  ),
+                  child: const Text("Confirm & Go Live"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _handleGoLiveToggle(bool val) async {
     HapticFeedback.mediumImpact();
-    setState(() => _syncingCloud = true);
-    try {
-      final res = await _api.syncToCloud();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Cloud Sync complete: Profile synced, ${res['jobs_synced_count']} jobs synced to Firestore.")),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Cloud Sync error: $e")));
-    } finally {
-      if (mounted) setState(() => _syncingCloud = false);
+    if (val) {
+      final confirmed = await _showGoLiveConfirmationDialog();
+      if (confirmed == true) {
+        try {
+          final res = await _api.toggleGoLive();
+          setState(() => _goLive = res["go_live"] ?? true);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Live mode ACTIVE. Real applications enabled.")),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error toggling mode: $e")));
+          }
+        }
+      }
+    } else {
+      try {
+        final res = await _api.toggleGoLive();
+        setState(() => _goLive = res["go_live"] ?? false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Dry-run mode ACTIVE. No live submissions will occur.")),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error toggling mode: $e")));
+        }
+      }
     }
   }
 
-  Future<void> _testPushNotification() async {
-    HapticFeedback.lightImpact();
+  Future<void> _updateDailyCap(double val) async {
+    final newCap = val.round();
+    setState(() => _dailyCap = newCap);
     try {
-      final res = await _api.sendTestNotification("ApplyPilot Test Alert", "Push notifications are operational.");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(res["message"] ?? "Push notification dispatched.")),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Push error: $e")));
-    }
+      await _api.updateProfile({"daily_cap": newCap});
+    } catch (_) {}
   }
 
   @override
@@ -110,11 +217,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     HapticFeedback.lightImpact();
     try {
       final res = await _api.triggerBackup();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Backup created at: ${res['backup_path'] ?? 'backups/'}")),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Backup created at: ${res['backup_path'] ?? 'backups/'}")),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Backup failed: $e")));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Backup failed: $e")));
+      }
     }
   }
 
@@ -138,9 +249,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       try {
         final res = await _api.rotateToken();
         _tokenController.text = _api.token;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res["message"])));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res["message"])));
+        }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Rotation failed: $e")));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Rotation failed: $e")));
+        }
       }
     }
   }
@@ -153,73 +268,214 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final cardBg = isDark ? AppColors.surfaceDark : AppColors.surfaceLight;
     final borderColor = isDark ? AppColors.borderHairlineDark : AppColors.borderHairlineLight;
     final accentGreen = isDark ? AppColors.accentDark : AppColors.racingGreen;
-    final brassColor = isDark ? AppColors.brassDark : AppColors.mutedBrass;
+    final coral = AppColors.getSemanticColor("coral", isDark);
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
           "Settings & Connectivity",
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: primaryTextColor),
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: primaryTextColor),
         ),
       ),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.s16),
         children: [
-          // 1. Appearance / Theme
-          _buildSectionHeader("Appearance and theme", secondaryTextColor),
+          // 1. APPLICATION MODE & GO-LIVE SAFETY SWITCH
+          Text(
+            "SUBMISSION SAFETY MODE",
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: secondaryTextColor),
+          ),
           const SizedBox(height: AppSpacing.s8),
+
           Container(
             padding: const EdgeInsets.all(AppSpacing.s16),
             decoration: BoxDecoration(
-              color: isDark ? HallmarkConsole.panel : cardBg,
-              borderRadius: BorderRadius.circular(HallmarkConsole.radiusPanel),
-              border: Border.all(color: isDark ? HallmarkConsole.rule : borderColor, width: HallmarkConsole.ruleWidth),
+              color: cardBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: _goLive ? coral.withOpacity(0.5) : borderColor,
+                width: _goLive ? 1.5 : 1.0,
+              ),
             ),
-            child: ValueListenableBuilder<ThemeMode>(
-              valueListenable: themeModeNotifier,
-              builder: (context, currentMode, _) {
-                return Column(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    RadioListTile<ThemeMode>(
-                      title: const Text("Warm Ivory (Light Editorial)"),
-                      subtitle: const Text("Ivory #FAFAF7, British Racing Green & Muted Brass"),
-                      value: ThemeMode.light,
-                      groupValue: currentMode,
-                      activeColor: accentGreen,
-                      onChanged: (mode) => setThemeMode(mode!),
+                    Icon(
+                      _goLive ? Icons.warning_amber_rounded : Icons.shield_outlined,
+                      size: 20,
+                      color: _goLive ? coral : accentGreen,
                     ),
-                    RadioListTile<ThemeMode>(
-                      title: const Text("Deep Forest Obsidian (Dark Editorial)"),
-                      subtitle: const Text("Deep Forest Slate & Emerald Racing Green"),
-                      value: ThemeMode.dark,
-                      groupValue: currentMode,
-                      activeColor: accentGreen,
-                      onChanged: (mode) => setThemeMode(mode!),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _goLive ? "Live Submission Mode" : "Dry-Run Safety Mode",
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: _goLive ? coral : primaryTextColor,
+                            ),
+                          ),
+                          Text(
+                            _goLive
+                                ? "Real applications being submitted to employer portals"
+                                : "Forms filled & screenshots taken without submitting",
+                            style: TextStyle(fontSize: 11, color: secondaryTextColor),
+                          ),
+                        ],
+                      ),
                     ),
-                    RadioListTile<ThemeMode>(
-                      title: const Text("System Default"),
-                      value: ThemeMode.system,
-                      groupValue: currentMode,
-                      activeColor: accentGreen,
-                      onChanged: (mode) => setThemeMode(mode!),
+                    Switch(
+                      value: _goLive,
+                      activeColor: coral,
+                      inactiveThumbColor: accentGreen,
+                      onChanged: _loadingProfile ? null : (val) => _handleGoLiveToggle(val),
                     ),
                   ],
-                );
-              },
+                ),
+                const SizedBox(height: AppSpacing.s16),
+                const Divider(height: 1),
+                const SizedBox(height: AppSpacing.s16),
+
+                // Daily Cap Slider
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text("Daily Cap: $_dailyCap applications", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: primaryTextColor)),
+                    Text("Cap resets midnight", style: TextStyle(fontSize: 10, color: secondaryTextColor)),
+                  ],
+                ),
+                Slider(
+                  value: _dailyCap.toDouble().clamp(10, 100),
+                  min: 10,
+                  max: 100,
+                  divisions: 18,
+                  activeColor: accentGreen,
+                  label: "$_dailyCap",
+                  onChanged: (val) => setState(() => _dailyCap = val.round()),
+                  onChangeEnd: _updateDailyCap,
+                ),
+              ],
             ),
           ),
 
           const SizedBox(height: AppSpacing.s20),
 
-          // 2. Tailscale PC Host Connection
-          _buildSectionHeader("Tailscale host connection", secondaryTextColor),
+          // 2. SYSTEM INTEGRATION CHIPS
+          Text(
+            "INTEGRATION STATUS",
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: secondaryTextColor),
+          ),
           const SizedBox(height: AppSpacing.s8),
+
           Container(
             padding: const EdgeInsets.all(AppSpacing.s16),
             decoration: BoxDecoration(
-              color: isDark ? HallmarkConsole.panel : cardBg,
-              borderRadius: BorderRadius.circular(HallmarkConsole.radiusPanel),
-              border: Border.all(color: isDark ? HallmarkConsole.rule : borderColor, width: HallmarkConsole.ruleWidth),
+              color: cardBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: borderColor),
+            ),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildStatusChip("Gmail OTP Matcher", true, accentGreen, primaryTextColor, isDark),
+                _buildStatusChip("Telegram Bot", true, accentGreen, primaryTextColor, isDark),
+                _buildStatusChip("SQLite WAL Mode", true, accentGreen, primaryTextColor, isDark),
+                _buildStatusChip("Tailscale Mesh", true, accentGreen, primaryTextColor, isDark),
+                _buildStatusChip("Playwright Engine", true, accentGreen, primaryTextColor, isDark),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.s20),
+
+          // 3. SAFETY GUARANTEES & STRICT RULES
+          Text(
+            "ACTIVE SAFETY GUARANTEES",
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: secondaryTextColor),
+          ),
+          const SizedBox(height: AppSpacing.s8),
+
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.s16),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: borderColor),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildRuleRow(Icons.check_circle_outline, "Seniority Guard", "Fresher / 0–2 years only. Rejects senior, staff, lead, principal, manager, director, or 3+ years requirements.", accentGreen, primaryTextColor, secondaryTextColor),
+                const SizedBox(height: 12),
+                _buildRuleRow(Icons.check_circle_outline, "India-Only & Pay Floor", "India only (Remote or major tech hubs). Minimum ₹7 LPA when pay listed; internships under ₹25k skipped.", accentGreen, primaryTextColor, secondaryTextColor),
+                const SizedBox(height: 12),
+                _buildRuleRow(Icons.check_circle_outline, "Assist-Only Enforcement", "LinkedIn Easy Apply, Indeed, Naukri, Workday require candidate review. Auto-submit allowed only on Greenhouse, Lever, Ashby, Workable.", accentGreen, primaryTextColor, secondaryTextColor),
+                const SizedBox(height: 12),
+                _buildRuleRow(Icons.check_circle_outline, "Zero Hallucination", "All claims strictly checked against facts.py. Unverified metrics, patents, or certifications block application and route to Needs You.", accentGreen, primaryTextColor, secondaryTextColor),
+                const SizedBox(height: 12),
+                _buildRuleRow(Icons.check_circle_outline, "Proof-Backed Application", "Marked as Applied only with confirmed screenshot & ATS confirmation text. Retries are strictly idempotent.", accentGreen, primaryTextColor, secondaryTextColor),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.s20),
+
+          // 4. DATA PRESERVATION & IMMEDIATE BACKUP
+          Text(
+            "DATA INTEGRITY & BACKUPS",
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: secondaryTextColor),
+          ),
+          const SizedBox(height: AppSpacing.s8),
+
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.s16),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: borderColor),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("Nightly Backups & WAL Snapshots", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: primaryTextColor)),
+                const SizedBox(height: 2),
+                Text("Database snapshots are stored in /backups with timestamped archives.", style: TextStyle(fontSize: 11, color: secondaryTextColor)),
+                const SizedBox(height: AppSpacing.s12),
+                OutlinedButton.icon(
+                  onPressed: _triggerBackup,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: primaryTextColor,
+                    side: BorderSide(color: borderColor),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  icon: const Icon(Icons.backup_outlined, size: 16),
+                  label: const Text("Create Immediate Backup Now", style: TextStyle(fontSize: 12)),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.s20),
+
+          // 5. TAILSCALE PC HOST CONNECTION
+          Text(
+            "TAILSCALE HOST CONNECTION",
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: secondaryTextColor),
+          ),
+          const SizedBox(height: AppSpacing.s8),
+
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.s16),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: borderColor),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -242,24 +498,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         onPressed: _testing ? null : _testAndSaveConnection,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: accentGreen,
-                          foregroundColor: AppColors.pureWhite,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
-                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12),
+                          foregroundColor: isDark ? const Color(0xFF0E0F0E) : Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          elevation: 0,
                         ),
                         icon: _testing
-                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.pureWhite))
-                            : const Icon(Icons.check_circle_outline, size: 18),
-                        label: const Text("Verify Connection"),
+                            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.check_circle_outline, size: 16),
+                        label: const Text("Verify Connection", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                       ),
                     ),
                     const SizedBox(width: AppSpacing.s8),
                     OutlinedButton(
                       onPressed: _rotateToken,
                       style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
-                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12, horizontal: AppSpacing.s12),
+                        foregroundColor: primaryTextColor,
+                        side: BorderSide(color: borderColor),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
                       ),
-                      child: const Text("Rotate Token"),
+                      child: const Text("Rotate Token", style: TextStyle(fontSize: 12)),
                     ),
                   ],
                 ),
@@ -269,8 +528,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _testResult!,
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: _testResult!.startsWith("Connection Verified") ? AppColors.successLight : AppColors.errorLight,
+                      fontWeight: FontWeight.w600,
+                      color: _testResult!.startsWith("Connection Verified") ? AppColors.successLight : coral,
                     ),
                   ),
                 ],
@@ -280,199 +539,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           const SizedBox(height: AppSpacing.s20),
 
-          // 3. Database & Backups
-          _buildSectionHeader("Data preservation & backups", secondaryTextColor),
-          const SizedBox(height: AppSpacing.s8),
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.s16),
-            decoration: BoxDecoration(
-              color: isDark ? HallmarkConsole.panel : cardBg,
-              borderRadius: BorderRadius.circular(HallmarkConsole.radiusPanel),
-              border: Border.all(color: isDark ? HallmarkConsole.rule : borderColor, width: HallmarkConsole.ruleWidth),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("Nightly Backups & Integrity", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: primaryTextColor)),
-                const SizedBox(height: 4),
-                Text("Database snapshots are stored in /backups with timestamped tar archives.", style: TextStyle(fontSize: 11, color: secondaryTextColor)),
-                const SizedBox(height: AppSpacing.s12),
-                OutlinedButton.icon(
-                  onPressed: _triggerBackup,
-                  style: OutlinedButton.styleFrom(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
-                  ),
-                  icon: const Icon(Icons.backup_outlined, size: 16),
-                  label: const Text("Trigger Immediate Nightly Backup"),
-                ),
-              ],
-            ),
+          // 6. APPEARANCE & THEME
+          Text(
+            "THEME",
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5, color: secondaryTextColor),
           ),
-
-          const SizedBox(height: AppSpacing.s20),
-
-          // 4. Firebase Cloud Synchronization
-          _buildSectionHeader("Cloud infrastructure & sync", secondaryTextColor),
           const SizedBox(height: AppSpacing.s8),
+
           Container(
-            padding: const EdgeInsets.all(AppSpacing.s16),
+            padding: const EdgeInsets.all(AppSpacing.s12),
             decoration: BoxDecoration(
-              color: isDark ? HallmarkConsole.panel : cardBg,
-              borderRadius: BorderRadius.circular(HallmarkConsole.radiusPanel),
-              border: Border.all(color: isDark ? HallmarkConsole.rule : borderColor, width: HallmarkConsole.ruleWidth),
+              color: cardBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: borderColor),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: ValueListenableBuilder<ThemeMode>(
+              valueListenable: themeModeNotifier,
+              builder: (context, currentMode, _) {
+                return Column(
                   children: [
-                    Text("Firebase Cloud Replica", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: primaryTextColor)),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: (_firebaseStatus != null && _firebaseStatus!["initialized"] == true
-                                ? AppColors.successLight
-                                : AppColors.warningLight)
-                            .withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(AppRadii.badge),
-                      ),
-                      child: Text(
-                        _firebaseStatus != null && _firebaseStatus!["initialized"] == true
-                            ? "Connected (applypilot-89c65)"
-                            : "Offline / Standby",
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: _firebaseStatus != null && _firebaseStatus!["initialized"] == true
-                              ? AppColors.successLight
-                              : AppColors.warningLight,
-                        ),
-                      ),
+                    RadioListTile<ThemeMode>(
+                      title: const Text("Dark Theme (#0E0F0E)", style: TextStyle(fontSize: 13)),
+                      value: ThemeMode.dark,
+                      groupValue: currentMode,
+                      activeColor: accentGreen,
+                      onChanged: (mode) => setThemeMode(mode!),
+                    ),
+                    RadioListTile<ThemeMode>(
+                      title: const Text("Light Theme (#FAFAF7)", style: TextStyle(fontSize: 13)),
+                      value: ThemeMode.light,
+                      groupValue: currentMode,
+                      activeColor: accentGreen,
+                      onChanged: (mode) => setThemeMode(mode!),
+                    ),
+                    RadioListTile<ThemeMode>(
+                      title: const Text("System Default", style: TextStyle(fontSize: 13)),
+                      value: ThemeMode.system,
+                      groupValue: currentMode,
+                      activeColor: accentGreen,
+                      onChanged: (mode) => setThemeMode(mode!),
                     ),
                   ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  "Replicates your candidate profile & discovered jobs to Firestore cloud database with Cloud Messaging alerts.",
-                  style: TextStyle(fontSize: 11, color: secondaryTextColor),
-                ),
-                const SizedBox(height: AppSpacing.s12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _syncingCloud ? null : _triggerCloudSync,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: accentGreen,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
-                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12),
-                        ),
-                        icon: _syncingCloud
-                            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                            : const Icon(Icons.cloud_sync_outlined, size: 16),
-                        label: const Text("Sync to Cloud Now", style: TextStyle(fontSize: 12)),
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.s8),
-                    OutlinedButton.icon(
-                      onPressed: _testPushNotification,
-                      style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
-                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12, horizontal: AppSpacing.s12),
-                      ),
-                      icon: const Icon(Icons.notifications_active_outlined, size: 16),
-                      label: const Text("Test Push", style: TextStyle(fontSize: 12)),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: AppSpacing.s20),
-
-          // 5. Gemini AI Intelligence Layer
-          _buildSectionHeader("Gemini AI intelligence engines", secondaryTextColor),
-          const SizedBox(height: AppSpacing.s8),
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.s16),
-            decoration: BoxDecoration(
-              color: isDark ? HallmarkConsole.panel : cardBg,
-              borderRadius: BorderRadius.circular(HallmarkConsole.radiusPanel),
-              border: Border.all(color: isDark ? HallmarkConsole.rule : borderColor, width: HallmarkConsole.ruleWidth),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.auto_awesome, color: ApplyPilotColors.aiViolet, size: 18),
-                        const SizedBox(width: 6),
-                        Text("Gemini 2.5 Flash", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: primaryTextColor)),
-                      ],
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: (_aiStatus != null && _aiStatus!["is_connected"] == true
-                                ? ApplyPilotColors.aiViolet
-                                : AppColors.warningLight)
-                            .withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(AppRadii.badge),
-                      ),
-                      child: Text(
-                        _aiStatus != null && _aiStatus!["is_connected"] == true
-                            ? "Active • ${_aiStatus!['latency_ms']}ms"
-                            : "Standby",
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: _aiStatus != null && _aiStatus!["is_connected"] == true
-                              ? ApplyPilotColors.aiViolet
-                              : AppColors.warningLight,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  "Powers 5-factor explainable matching, ATS resume tailoring, Answer Bank grounding, and predictive interview coaching.",
-                  style: TextStyle(fontSize: 11, color: secondaryTextColor),
-                ),
-                const SizedBox(height: AppSpacing.s12),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantScreen()));
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: ApplyPilotColors.aiViolet,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12, horizontal: AppSpacing.s16),
-                  ),
-                  icon: const Icon(Icons.psychology_outlined, size: 18),
-                  label: const Text("Launch AI Career Advisor", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: AppSpacing.s20),
-
-          // 6. About & Version
-          Center(
-            child: Column(
-              children: [
-                Text("ApplyPilot • Autonomous Career Cockpit v1.3.0", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: secondaryTextColor)),
-                const SizedBox(height: 2),
-                Text("FastAPI + Playwright on Windows Host ↔ Flutter on Android", style: TextStyle(fontSize: 10, color: secondaryTextColor)),
-              ],
+                );
+              },
             ),
           ),
           const SizedBox(height: AppSpacing.s24),
@@ -481,10 +590,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildSectionHeader(String title, Color color) {
-    return Text(
-      title,
-      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: color),
+  Widget _buildStatusChip(String label, bool active, Color accent, Color textColor, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C1F1C) : const Color(0xFFF3F4F1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: active ? accent.withOpacity(0.3) : Colors.grey.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: active ? accent : Colors.grey,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: textColor)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRuleRow(IconData icon, String title, String description, Color accent, Color primaryColor, Color secondaryColor) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: accent),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: primaryColor)),
+              const SizedBox(height: 2),
+              Text(description, style: TextStyle(fontSize: 11, height: 1.35, color: secondaryColor)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

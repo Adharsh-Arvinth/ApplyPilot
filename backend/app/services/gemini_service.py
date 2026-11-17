@@ -17,17 +17,15 @@ CANDIDATE PROFILE (VERIFIED TRUTH SOURCE):
 - Phone: +91 98765 43210
 - Links: GitHub (github.com/candidate), LinkedIn (linkedin.com/in/candidate)
 - Degree: Integrated MTech in Computer Science & Engineering (Specialization: Data Science), Vellore Institute of Technology (VIT Vellore)
-- Graduation: May 2027 | CGPA: 7.62/10
-- Notice Period: Immediate / Negotiable for college schedule | Work Authorization: Indian citizen, no sponsorship required in India
-- Target Roles: Data Scientist, ML Engineer, Data Analyst, Analytics Engineer, Python Developer, Backend Developer, AI Engineer, GenAI Engineer, Computer Vision Engineer
+- Education: Started Sep 2022 | CGPA: 7.62/10
+- Target Roles: Data Scientist, ML Engineer, Data Analyst, Analytics Engineer, Python Developer, Backend Developer, AI Engineer
 - Target Locations: Remote, Bengaluru, Chennai, Hyderabad, Pune, Coimbatore, Mumbai, Delhi NCR
 - Published Patents:
-  1. "Proactive Multimodal Fusion-Based Accident Predictor for a Driver" (OpenCV + MediaPipe, MFCC/pitch/amplitude voice-stress features, Random Forest + LSTM, GenAI safety reports)
-  2. "Acoustic Doppler Session Guard" (FFT proximity detection, dual-band spectral veto, auto-lock in 10.5 s)
+  1. "A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver"
+  2. "Acoustic Doppler Session Guard"
 - Key Benchmarks & Projects:
   * Agentic Code Intelligence: High-performance code retrieval over 8,765 Python programs (embeddings + BM25 + AST), 25.59% NDCG@10 vs 5.14% baseline, 43-63 ms CPU latency
-  * Autonomous Job Search Engine (ApplyPilot): Tailscale encrypted microservices, ATS automation, FastAPI, Flutter
-- Certifications: AWS Certified Solutions Architect - Associate; Generative AI for Data Analysts
+- Certifications: AWS Cloud Solutions Architect; Generative AI for Data Analysts
 - Core Technical Skills: Python, FastAPI, PyTorch, LangChain, Transformers, Docker, Kubernetes, AWS, SQL, Vector Databases, Data Engineering, REST APIs, Git
 """
 
@@ -219,7 +217,7 @@ Respond ONLY with a JSON object matching this schema:
                 "compensation": {"score": 80, "reason": "Within acceptable parameters"}
             },
             "strengths": ["VIT Vellore Data Science Master's degree", "2 published AI/IoT patents"],
-            "weaknesses": ["Entry-level graduation status (May 2027)"],
+            "weaknesses": ["Fresher / Early-career candidate"],
             "actionable_advice": "Highlight system design and low-latency benchmark performance."
         }
 
@@ -239,11 +237,11 @@ Company: {job_dict.get('company', '')}
 Location: {job_dict.get('location', '')}
 
 Candidate Verified Background:
-- Degree: Integrated MTech CSE (Data Science), VIT Vellore (2022-2027)
-- Patent 1: Proactive Multimodal Fusion-Based Accident Predictor (OpenCV, MediaPipe, Random Forest, LSTM, GenAI)
-- Patent 2: Acoustic Doppler Session Guard (FFT proximity detection, dual-band spectral veto)
+- Degree: Integrated MTech CSE (Data Science), VIT Vellore (Started Sep 2022)
+- Patent 1: A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver
+- Patent 2: Acoustic Doppler Session Guard
 - Benchmark: Agentic Code Intelligence (NDCG@10 25.59%, 43-63ms CPU latency across 8,765 Python programs)
-- Certifications: AWS Certified Solutions Architect - Associate; Generative AI for Data Analysts
+- Certifications: AWS Cloud Solutions Architect; Generative AI for Data Analysts
 
 Provide tailored bullet points and ATS keyword analysis.
 Respond ONLY with a JSON object:

@@ -436,6 +436,7 @@ def get_stats(db: Session = Depends(get_db)):
     maybe = db.query(Job).filter(Job.status.in_(["maybe", "evaluated"])).count()
     skipped = db.query(Job).filter(Job.status == "skipped").count()
     blocked = db.query(Job).filter(Job.status == "blocked").count()
+    unverified = db.query(Application).filter(Application.status == "unverified").count()
     interviews = db.query(Job).filter(Job.status == "interview").count()
     queue = db.query(Job).filter(Job.status.in_(["queued", "approved"])).count()
     discovered = db.query(Job).filter(Job.status == "discovered").count()
@@ -452,23 +453,23 @@ def get_stats(db: Session = Depends(get_db)):
         raw_reason = getattr(profile, "pause_reason", "") or "paused_by_user"
         auto_state = raw_reason
         if raw_reason == "paused_by_circuit_breaker" or circuit_broken:
-            recovery = "Circuit breaker tripped after repeated errors. Check network connection or execution logs before resuming."
-            can_resume = False
+            recovery = "Paused: circuit breaker tripped after repeated errors. Review logs and tap Resume to clear."
+            can_resume = True
         elif raw_reason == "paused_by_daily_cap" or (daily_remaining <= 0 and profile.go_live):
-            recovery = f"Daily cap ({daily_cap}) reached in {tz_str}. Automation resumes at midnight or increase cap in Profile."
-            can_resume = False
+            recovery = f"Paused: daily cap ({daily_cap}) reached in {tz_str}. Automation resumes at midnight or tap Resume after adjusting cap."
+            can_resume = True
         else:
             recovery = "Paused by user. Tap Resume to restart automated pipeline."
             can_resume = True
     elif circuit_broken:
         auto_state = "paused_by_circuit_breaker"
-        recovery = "Circuit breaker tripped after repeated errors. Check execution logs."
-        can_resume = False
+        recovery = "Paused: circuit breaker tripped after repeated errors. Check execution logs."
+        can_resume = True
         is_paused = True
     elif profile and profile.go_live and daily_remaining <= 0:
         auto_state = "paused_by_daily_cap"
-        recovery = f"Daily cap ({daily_cap}) reached today. Resumes at midnight."
-        can_resume = False
+        recovery = f"Paused: daily cap ({daily_cap}) reached today. Resumes at midnight."
+        can_resume = True
         is_paused = True
     elif queue == 0:
         auto_state = "idle"
@@ -502,6 +503,7 @@ def get_stats(db: Session = Depends(get_db)):
         "maybe_count": maybe,
         "skipped_count": skipped,
         "blocked_count": blocked,
+        "unverified_count": unverified,
         "failed_count": failed_count,
         "interview_count": interviews,
         "queue_count": queue,
@@ -566,12 +568,14 @@ def resume_automation(force: bool = False, db: Session = Depends(get_db)):
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
-    # Safety checks
     if AutoApplyEngine.is_circuit_broken() and not force:
         raise HTTPException(
             status_code=400,
-            detail="Cannot resume: Circuit breaker active due to repeated failures. Review execution logs."
+            detail="Cannot resume: Circuit breaker active due to consecutive failures. Pre-flight check failed."
         )
+
+    # Reset circuit breaker on explicit user resume request
+    AutoApplyEngine.reset_circuit_breaker()
 
     # Check daily cap
     tz_str = getattr(profile, "timezone", "Asia/Kolkata") or "Asia/Kolkata"

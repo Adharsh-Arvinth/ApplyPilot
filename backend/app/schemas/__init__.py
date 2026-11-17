@@ -1,5 +1,5 @@
 import datetime
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, computed_field
 from typing import List, Optional, Any, Dict
 
 class ProfileBase(BaseModel):
@@ -119,6 +119,21 @@ class AnswerBankOut(AnswerBankBase):
     usage_count: int
     updated_at: datetime.datetime
     model_config = ConfigDict(from_attributes=True)
+
+    @computed_field
+    @property
+    def display_category(self) -> str:
+        names = {
+            "personal": "Personal Contact",
+            "education": "Education & Credentials",
+            "work_auth": "Work Authorization & Legal",
+            "technical": "Technical Skills & Projects",
+            "behavioral": "Behavioral & Work Style",
+            "demographics": "Demographics & Disclosures",
+            "preferences": "Preferences & Compensation",
+            "general": "General Questions"
+        }
+        return names.get(self.category, self.category.replace("_", " ").title())
 
 
 class ResumeVersionBase(BaseModel):
@@ -283,6 +298,7 @@ class StatsOut(BaseModel):
     maybe_count: int
     skipped_count: int = 0
     blocked_count: int
+    unverified_count: int = 0
     failed_count: int = 0
     interview_count: int
     queue_count: int

@@ -650,68 +650,25 @@ class _HomeScreenState extends State<HomeScreen> {
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.s16),
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isOnline ? emerald : AppColors.getSemanticColor("coral", isDark),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  isOnline ? "Tailscale Connected" : "Host Offline",
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: primaryTextColor),
-                ),
-              ],
-            ),
-            Row(
-              children: [
-                _buildDateFilterChip("Today", _dateFilter == "Today"),
-                const SizedBox(width: 4),
-                _buildDateFilterChip("Week", _dateFilter == "Week"),
-                const SizedBox(width: 4),
-                _buildDateFilterChip("All", _dateFilter == "All"),
-              ],
-            ),
-          ],
-        ),
+        _buildStatusChipsRow(isDark, cardBg, borderColor, primaryTextColor, secondaryTextColor),
 
-        const SizedBox(height: AppSpacing.s12),
-
-        _buildAutomationStatusBanner(isDark),
-
-        const SizedBox(height: AppSpacing.s12),
-
-        // Prominent Needs You Card on Mobile if items exist
-        if (_needsYouItems.isNotEmpty) ...[
-          _buildNeedsYouDecisionCard(isDark, cardBg, borderColor, primaryTextColor, secondaryTextColor, accentGreen),
+        if (isPaused) ...[
           const SizedBox(height: AppSpacing.s12),
+          _buildAutomationStatusBanner(isDark),
         ],
 
-        // 2. Render Ordered Smart Widgets
-        ...finalWidgetOrder.map((key) {
-          final isPinned = _prefs.pinned.contains(key);
-          return Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.s12),
-            child: Stack(
-              children: [
-                _buildWidgetByKey(key, isDark, isPaused),
-                if (isPinned)
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Icon(Icons.push_pin, size: 12, color: emerald.withOpacity(0.6)),
-                  ),
-              ],
-            ),
-          );
-        }),
+        const SizedBox(height: AppSpacing.s16),
+
+        _buildProgressRingHero(isDark, cardBg, borderColor, primaryTextColor, secondaryTextColor, accentGreen),
+
+        const SizedBox(height: AppSpacing.s16),
+
+        _buildThreeQuietStatRows(isDark, cardBg, borderColor, primaryTextColor, secondaryTextColor, accentGreen),
+
+        if (_needsYouItems.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.s16),
+          _buildNeedsYouDecisionCard(isDark, cardBg, borderColor, primaryTextColor, secondaryTextColor, accentGreen),
+        ],
 
         const SizedBox(height: AppSpacing.s16),
 
@@ -719,6 +676,283 @@ class _HomeScreenState extends State<HomeScreen> {
 
         const SizedBox(height: AppSpacing.s32),
       ],
+    );
+  }
+
+  Widget _buildStatusChipsRow(bool isDark, Color cardBg, Color borderColor, Color primaryTextColor, Color secondaryTextColor) {
+    final goLive = _profile["go_live"] == true;
+    final isOnline = _health["status"] == "online" || _health["status"] == "healthy";
+
+    final liveDotColor = isDark ? const Color(0xFF7FD1A8) : const Color(0xFF2F6F4F);
+    final dryDotColor = isDark ? const Color(0xFF8A908A) : const Color(0xFF6E736E);
+    final onlineDotColor = isDark ? const Color(0xFF7FD1A8) : const Color(0xFF2F6F4F);
+    final offlineDotColor = isDark ? const Color(0xFFE5736B) : const Color(0xFFC0392B);
+
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: borderColor, width: 1.0),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: goLive ? liveDotColor : dryDotColor),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                goLive ? "Live" : "Dry-run",
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: goLive ? liveDotColor : secondaryTextColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: borderColor, width: 1.0),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: isOnline ? onlineDotColor : offlineDotColor),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                isOnline ? "PC Active" : "PC Offline",
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                  color: isOnline ? primaryTextColor : offlineDotColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Spacer(),
+        Text(
+          "Synced ${_lastSyncTime.hour.toString().padLeft(2, '0')}:${_lastSyncTime.minute.toString().padLeft(2, '0')}",
+          style: TextStyle(fontSize: 11, color: secondaryTextColor),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProgressRingHero(bool isDark, Color cardBg, Color borderColor, Color primaryTextColor, Color secondaryTextColor, Color accentGreen) {
+    final int appliedToday = (_stats["daily_applied"] as num? ?? 0).toInt();
+    final int realApplied = (_stats["real_applied_today"] as num? ?? 0).toInt();
+    final int dryRunToday = (_stats["dry_run_today"] as num? ?? 0).toInt();
+    final int dailyCap = (_stats["daily_cap"] as num? ?? 100).toInt();
+    final double ratio = dailyCap > 0 ? (appliedToday / dailyCap).clamp(0.0, 1.0) : 0.0;
+
+    final trackColor = isDark ? const Color(0xFF1C1F1C) : const Color(0xFFF0F0EC);
+    final progressColor = isDark ? const Color(0xFF7FD1A8) : const Color(0xFF2F6F4F);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor, width: 1.0),
+      ),
+      child: Column(
+        children: [
+          SizedBox(
+            width: 150,
+            height: 150,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                TweenAnimationBuilder<double>(
+                  tween: Tween<double>(begin: 0.0, end: ratio),
+                  duration: const Duration(milliseconds: 250),
+                  curve: const Cubic(0.2, 0.0, 0.0, 1.0),
+                  builder: (context, value, _) {
+                    return SizedBox(
+                      width: 140,
+                      height: 140,
+                      child: CircularProgressIndicator(
+                        value: value,
+                        strokeWidth: 10,
+                        backgroundColor: trackColor,
+                        valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+                        strokeCap: StrokeCap.round,
+                      ),
+                    );
+                  },
+                ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TweenAnimationBuilder<int>(
+                      tween: IntTween(begin: 0, end: appliedToday),
+                      duration: const Duration(milliseconds: 250),
+                      curve: const Cubic(0.2, 0.0, 0.0, 1.0),
+                      builder: (context, count, _) {
+                        return Text(
+                          "$count / $dailyCap",
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w600,
+                            color: primaryTextColor,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      "today",
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                        color: secondaryTextColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            "$realApplied real • $dryRunToday dry-run",
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w400,
+              color: secondaryTextColor,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildThreeQuietStatRows(bool isDark, Color cardBg, Color borderColor, Color primaryTextColor, Color secondaryTextColor, Color accentGreen) {
+    final int realAppliedToday = (_stats["real_applied_today"] as num? ?? 0).toInt();
+    final int totalDryRun = (_stats["total_dry_run"] as num? ?? _stats["dry_run_today"] ?? 0).toInt();
+    final int nyCount = (_stats["needs_you_count"] as num? ?? _needsYouItems.length).toInt();
+    final int interviewCount = (_stats["interview_count"] as num? ?? 0).toInt();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor, width: 1.0),
+      ),
+      child: Column(
+        children: [
+          _buildQuietStatTile(
+            label: "Applied",
+            value: "$realAppliedToday real",
+            subValue: "($totalDryRun dry-run total)",
+            dotColor: isDark ? const Color(0xFF7FD1A8) : const Color(0xFF2F6F4F),
+            primaryTextColor: primaryTextColor,
+            secondaryTextColor: secondaryTextColor,
+            onTap: widget.onNavigateToTracker,
+            showDivider: true,
+            borderColor: borderColor,
+          ),
+          _buildQuietStatTile(
+            label: "Needs You",
+            value: "$nyCount",
+            subValue: nyCount > 0 ? "actions pending" : "inbox clear",
+            dotColor: nyCount > 0 ? (isDark ? const Color(0xFFE6B450) : const Color(0xFF996500)) : (isDark ? const Color(0xFF8A908A) : const Color(0xFF6E736E)),
+            primaryTextColor: primaryTextColor,
+            secondaryTextColor: secondaryTextColor,
+            onTap: widget.onNavigateToNeedsYou,
+            showDivider: true,
+            borderColor: borderColor,
+          ),
+          _buildQuietStatTile(
+            label: "Interviews",
+            value: "$interviewCount",
+            subValue: "active rounds",
+            dotColor: isDark ? const Color(0xFF7FD1A8) : const Color(0xFF2F6F4F),
+            primaryTextColor: primaryTextColor,
+            secondaryTextColor: secondaryTextColor,
+            onTap: widget.onNavigateToTracker,
+            showDivider: false,
+            borderColor: borderColor,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuietStatTile({
+    required String label,
+    required String value,
+    required String subValue,
+    required Color dotColor,
+    required Color primaryTextColor,
+    required Color secondaryTextColor,
+    required VoidCallback onTap,
+    required bool showDivider,
+    required Color borderColor,
+  }) {
+    return InkWell(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: dotColor),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  label,
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400, color: primaryTextColor),
+                ),
+                const Spacer(),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: primaryTextColor,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  subValue,
+                  style: TextStyle(fontSize: 12, color: secondaryTextColor),
+                ),
+                const SizedBox(width: 8),
+                Icon(Icons.chevron_right, size: 16, color: secondaryTextColor),
+              ],
+            ),
+          ),
+          if (showDivider)
+            Divider(height: 1, thickness: 1, color: borderColor, indent: 16, endIndent: 16),
+        ],
+      ),
     );
   }
 
@@ -1121,8 +1355,8 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.all(AppSpacing.s16),
       decoration: BoxDecoration(
         color: cardBg,
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        border: Border.all(color: borderColor),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor, width: 1.0),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1131,18 +1365,25 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                "LIVE OPERATION STREAM",
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8, color: secondaryTextColor),
+                "Execution Log",
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: primaryTextColor,
+                ),
               ),
               Text(
-                "Real-time audit log",
-                style: TextStyle(fontSize: 10, color: secondaryTextColor),
+                "Audit Trail",
+                style: TextStyle(fontSize: 12, color: secondaryTextColor),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.s10),
+          const SizedBox(height: 12),
           if (_logs.isEmpty)
-            Text("No execution events logged yet.", style: TextStyle(fontSize: 11, color: secondaryTextColor))
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Text("No execution events logged yet.", style: TextStyle(fontSize: 12, color: secondaryTextColor)),
+            )
           else
             ...List.generate(_logs.length, (idx) {
               final log = _logs[idx];
@@ -1150,16 +1391,25 @@ class _HomeScreenState extends State<HomeScreen> {
               final level = (log["level"] ?? "info").toString();
               final isErr = level == "error" || level == "critical";
               final isWarn = level == "warning";
-              final outcome = (log["outcome"] ?? "").toString();
               final company = (log["company"] ?? "").toString();
               final role = (log["role"] ?? "").toString();
               final timestamp = (log["timestamp"] ?? "").toString();
-              final details = (log["details_json"] ?? "").toString();
               final isExpanded = _expandedLogIndices.contains(idx);
 
-              final color = isErr
-                  ? AppColors.getSemanticColor("coral", isDark)
-                  : (isWarn ? AppColors.getSemanticColor("amber", isDark) : emerald);
+              final Color dotColor = isErr
+                  ? (isDark ? const Color(0xFFE5736B) : const Color(0xFFC0392B))
+                  : (isWarn
+                      ? (isDark ? const Color(0xFFE6B450) : const Color(0xFF996500))
+                      : (isDark ? const Color(0xFF8A908A) : const Color(0xFF6E736E)));
+
+              String timeDisplay = "";
+              if (timestamp.isNotEmpty) {
+                try {
+                  timeDisplay = timestamp.contains("T")
+                      ? timestamp.split("T")[1].substring(0, 5)
+                      : (timestamp.length >= 5 ? timestamp.substring(0, 5) : timestamp);
+                } catch (_) {}
+              }
 
               return InkWell(
                 onTap: () {
@@ -1171,86 +1421,58 @@ class _HomeScreenState extends State<HomeScreen> {
                     }
                   });
                 },
-                borderRadius: BorderRadius.circular(4),
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: AppSpacing.s8),
-                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-                  decoration: BoxDecoration(
-                    color: isExpanded ? borderColor.withOpacity(0.2) : Colors.transparent,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Column(
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text("›", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color)),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        company.isNotEmpty ? "$company · $role" : msg,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                          fontFamily: 'monospace',
-                                          color: isErr ? color : primaryTextColor,
-                                        ),
-                                        maxLines: isExpanded ? null : 1,
-                                        overflow: isExpanded ? null : TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                    if (outcome.isNotEmpty)
-                                      Container(
-                                        margin: const EdgeInsets.only(left: 6),
-                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                        decoration: BoxDecoration(
-                                          color: color.withOpacity(0.12),
-                                          borderRadius: BorderRadius.circular(3),
-                                        ),
-                                        child: Text(
-                                          outcome.toUpperCase(),
-                                          style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: color),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                                if (company.isNotEmpty && msg.isNotEmpty && msg != company)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 2),
-                                    child: Text(
-                                      msg,
-                                      style: TextStyle(fontSize: 10, color: secondaryTextColor),
-                                      maxLines: isExpanded ? null : 1,
-                                      overflow: isExpanded ? null : TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ],
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(shape: BoxShape.circle, color: dotColor),
+                        ),
                       ),
-                      if (isExpanded) ...[
-                        const SizedBox(height: 6),
-                        Padding(
-                          padding: const EdgeInsets.only(left: 18),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (timestamp.isNotEmpty)
-                                Text("Time: $timestamp", style: TextStyle(fontSize: 10, color: secondaryTextColor)),
-                              if (details.isNotEmpty) ...[
-                                const SizedBox(height: 2),
-                                Text("Details: $details", style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: secondaryTextColor)),
-                              ],
-                            ],
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (company.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 2),
+                                child: Text(
+                                  "$company ${role.isNotEmpty ? '• $role' : ''}",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: primaryTextColor,
+                                  ),
+                                ),
+                              ),
+                            Text(
+                              msg,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w400,
+                                height: 1.35,
+                                color: isErr ? dotColor : primaryTextColor,
+                              ),
+                              maxLines: null, // Full text, zero truncation
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (timeDisplay.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        Text(
+                          timeDisplay,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: secondaryTextColor,
+                            fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                         ),
                       ],

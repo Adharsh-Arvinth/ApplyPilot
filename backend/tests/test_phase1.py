@@ -4,6 +4,7 @@ from sqlalchemy import text
 from backend.app.main import app
 from backend.app.core.config import settings
 from backend.app.core.database import SessionLocal, init_db
+from backend.app.models import Profile
 from backend.app.core.security import encrypt_value, decrypt_value
 from backend.app.services.answer_service import AnswerService
 
@@ -59,6 +60,15 @@ def test_encryption_at_rest():
     assert decrypted == secret
 
 def test_answer_bank_seeding_and_lookup():
+    db = SessionLocal()
+    try:
+        profile = db.query(Profile).first()
+        if profile:
+            profile.work_authorization = "Yes"
+            db.commit()
+    finally:
+        db.close()
+
     # Test seeded lookup for work authorization
     res = client.post("/api/v1/answer-bank/lookup", params={"label": "Are you legally authorized to work in India? *"}, headers=AUTH_HEADERS)
     assert res.status_code == 200

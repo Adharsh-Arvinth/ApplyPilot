@@ -20,8 +20,20 @@ class _AnswerBankScreenState extends State<AnswerBankScreen> {
   bool? _verifiedFilter;
   List<dynamic> _answers = [];
 
+  static const Map<String, String> _categoryDisplayNames = {
+    "all": "All Categories",
+    "personal": "Personal Contact",
+    "education": "Education & Degrees",
+    "work_auth": "Work Authorization",
+    "technical": "Technical Skills",
+    "behavioral": "Behavioral",
+    "preferences": "Job Preferences",
+    "demographics": "Demographics",
+    "custom": "Custom Answers",
+  };
+
   final List<String> _categories = [
-    "all", "personal", "education", "work_auth", "technical", "behavioral", "preferences", "custom"
+    "all", "personal", "education", "work_auth", "technical", "behavioral", "preferences", "demographics", "custom"
   ];
 
   @override
@@ -82,7 +94,9 @@ class _AnswerBankScreenState extends State<AnswerBankScreen> {
         await _api.deleteAnswer(id);
         _loadAnswers();
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to delete: $e")));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to delete: $e")));
+        }
       }
     }
   }
@@ -100,16 +114,17 @@ class _AnswerBankScreenState extends State<AnswerBankScreen> {
       appBar: AppBar(
         title: Text(
           "Answer Bank",
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: primaryTextColor),
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: primaryTextColor),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add),
+            icon: const Icon(Icons.add, size: 20),
             tooltip: "Add Entry",
             onPressed: () => _openEditModal(),
           ),
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh, size: 20),
+            tooltip: "Refresh Answers",
             onPressed: _loadAnswers,
           ),
         ],
@@ -129,47 +144,53 @@ class _AnswerBankScreenState extends State<AnswerBankScreen> {
                   decoration: InputDecoration(
                     hintText: "Search questions, answers, or categories...",
                     hintStyle: TextStyle(fontSize: 13, color: secondaryTextColor),
-                    prefixIcon: Icon(Icons.search, size: 20, color: secondaryTextColor),
+                    prefixIcon: Icon(Icons.search, size: 18, color: secondaryTextColor),
                     filled: true,
                     fillColor: cardBg,
                     contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: AppSpacing.s12),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadii.control), borderSide: BorderSide(color: borderColor)),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: borderColor)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: borderColor)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: accentGreen, width: 1.5)),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.s8),
-                // Category Pills (Wrapping)
+                // Category Pills (Wrapping with Human-Readable Labels)
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: _categories.map((cat) {
-                      final isSelected = _selectedCategory == cat;
-                      return InkWell(
-                        onTap: () {
-                          setState(() => _selectedCategory = cat);
-                          _loadAnswers();
-                        },
-                        borderRadius: BorderRadius.circular(AppRadii.pill),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: isSelected ? accentGreen : Colors.transparent,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: _categories.map((cat) {
+                        final isSelected = _selectedCategory == cat;
+                        final label = _categoryDisplayNames[cat] ?? cat;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: InkWell(
+                            onTap: () {
+                              setState(() => _selectedCategory = cat);
+                              _loadAnswers();
+                            },
                             borderRadius: BorderRadius.circular(AppRadii.pill),
-                            border: Border.all(color: isSelected ? accentGreen : borderColor),
-                          ),
-                          child: Text(
-                            cat.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: isSelected ? AppColors.pureWhite : secondaryTextColor,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: isSelected ? accentGreen : Colors.transparent,
+                                borderRadius: BorderRadius.circular(AppRadii.pill),
+                                border: Border.all(color: isSelected ? accentGreen : borderColor),
+                              ),
+                              child: Text(
+                                label,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                                  color: isSelected ? (isDark ? const Color(0xFF0E0F0E) : Colors.white) : secondaryTextColor,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    }).toList(),
+                        );
+                      }).toList(),
+                    ),
                   ),
                 ),
               ],
@@ -181,7 +202,9 @@ class _AnswerBankScreenState extends State<AnswerBankScreen> {
             child: _loading
                 ? Center(child: CircularProgressIndicator(strokeWidth: 2, color: accentGreen))
                 : _answers.isEmpty
-                    ? Center(child: Text("No entries found in Answer Bank.", style: TextStyle(color: secondaryTextColor)))
+                    ? Center(
+                        child: Text("No entries found in Answer Bank.", style: TextStyle(fontSize: 13, color: secondaryTextColor)),
+                      )
                     : ListView.builder(
                         padding: const EdgeInsets.all(AppSpacing.s16),
                         itemCount: _answers.length,
@@ -191,22 +214,24 @@ class _AnswerBankScreenState extends State<AnswerBankScreen> {
                           final isVerified = ans["is_verified"] == true;
                           final evidence = ans["supporting_evidence"] ?? "";
                           final allowReuse = ans["allow_reuse"] != false;
+                          final usageCount = (ans["usage_count"] as int?) ?? 0;
+                          final catKey = (ans["category"] ?? "").toString().toLowerCase();
+                          final catLabel = _categoryDisplayNames[catKey] ?? (ans["display_category"] ?? catKey);
 
                           return MotionFadeSlide(
                             index: idx,
                             child: Container(
                               margin: const EdgeInsets.only(bottom: AppSpacing.s12),
                               decoration: BoxDecoration(
-                                color: isDark ? HallmarkConsole.panel : cardBg,
-                                borderRadius: BorderRadius.circular(HallmarkConsole.radiusPanel),
-                                border: Border.all(color: isDark ? HallmarkConsole.rule : borderColor, width: HallmarkConsole.ruleWidth),
+                                color: cardBg,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: borderColor, width: 1.0),
                               ),
-                              child: Padding(
                               padding: const EdgeInsets.all(AppSpacing.s16),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // Header: Question + Verification Badge
+                                  // Header: Question + Verification Badge + Usage Count
                                   Row(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -214,25 +239,25 @@ class _AnswerBankScreenState extends State<AnswerBankScreen> {
                                       Expanded(
                                         child: Text(
                                           ans["question_text"] ?? "",
-                                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: primaryTextColor),
+                                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: primaryTextColor),
                                         ),
                                       ),
                                       const SizedBox(width: AppSpacing.s8),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                                         decoration: BoxDecoration(
-                                          color: (isVerified ? AppColors.successLight : AppColors.warningLight).withOpacity(0.12),
-                                          borderRadius: BorderRadius.circular(AppRadii.badge),
-                                          border: Border.all(color: (isVerified ? AppColors.successLight : AppColors.warningLight).withOpacity(0.3)),
+                                          color: (isVerified ? accentGreen : Colors.amber).withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(color: (isVerified ? accentGreen : Colors.amber).withOpacity(0.3)),
                                         ),
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Icon(isVerified ? Icons.verified : Icons.lightbulb_outline, size: 11, color: isVerified ? AppColors.successLight : AppColors.warningLight),
+                                            Icon(isVerified ? Icons.verified : Icons.lightbulb_outline, size: 10, color: isVerified ? accentGreen : Colors.amber),
                                             const SizedBox(width: 4),
                                             Text(
-                                              isVerified ? "Verified Fact" : "AI Suggestion",
-                                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isVerified ? AppColors.successLight : AppColors.warningLight),
+                                              isVerified ? "Verified Fact" : "AI Learned",
+                                              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: isVerified ? accentGreen : Colors.amber),
                                             ),
                                           ],
                                         ),
@@ -246,8 +271,8 @@ class _AnswerBankScreenState extends State<AnswerBankScreen> {
                                     width: double.infinity,
                                     padding: const EdgeInsets.all(AppSpacing.s12),
                                     decoration: BoxDecoration(
-                                      color: isDark ? AppColors.surfaceSubtleDark : AppColors.surfaceSubtleLight,
-                                      borderRadius: BorderRadius.circular(AppRadii.control),
+                                      color: isDark ? const Color(0xFF1C1F1C) : const Color(0xFFF3F4F1),
+                                      borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
                                       ans["answer"] ?? "",
@@ -263,7 +288,7 @@ class _AnswerBankScreenState extends State<AnswerBankScreen> {
                                       child: Row(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Icon(Icons.shield_outlined, size: 13, color: secondaryTextColor),
+                                          Icon(Icons.shield_outlined, size: 12, color: secondaryTextColor),
                                           const SizedBox(width: 4),
                                           Expanded(
                                             child: Text("Evidence: $evidence", style: TextStyle(fontSize: 11, color: secondaryTextColor)),
@@ -272,23 +297,26 @@ class _AnswerBankScreenState extends State<AnswerBankScreen> {
                                       ),
                                     ),
 
-                                  // Footer: Category, Reuse Permission, Edit/Delete
+                                  // Footer: Human-readable category, Usage Count, Edit/Delete
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
                                       Row(
                                         children: [
                                           Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            decoration: HallmarkConsole.tagDecoration(),
+                                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: accentGreen.withOpacity(0.08),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
                                             child: Text(
-                                              ans['category'].toString().toLowerCase(),
-                                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: secondaryTextColor),
+                                              catLabel,
+                                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: accentGreen),
                                             ),
                                           ),
-                                          const SizedBox(width: 6),
+                                          const SizedBox(width: 8),
                                           Text(
-                                            allowReuse ? "Auto-reuse permitted" : "Confirm before use",
+                                            "Times used: $usageCount",
                                             style: TextStyle(fontSize: 11, color: secondaryTextColor),
                                           ),
                                         ],
@@ -296,12 +324,12 @@ class _AnswerBankScreenState extends State<AnswerBankScreen> {
                                       Row(
                                         children: [
                                           IconButton(
-                                            icon: const Icon(Icons.edit_outlined, size: 18),
+                                            icon: const Icon(Icons.edit_outlined, size: 16),
                                             tooltip: "Edit Answer",
                                             onPressed: () => _openEditModal(existing: ans),
                                           ),
                                           IconButton(
-                                            icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.errorLight),
+                                            icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.errorLight),
                                             tooltip: "Delete Answer",
                                             onPressed: () => _deleteAnswer(id),
                                           ),
@@ -312,7 +340,7 @@ class _AnswerBankScreenState extends State<AnswerBankScreen> {
                                 ],
                               ),
                             ),
-                          ));
+                          );
                         },
                       ),
           ),
@@ -342,6 +370,17 @@ class _AnswerEditSheetState extends State<_AnswerEditSheet> {
   late bool _isVerified;
   late bool _allowReuse;
 
+  static const Map<String, String> _categories = {
+    "personal": "Personal Contact",
+    "education": "Education & Degrees",
+    "work_auth": "Work Authorization",
+    "technical": "Technical Skills",
+    "behavioral": "Behavioral",
+    "preferences": "Job Preferences",
+    "demographics": "Demographics",
+    "custom": "Custom Answers",
+  };
+
   @override
   void initState() {
     super.initState();
@@ -349,7 +388,7 @@ class _AnswerEditSheetState extends State<_AnswerEditSheet> {
     _qController = TextEditingController(text: ex?["question_text"] ?? "");
     _aController = TextEditingController(text: ex?["answer"] ?? "");
     _evidenceController = TextEditingController(text: ex?["supporting_evidence"] ?? "");
-    _category = ex?["category"] ?? "general";
+    _category = ex?["category"] ?? "education";
     _mode = ex?["mode"] ?? "always_use";
     _isVerified = ex?["is_verified"] ?? true;
     _allowReuse = ex?["allow_reuse"] ?? true;
@@ -419,7 +458,7 @@ class _AnswerEditSheetState extends State<_AnswerEditSheet> {
             children: [
               Text(
                 widget.existing != null ? "Edit Answer Bank Entry" : "New Candidate Fact",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: primaryTextColor),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: primaryTextColor),
               ),
               IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
             ],
@@ -428,31 +467,42 @@ class _AnswerEditSheetState extends State<_AnswerEditSheet> {
           Expanded(
             child: ListView(
               children: [
-                Text("QUESTION OR FIELD LABEL", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: secondaryTextColor)),
+                Text("QUESTION OR FORM PROMPT", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: secondaryTextColor)),
                 const SizedBox(height: 6),
-                TextField(controller: _qController, decoration: const InputDecoration(hintText: "e.g. Years of Python experience")),
+                TextField(controller: _qController, decoration: const InputDecoration(hintText: "e.g. Highest degree completed")),
                 const SizedBox(height: AppSpacing.s16),
 
-                Text("ANSWER", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: secondaryTextColor)),
+                Text("CATEGORY", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: secondaryTextColor)),
                 const SizedBox(height: 6),
-                TextField(controller: _aController, maxLines: 3, decoration: const InputDecoration(hintText: "e.g. 2+ years through academic R&D")),
+                DropdownButtonFormField<String>(
+                  value: _categories.containsKey(_category) ? _category : "education",
+                  items: _categories.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
+                  onChanged: (val) {
+                    if (val != null) setState(() => _category = val);
+                  },
+                ),
                 const SizedBox(height: AppSpacing.s16),
 
-                Text("SUPPORTING EVIDENCE / CITATION", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: secondaryTextColor)),
+                Text("ANSWER TEXT", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: secondaryTextColor)),
                 const SizedBox(height: 6),
-                TextField(controller: _evidenceController, decoration: const InputDecoration(hintText: "e.g. Published patent #202441058291")),
+                TextField(controller: _aController, maxLines: 3, decoration: const InputDecoration(hintText: "e.g. MTech Integrated CSE")),
+                const SizedBox(height: AppSpacing.s16),
+
+                Text("SUPPORTING EVIDENCE / CITATION", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: secondaryTextColor)),
+                const SizedBox(height: 6),
+                TextField(controller: _evidenceController, decoration: const InputDecoration(hintText: "e.g. Academic Transcript / facts.py")),
                 const SizedBox(height: AppSpacing.s16),
 
                 Row(
                   children: [
                     Checkbox(value: _isVerified, activeColor: accentGreen, onChanged: (v) => setState(() => _isVerified = v ?? true)),
-                    Text("Verified Fact (High confidence truth)", style: TextStyle(fontSize: 12, color: primaryTextColor)),
+                    Text("Verified Fact (Single source of truth)", style: TextStyle(fontSize: 12, color: primaryTextColor)),
                   ],
                 ),
                 Row(
                   children: [
                     Checkbox(value: _allowReuse, activeColor: accentGreen, onChanged: (v) => setState(() => _allowReuse = v ?? true)),
-                    Text("Allow Automatic Reuse in ATS forms", style: TextStyle(fontSize: 12, color: primaryTextColor)),
+                    Text("Allow automatic reuse in ATS forms", style: TextStyle(fontSize: 12, color: primaryTextColor)),
                   ],
                 ),
               ],
@@ -465,11 +515,12 @@ class _AnswerEditSheetState extends State<_AnswerEditSheet> {
               onPressed: _save,
               style: ElevatedButton.styleFrom(
                 backgroundColor: accentGreen,
-                foregroundColor: AppColors.pureWhite,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.control)),
-                padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12),
+                foregroundColor: isDark ? const Color(0xFF0E0F0E) : Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                elevation: 0,
               ),
-              child: const Text("Save Entry", style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text("Save Entry", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
             ),
           ),
         ],
