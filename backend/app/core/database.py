@@ -134,6 +134,7 @@ def migrate_db():
             ("worker", "VARCHAR(64)"),
             ("lease_until", "DATETIME"),
             ("attempts", "INTEGER DEFAULT 0"),
+            ("bypass_cooldown", "BOOLEAN DEFAULT 0"),
         ]
         for col_name, col_def in job_additions:
             if col_name not in job_cols:

@@ -28,7 +28,7 @@ def test_sqlite_wal_mode():
         db.close()
 
 def test_health_endpoint():
-    res = client.get("/api/v1/health")
+    res = client.get("/api/v1/health", headers=AUTH_HEADERS)
     assert res.status_code == 200
     data = res.json()
     assert data["status"] == "online"

@@ -1,8 +1,10 @@
 import logging
+import ipaddress
 from pathlib import Path
+from typing import Optional
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from fastapi.responses import RedirectResponse, FileResponse
+from fastapi import FastAPI, Request, Response
+from fastapi.responses import RedirectResponse, FileResponse, JSONResponse, HTMLResponse
 from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -49,6 +51,116 @@ app = FastAPI(
     version="1.3.0",
     lifespan=lifespan
 )
+
+def is_trusted_network(client_host: str) -> bool:
+    """Allow only localhost (127.0.0.1, ::1, testclient) and Tailscale CGNAT subnet (100.64.0.0/10)."""
+    if not client_host:
+        return False
+    if client_host in ["127.0.0.1", "::1", "localhost", "testclient"]:
+        return True
+    try:
+        ip = ipaddress.ip_address(client_host)
+        tailscale_net = ipaddress.ip_network("100.64.0.0/10")
+        return ip in tailscale_net
+    except Exception:
+        return False
+
+def extract_token(request: Request) -> Optional[str]:
+    # 1. Bearer token in Authorization header
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        return auth_header[7:].strip()
+    
+    # 2. X-ApplyPilot-Token header
+    custom_hdr = request.headers.get("X-ApplyPilot-Token", "")
+    if custom_hdr:
+        return custom_hdr.strip()
+    
+    # 3. Query parameter ?token=...
+    token_param = request.query_params.get("token", "")
+    if token_param:
+        return token_param.strip()
+        
+    # 4. Cookie applypilot_token
+    cookie_token = request.cookies.get("applypilot_token", "")
+    if cookie_token:
+        return cookie_token.strip()
+        
+    return None
+
+@app.middleware("http")
+async def security_and_token_middleware(request: Request, call_next):
+    # 1. IP / Interface check: localhost and Tailscale mesh only
+    client_host = request.client.host if request.client else ""
+    if not is_trusted_network(client_host):
+        logger.warning(f"Rejected request from untrusted interface/IP: {client_host}")
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "Forbidden: ApplyPilot is bound to localhost and Tailscale interface only."}
+        )
+
+    # 2. Token Authentication on EVERY route including /app, /output, and /api
+    token = extract_token(request)
+    valid_token = settings.APPLYPILOT_TOKEN
+    
+    if not token:
+        logger.warning(f"Unauthorized request to {request.url.path} from {client_host}: missing token.")
+        if request.url.path.startswith("/app"):
+            return HTMLResponse(
+                status_code=401,
+                content="""<!DOCTYPE html>
+<html>
+<head><title>401 Unauthorized - ApplyPilot</title>
+<style>body{background:#0e0f0e;color:#eceeec;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;}</style>
+</head>
+<body>
+  <div style="text-align:center;padding:24px;border:1px solid #262926;border-radius:12px;background:#161816;max-width:400px;">
+    <h2 style="color:#e5736b;">Authentication Required</h2>
+    <p style="color:#8a908a;font-size:14px;">Valid ApplyPilot login token is required to access the cockpit.</p>
+    <p style="font-size:12px;color:#7fd1a8;">Pass token via <code>?token=YOUR_TOKEN</code> or log in.</p>
+  </div>
+</body>
+</html>"""
+            )
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Unauthorized: Valid ApplyPilot login token required."}
+        )
+
+    if token != valid_token:
+        logger.warning(f"Forbidden request to {request.url.path} from {client_host}: invalid token.")
+        if request.url.path.startswith("/app"):
+            return HTMLResponse(
+                status_code=403,
+                content="""<!DOCTYPE html>
+<html>
+<head><title>403 Forbidden - ApplyPilot</title>
+<style>body{background:#0e0f0e;color:#eceeec;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;}</style>
+</head>
+<body>
+  <div style="text-align:center;padding:24px;border:1px solid #262926;border-radius:12px;background:#161816;max-width:400px;">
+    <h2 style="color:#e5736b;">Forbidden</h2>
+    <p style="color:#8a908a;font-size:14px;">The provided ApplyPilot token is invalid or unauthorized.</p>
+  </div>
+</body>
+</html>"""
+            )
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "Forbidden: Invalid authorization token."}
+        )
+
+    # If valid token provided via query parameter or header on /app, set cookie for static assets
+    response = await call_next(request)
+    if token == valid_token and (request.query_params.get("token") or not request.cookies.get("applypilot_token")):
+        response.set_cookie(
+            key="applypilot_token",
+            value=token,
+            httponly=True,
+            samesite="lax",
+            max_age=86400 * 30
+        )
+    return response
 
 # CORS enabled for mobile client over Tailscale
 app.add_middleware(

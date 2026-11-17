@@ -10,6 +10,7 @@ import subprocess
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple, List
 from playwright.async_api import async_playwright, Page, BrowserContext
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from backend.app.core.config import settings
 from backend.app.models import Job, Profile, Application, NeedsInput, RunLog, JobStateTransition
@@ -232,17 +233,51 @@ class AutoApplyEngine:
         _consecutive_failures = 0
 
     @staticmethod
-    def _is_company_cooldown_active(db: Session, company: str, is_live: bool = False) -> bool:
+    def _is_company_cooldown_active(db: Session, company: str, is_live: bool = False, bypass_override: bool = False) -> bool:
         """Check if candidate already applied to this company within 30 days (excluding manual tracker notes)."""
-        thirty_days_ago = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=30)
-        statuses = ["submitted", "applied"] if is_live else ["submitted", "dry_run", "applied"]
-        recent = db.query(Application).join(Job).filter(
-            Job.company.ilike(company),
-            Application.submitted_at >= thirty_days_ago,
+        if bypass_override or not company:
+            return False
+        thirty_days_ago_utc = datetime.datetime.now(datetime.timezone.utc)
+        thirty_days_ago_naive = thirty_days_ago_utc.replace(tzinfo=None) - datetime.timedelta(days=30)
+        thirty_days_ago_utc = thirty_days_ago_utc - datetime.timedelta(days=30)
+        
+        # Include all active live states: submitted, applied, needs_review, unverified
+        statuses = ["submitted", "applied", "needs_review", "unverified"] if is_live else ["submitted", "applied", "needs_review", "unverified", "dry_run"]
+        norm_company = company.strip().lower()
+        
+        # 1. Check Application table
+        recent_apps = db.query(Application).join(Job).filter(
+            func.lower(func.trim(Job.company)) == norm_company,
             Application.resume_file != "manual_tracking_submission",
             Application.status.in_(statuses)
-        ).first()
-        return recent is not None
+        ).all()
+        for app in recent_apps:
+            sub_at = app.submitted_at
+            if sub_at:
+                if sub_at.tzinfo is not None:
+                    if sub_at >= thirty_days_ago_utc:
+                        return True
+                else:
+                    if sub_at >= thirty_days_ago_naive:
+                        return True
+
+        # 2. Also check Job table directly for any jobs for this company in active submission state
+        job_statuses = ["submitted", "applied", "needs_review"]
+        recent_jobs = db.query(Job).filter(
+            func.lower(func.trim(Job.company)) == norm_company,
+            Job.status.in_(job_statuses)
+        ).all()
+        for j in recent_jobs:
+            p_at = j.last_verified_at or j.posted_at
+            if p_at:
+                if p_at.tzinfo is not None:
+                    if p_at >= thirty_days_ago_utc:
+                        return True
+                else:
+                    if p_at >= thirty_days_ago_naive:
+                        return True
+
+        return False
 
     @staticmethod
     async def _type_human(page: Page, selector: str, text: str):
@@ -342,7 +377,8 @@ class AutoApplyEngine:
         db: Session,
         job: Job,
         profile: Profile,
-        force_dry_run: bool = False
+        force_dry_run: bool = False,
+        bypass_cooldown: bool = False
     ) -> Dict[str, Any]:
         """
         Execute automated form fill & preview/submission for an eligible job.
@@ -397,7 +433,10 @@ class AutoApplyEngine:
             logger.info(f"Skipping {job.company} — {job.title}: Already submitted live (Application ID: {existing_app.id}).")
             return {"status": "skipped", "reason": "already_applied", "application_id": existing_app.id}
 
-        if not is_live:
+        # Check for bypass cooldown override (e.g. manual re-submit or explicit dry-run mode that ignores cooldown)
+        has_bypass = bypass_cooldown or getattr(job, "bypass_cooldown", False) or force_dry_run
+
+        if not is_live and not force_dry_run:
             existing_dry_run = db.query(Application).filter(
                 Application.job_id == job.id,
                 Application.status == "dry_run"
@@ -406,7 +445,7 @@ class AutoApplyEngine:
                 logger.info(f"Skipping {job.company} — {job.title}: Already dry-run verified (Application ID: {existing_dry_run.id}).")
                 return {"status": "skipped", "reason": "already_dry_run", "application_id": existing_dry_run.id}
 
-        if AutoApplyEngine._is_company_cooldown_active(db, job.company, is_live=is_live):
+        if not has_bypass and AutoApplyEngine._is_company_cooldown_active(db, job.company, is_live=is_live):
             logger.info(f"Skipping {job.company}: Applied within 30-day cooldown window.")
             AutoApplyEngine._record_transition(db, job, "skipped", "30-day company cooldown active", "cooldown_active")
             job.status = "skipped"
@@ -414,6 +453,11 @@ class AutoApplyEngine:
             job.blocked_category = "duplicate"
             db.commit()
             return {"status": "skipped", "reason": "30-day cooldown"}
+
+        if getattr(job, "bypass_cooldown", False):
+            # One-time manual override consumed
+            job.bypass_cooldown = False
+            db.commit()
 
         # 2. Daily cap check with user timezone awareness & zero-cap resilience (authoritative)
         tz_str = getattr(profile, "timezone", "Asia/Kolkata") or "Asia/Kolkata"
@@ -770,23 +814,55 @@ class AutoApplyEngine:
                         except Exception:
                             pass
 
-                # Consent & Privacy Checkboxes (Strictly based on Answer Bank remembered consent; NEVER auto-ticked)
-                consent_boxes = await page.query_selector_all("input[name*='consent'], input[name*='privacy'], input[type='checkbox'][name*='terms']")
-                for cbox in consent_boxes:
+                # 4b. Consent, Legal & AI-Notetaker Checkbox Verification
+                # Per safety rules: NEVER auto-tick consent, privacy, terms, background check, or Lever AI-notetaker checkboxes.
+                all_checkboxes = await page.query_selector_all("input[type='checkbox']")
+                for cbox in all_checkboxes:
                     lbl_t = ""
                     try:
-                        lbl_t = await page.evaluate("(el) => el.closest('label, div, .field')?.innerText || ''", cbox)
+                        lbl_t = await page.evaluate("""(el) => {
+                            const container = el.closest('label, .field, .form-group, .application-question, div');
+                            return container ? container.innerText.trim() : (el.getAttribute('aria-label') || el.name || '');
+                        }""", cbox)
                     except Exception:
                         pass
-                    remembered = AnswerService.resolve_answer(db, lbl_t or "terms and conditions consent")
-                    if remembered and remembered[0] in ["Yes", "I agree", "consent", "True"]:
-                        try:
-                            await cbox.check(force=True)
-                            logger.info("Checked remembered consent from Answer Bank.")
-                        except Exception:
-                            pass
-                    else:
-                        logger.info("Unremembered consent checkbox; leaving un-ticked per safety rules.")
+                    
+                    lower_lbl = lbl_t.lower()
+                    is_consent = any(term in lower_lbl for term in [
+                        "consent", "privacy", "data processing", "terms", "agree", "notetaker", 
+                        "ai note", "recording", "background check", "non-compete", "gdpr", 
+                        "certify", "attest", "declaration", "policy", "legal"
+                    ])
+                    is_required = await cbox.get_attribute("required") is not None or "required" in lower_lbl or "*" in lower_lbl
+                    
+                    if is_consent or is_required:
+                        is_checked = await cbox.is_checked()
+                        if not is_checked:
+                            logger.warning(f"Consent / Legal agreement checkbox requires human input: '{lbl_t[:60]}...' (never auto-ticked). Routing to Needs You.")
+                            needs = NeedsInput(
+                                job_id=job.id,
+                                question_text=f"Legal / Consent Checkbox: {lbl_t[:300]}",
+                                field_type="checkbox",
+                                options_json=json.dumps(["I agree", "I decline"]),
+                                gemini_reason="Consent, legal, or AI notetaker agreement requires manual candidate approval (never auto-ticked)",
+                                status="pending"
+                            )
+                            db.add(needs)
+                            db.commit()
+                            
+                            AutoApplyEngine._record_transition(
+                                db, job, "needs_attention",
+                                f"Legal / Consent agreement requires candidate approval: {lbl_t[:50]}",
+                                "needs_human_input"
+                            )
+                            job.status = "needs_attention"
+                            db.commit()
+                            
+                            return {
+                                "status": "needs_input",
+                                "reason": "legal_consent_checkbox_requires_candidate_action",
+                                "field": lbl_t
+                            }
 
                 # Resume File Upload
                 file_input = await page.query_selector("input[type='file'], #_systemfield_resume, input[id*='resume']")
@@ -920,15 +996,14 @@ class AutoApplyEngine:
                             opts = await page.query_selector_all(".select__option, [class*='select__option']")
                             opt_texts = [(await o.inner_text()).strip() for o in opts if (await o.inner_text()).strip()]
 
-                            # Smart fallback if not directly in AnswerBank
-                            if not ans_val and opt_texts:
+                            # Check if question is sensitive (work auth, legal consent, salary, demographics, etc.)
+                            is_sens, _ = GeminiService.is_sensitive_question(label_text)
+                            if is_sens and not ans_val:
+                                # Sensitive question without explicit candidate Answer Bank entry -> NEVER auto-guess
+                                ans_val = None
+                            elif not ans_val and opt_texts:
                                 lbl_l = label_text.lower()
-                                if any(k in lbl_l for k in ["agree", "confirm", "able to", "willing", "commit", "privacy", "words", "office", "authorized"]):
-                                    if any(x.lower() == "yes" for x in opt_texts):
-                                        ans_val = "Yes"
-                                    elif any("acknowledge" in x.lower() or "confirm" in x.lower() for x in opt_texts):
-                                        ans_val = next(x for x in opt_texts if "acknowledge" in x.lower() or "confirm" in x.lower())
-                                elif "country" in lbl_l:
+                                if "country" in lbl_l:
                                     if any("india" in x.lower() for x in opt_texts):
                                         ans_val = "India"
                                 elif any(k in lbl_l for k in ["mathematics", "language", "school", "high school", "grade", "performance"]):

@@ -325,6 +325,24 @@ async def apply_to_job(job_id: int, db: Session = Depends(get_db)):
     result = await AutoApplyEngine.process_job_application(db, job, profile)
     return {"job_id": job.id, "company": job.company, "result": result}
 
+@router.post("/jobs/{job_id}/resubmit-override", summary="Manual override: Bypass 30-day cooldown to re-submit corrected resume")
+def override_cooldown_for_job(job_id: int, db: Session = Depends(get_db)):
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    job.bypass_cooldown = True
+    job.status = "queued"
+    job.skip_reason = ""
+    job.blocked_reason = ""
+    db.commit()
+    db.refresh(job)
+    return {
+        "status": "success",
+        "message": f"Cooldown bypass enabled for {job.company} — {job.title}. Ready for re-submission.",
+        "job_id": job.id,
+        "bypass_cooldown": True
+    }
+
 @router.post("/jobs/apply-next", summary="Process Next Eligible Job in Queue")
 async def apply_next_in_queue(db: Session = Depends(get_db)):
     profile = db.query(Profile).first()

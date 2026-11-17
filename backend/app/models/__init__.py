@@ -181,6 +181,7 @@ class Job(Base):
     notes = Column(Text, default="")
     recruiter_info = Column(String(256), default="")
     follow_up_date = Column(DateTime, nullable=True)
+    bypass_cooldown = Column(Boolean, default=False) # Manual one-off re-submit override
     
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)

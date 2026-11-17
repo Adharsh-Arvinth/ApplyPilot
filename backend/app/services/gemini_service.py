@@ -33,8 +33,8 @@ CANDIDATE PROFILE (VERIFIED TRUTH SOURCE):
 """
 
 class GeminiService:
-    PRIMARY_MODEL = getattr(settings, "GEMINI_MODEL", "gemini-2.0-flash")
-    FALLBACK_MODEL = "gemini-1.5-flash"
+    PRIMARY_MODEL = getattr(settings, "GEMINI_MODEL", "gemini-3.5-flash-lite")
+    FALLBACK_MODEL = "gemini-3.5-flash"
     
     _client: Optional[genai.Client] = None
     _cache: Dict[str, Any] = {}
