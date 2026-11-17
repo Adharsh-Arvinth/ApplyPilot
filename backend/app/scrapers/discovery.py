@@ -1,7 +1,10 @@
+import os
 import re
 import json
 import logging
 import datetime
+import asyncio
+import urllib.parse
 from typing import List, Dict, Any, Optional
 import httpx
 from sqlalchemy.orm import Session
@@ -140,6 +143,103 @@ class JobDiscoveryService:
                             })
         except Exception as e:
             logger.warning(f"Error fetching Ashby board {board_name}: {e}")
+        return jobs
+
+    @staticmethod
+    async def fetch_linkedin_easy_apply_jobs(keywords: str, location: str = "India") -> List[Dict[str, Any]]:
+        """Fetch live Easy Apply job postings from LinkedIn guest search endpoint."""
+        encoded_kw = urllib.parse.quote_plus(keywords)
+        encoded_loc = urllib.parse.quote_plus(location)
+        url = f"https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={encoded_kw}&location={encoded_loc}&f_AL=true&start=0"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5"
+        }
+        jobs = []
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                res = await client.get(url, headers=headers)
+                if res.status_code == 200:
+                    card_blocks = res.text.split('<li')
+                    for block in card_blocks[1:]:
+                        t_m = re.search(r'class="base-search-card__title">([^<]+)</h3>', block)
+                        c_m = re.search(r'class="base-search-card__subtitle"[^>]*>[\s\S]*?<a[^>]*>([^<]+)</a>', block)
+                        if not c_m:
+                            c_m = re.search(r'class="base-search-card__subtitle"[^>]*>([^<]+)</h4>', block)
+                        l_m = re.search(r'class="job-search-card__location">([^<]+)</span>', block)
+                        u_m = re.search(r'href="([^"]+)"[^>]*class="base-card__full-link', block)
+                        if not u_m:
+                            u_m = re.search(r'class="base-card__full-link[^"]*"\s+href="([^"]+)"', block)
+
+                        if t_m and u_m:
+                            title = t_m.group(1).strip()
+                            comp = c_m.group(1).strip() if c_m else "Company"
+                            loc = l_m.group(1).strip() if l_m else location
+                            job_url = u_m.group(1).split('?')[0].strip()
+                            if JobDiscoveryService.is_target_title(title) and JobDiscoveryService.is_eligible_location(loc):
+                                jobs.append({
+                                    "source": "linkedin",
+                                    "company": comp,
+                                    "title": title,
+                                    "url": job_url,
+                                    "location": loc,
+                                    "posted_at": datetime.datetime.now(datetime.timezone.utc),
+                                    "last_verified_at": datetime.datetime.now(datetime.timezone.utc),
+                                    "is_assist_only": False,
+                                    "salary_raw": "",
+                                    "salary_numeric": 0
+                                })
+        except Exception as e:
+            logger.warning(f"Error fetching LinkedIn Easy Apply jobs for {keywords}: {e}")
+        return jobs
+
+    @staticmethod
+    async def fetch_indeed_easy_apply_jobs(keywords: str, location: str = "India") -> List[Dict[str, Any]]:
+        """Fetch live Easy Apply job postings from Indeed using Playwright."""
+        from playwright.async_api import async_playwright
+        encoded_kw = urllib.parse.quote_plus(keywords)
+        encoded_loc = urllib.parse.quote_plus(location)
+        url = f"https://in.indeed.com/jobs?q={encoded_kw}&l={encoded_loc}&sc=0kf%3Aattr%28DSQF7%29%3B"
+        jobs = []
+        try:
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True)
+                context = await browser.new_context(
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+                )
+                page = await context.new_page()
+                await page.goto(url, wait_until="domcontentloaded", timeout=20000)
+                await asyncio.sleep(2)
+                beacons = await page.query_selector_all(".job_seen_beacon")
+                for b in beacons[:12]:
+                    t_el = await b.query_selector("a.jcs-JobTitle, h2.jobTitle span")
+                    c_el = await b.query_selector("[data-testid='company-name']")
+                    l_el = await b.query_selector("[data-testid='text-location']")
+                    title = (await t_el.inner_text()).strip() if t_el else ""
+                    comp = (await c_el.inner_text()).strip() if c_el else "Company"
+                    loc = (await l_el.inner_text()).strip() if l_el else location
+                    jk = await t_el.get_attribute("data-jk") if t_el else None
+                    if not jk:
+                        link = await t_el.get_attribute("href") if t_el else None
+                        if link and "jk=" in link:
+                            jk = link.split("jk=")[1].split("&")[0]
+                    if title and jk and JobDiscoveryService.is_target_title(title) and JobDiscoveryService.is_eligible_location(loc):
+                        jobs.append({
+                            "source": "indeed",
+                            "company": comp,
+                            "title": title,
+                            "url": f"https://in.indeed.com/viewjob?jk={jk}",
+                            "location": loc,
+                            "posted_at": datetime.datetime.now(datetime.timezone.utc),
+                            "last_verified_at": datetime.datetime.now(datetime.timezone.utc),
+                            "is_assist_only": False,
+                            "salary_raw": "",
+                            "salary_numeric": 0
+                        })
+                await browser.close()
+        except Exception as e:
+            logger.warning(f"Error fetching Indeed Easy Apply jobs for {keywords}: {e}")
         return jobs
 
     @staticmethod
@@ -434,6 +534,23 @@ class JobDiscoveryService:
             except Exception as e:
                 logger.warning(f"Error scraping live Lever {lev}: {e}")
 
+        # Live Easy Apply discovery from LinkedIn and Indeed
+        is_testing = bool(os.environ.get("PYTEST_CURRENT_TEST"))
+        if not is_testing:
+            for role in ["data scientist", "machine learning engineer", "ai engineer", "python developer"]:
+                try:
+                    li_res = await JobDiscoveryService.fetch_linkedin_easy_apply_jobs(role, "India")
+                    live_jobs.extend(li_res)
+                except Exception as e:
+                    logger.warning(f"Error fetching LinkedIn Easy Apply for {role}: {e}")
+
+            for role in ["data scientist", "machine learning engineer"]:
+                try:
+                    ind_res = await JobDiscoveryService.fetch_indeed_easy_apply_jobs(role, "India")
+                    live_jobs.extend(ind_res)
+                except Exception as e:
+                    logger.warning(f"Error fetching Indeed Easy Apply for {role}: {e}")
+
         # 2. Ingest verified pool merged with live jobs
         test_fixtures = JobDiscoveryService.get_test_verified_fixtures()
         pool = live_jobs + test_fixtures
@@ -456,8 +573,10 @@ class JobDiscoveryService:
             is_assist_only = bool(raw_job.get("is_assist_only", False))
             source_lower = (raw_job.get("source") or "").lower()
 
-            # Flag portal jobs (Naukri, LinkedIn) as assist-only
-            if source_lower in ["naukri", "linkedin"] or "naukri.com" in url or "linkedin.com" in url:
+            # Flag non-Easy Apply portal jobs as assist-only
+            if source_lower in ["naukri"] or "naukri.com" in url:
+                is_assist_only = True
+            elif raw_job.get("is_assist_only") is True:
                 is_assist_only = True
 
             is_internship = raw_job.get("is_internship", False) or "intern" in raw_job["title"].lower()

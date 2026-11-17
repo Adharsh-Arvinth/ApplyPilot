@@ -52,6 +52,8 @@ output/resumes/*
 !output/resumes/.gitkeep
 output/screenshots/*
 !output/screenshots/.gitkeep
+output/*.png
+scratch/
 
 # Legacy / Reference Submodule
 career-ops/

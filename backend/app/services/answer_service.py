@@ -477,7 +477,13 @@ class AnswerService:
             return "2027", "always_use"
 
         # Work Authorization, Sponsorship & Compliance (Evaluated first to avoid broad keyword shadowing)
-        if re.search(r'require.*sponsorship.*us|require.*visa.*us', clean_key):
+        if re.search(r'why.*(join|work for|interested in|apply to)', clean_key):
+            return "I am eager to apply my expertise in Machine Learning, Python engineering, and scalable distributed architectures to build high-impact, reliable systems alongside world-class engineering teams.", "always_use"
+        if re.search(r'intend\s*to\s*work|work\s*location\s*preference|from\s*where\s*do\s*you', clean_key):
+            return "India (Remote)", "always_use"
+        if re.search(r'preferred\s*(first\s*)?name', clean_key):
+            return first_name, "always_use"
+        if re.search(r'require.*sponsorship.*\bus\b|require.*visa.*\bus\b', clean_key):
             return "Yes", "always_use"
         if re.search(r'sponsorship|require.*visa|visa.*sponsorship|employment.*visa|immigration.*sponsorship', clean_key):
             return "No", "always_use"
@@ -487,7 +493,7 @@ class AnswerService:
             return "No", "always_use"
         if re.search(r'relocate|relocation|willing.*relocate', clean_key):
             return "Yes", "always_use"
-        if re.search(r'previously\s*worked|previously\s*employed', clean_key):
+        if re.search(r'previously\s*worked|previously\s*employed|worked\s*for.*before', clean_key):
             return "No", "always_use"
         if re.search(r'own\s*words|plagiarism', clean_key):
             return "Yes", "always_use"
@@ -511,10 +517,24 @@ class AnswerService:
             return "No, I do not have a disability", "always_use"
         if re.search(r'gender', clean_key):
             return "Male", "always_use"
-        if re.search(r'pronoun', clean_key):
+        if re.search(r'pronunciation', clean_key):
+            return "Uh-dharsh Ahr-vinth", "always_use"
+        if re.search(r'\bpronoun(s)?\b', clean_key):
             return "He/Him/His", "always_use"
-        if re.search(r'how did you hear', clean_key):
-            return "Company career page", "always_use"
+        if re.search(r'how\s*(did|do)\s*you\s*hear|heard\s*about', clean_key):
+            return "Company career page / Job Board", "always_use"
+        if re.search(r'language\s*skill', clean_key):
+            return "Python", "always_use"
+        if re.search(r'proudest\s*accomplishment|favorite\s*project.*(llm|ai|ml)|accomplishment.*(llm|ai|ml)', clean_key):
+            return "Architecting and evaluating agentic LLM retrieval pipelines and multimodal perception systems with patented architectures, achieving 25.59% NDCG@10 on MTEB benchmarks.", "always_use"
+        if re.search(r'why.*(palantir|spotify|figma|elastic|gitlab|cloudflare)', clean_key):
+            return "I am excited by the engineering rigor, distributed infrastructure, and high-impact machine learning challenges tackled here, and I look forward to contributing performant Python and ML systems.", "always_use"
+        if re.search(r'adjustment.*interview|accessible.*interview', clean_key):
+            return "None required", "always_use"
+        if re.search(r'gitlab\s*username', clean_key):
+            return "Adharsh-Arvinth", "always_use"
+        if re.search(r'employment\s*agreement|post-employment\s*restriction', clean_key):
+            return "No", "always_use"
 
         # Standalone Location fields (Must not shadow complex sentences)
         if clean_key in ["current location", "location", "your location"]:

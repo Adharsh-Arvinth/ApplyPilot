@@ -6,6 +6,7 @@ import asyncio
 import datetime
 import zoneinfo
 import logging
+import subprocess
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple
 from playwright.async_api import async_playwright, Page, BrowserContext
@@ -99,6 +100,41 @@ class AutoApplyEngine:
             await page.fill(selector, text)
 
     @staticmethod
+    def _get_latest_email_id(query: str = "from:greenhouse") -> Optional[str]:
+        """Fetch latest message ID from connected Gmail matching query."""
+        try:
+            cmd = f'gmail readonly search "{query}" --max 1 --json'
+            out = subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.DEVNULL)
+            data = json.loads(out)
+            if data and len(data) > 0:
+                return data[0].get("id")
+        except Exception as e:
+            logger.warning(f"Error checking Gmail query [{query}]: {e}")
+        return None
+
+    @staticmethod
+    def _fetch_otp_from_email(msg_id: str, num_digits: int = 8) -> Optional[str]:
+        """Fetch email content and extract verification code matching required length."""
+        try:
+            cmd = f'gmail readonly get {msg_id}'
+            msg_out = subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.DEVNULL)
+            # 1. <h1>CODE</h1>
+            m = re.search(r'<h1>\s*([A-Za-z0-9]{' + str(num_digits) + r'})\s*</h1>', msg_out)
+            if m:
+                return m.group(1).strip()
+            # 2. Standalone numeric code
+            m = re.search(r'\b([0-9]{' + str(num_digits) + r'})\b', msg_out)
+            if m:
+                return m.group(1).strip()
+            # 3. Any 6 to 8 digit code
+            m = re.search(r'\b([0-9]{6,8})\b', msg_out)
+            if m:
+                return m.group(1).strip()
+        except Exception as e:
+            logger.warning(f"Error fetching code from email {msg_id}: {e}")
+        return None
+
+    @staticmethod
     async def process_job_application(
         db: Session,
         job: Job,
@@ -114,10 +150,10 @@ class AutoApplyEngine:
             logger.info(f"Skipping {job.company} — {job.title}: Global queue is paused.")
             return {"status": "paused", "reason": "global_pause_active"}
 
-        # 0b. Assist-only source check (Naukri, LinkedIn)
-        if getattr(job, "is_assist_only", False) or (job.source or "").lower() in ["naukri", "linkedin"] or "naukri.com" in (job.url or "") or "linkedin.com" in (job.url or ""):
-            logger.info(f"Skipping automated submission for {job.company}: Source is assist-only (Naukri/LinkedIn).")
-            AutoApplyEngine._record_transition(db, job, "maybe", "Assist-only source (Naukri/LinkedIn). Automated submission disabled.", "assist_only")
+        # 0b. Assist-only source check (Naukri or flagged assist-only)
+        if getattr(job, "is_assist_only", False) or (job.source or "").lower() in ["naukri"] or "naukri.com" in (job.url or ""):
+            logger.info(f"Skipping automated submission for {job.company}: Source is assist-only (Naukri/Manual).")
+            AutoApplyEngine._record_transition(db, job, "maybe", "Assist-only source (Naukri/Manual). Automated submission disabled.", "assist_only")
             return {"status": "assist_only", "reason": "Job is an assist-only portal listing. Please complete manually via official application link."}
 
         # 1. Deduplication & Idempotency check
@@ -237,11 +273,18 @@ class AutoApplyEngine:
                 # For Lever postings, navigate directly to the application form
                 if (job.source or "").lower() == "lever" and not target_url.rstrip("/").endswith("/apply"):
                     target_url = f"{target_url.rstrip('/')}/apply"
+                elif "ashbyhq.com" in target_url.lower() and not target_url.rstrip("/").endswith("/application"):
+                    target_url = f"{target_url.rstrip('/')}/application"
 
                 try:
                     logger.info(f"Navigating Playwright to genuine live ATS URL: {target_url}")
                     resp = await page.goto(target_url, wait_until="domcontentloaded", timeout=25000)
                     await asyncio.sleep(2.0)
+                    if "ashbyhq.com" in target_url.lower():
+                        try:
+                            await page.wait_for_selector("#_systemfield_name, input[name='_systemfield_name']", timeout=8000)
+                        except Exception:
+                            pass
                     if resp and resp.status >= 400:
                         raise RuntimeError(f"Live ATS endpoint returned HTTP {resp.status}")
                 except Exception as net_err:
@@ -289,18 +332,60 @@ class AutoApplyEngine:
                 # Last Name
                 if await page.query_selector("#last_name, input[name='last_name']"):
                     await AutoApplyEngine._type_human(page, "#last_name, input[name='last_name']", profile.full_name.split()[-1] if profile.full_name and len(profile.full_name.split()) > 1 else "")
-                # Full Name (for Lever)
-                if await page.query_selector("input[name='name']"):
-                    await AutoApplyEngine._type_human(page, "input[name='name']", profile.full_name)
+                # Full Name (for Lever / Ashby)
+                if await page.query_selector("input[name='name'], #_systemfield_name, input[name='_systemfield_name']"):
+                    await AutoApplyEngine._type_human(page, "input[name='name'], #_systemfield_name, input[name='_systemfield_name']", profile.full_name)
                 # Email
-                if await page.query_selector("#email, input[name='email'], input[type='email']"):
-                    await AutoApplyEngine._type_human(page, "#email, input[name='email'], input[type='email']", profile.email)
+                if await page.query_selector("#email, input[name='email'], input[type='email'], #_systemfield_email, input[name='_systemfield_email']"):
+                    await AutoApplyEngine._type_human(page, "#email, input[name='email'], input[type='email'], #_systemfield_email, input[name='_systemfield_email']", profile.email)
                 # Phone
-                if await page.query_selector("#phone, input[name='phone'], input[type='tel']"):
-                    await AutoApplyEngine._type_human(page, "#phone, input[name='phone'], input[type='tel']", profile.phone)
+                if await page.query_selector("#phone, input[name='phone'], input[type='tel'], #_systemfield_phoneNumber, input[name*='phone']"):
+                    await AutoApplyEngine._type_human(page, "#phone, input[name='phone'], input[type='tel'], #_systemfield_phoneNumber, input[name*='phone']", profile.phone)
 
-                # Location (Lever / Ashby / Greenhouse)
-                loc_el = await page.query_selector("input[name='location'], #location-input, input[name*='location']")
+                # Greenhouse Country dial code (React-Select)
+                country_el = await page.query_selector("#country")
+                if country_el:
+                    try:
+                        await country_el.click()
+                        await asyncio.sleep(0.2)
+                        for char in "India":
+                            await page.keyboard.press(char)
+                            await asyncio.sleep(0.08)
+                        await asyncio.sleep(0.8)
+                        for o in await page.query_selector_all(".select__option"):
+                            t = (await o.inner_text()).strip()
+                            if "+91" in t or t == "India":
+                                await o.click()
+                                logger.info(f"Selected country dropdown: {t}")
+                                break
+                        await page.keyboard.press("Escape")
+                        await asyncio.sleep(0.3)
+                    except Exception as e:
+                        logger.warning(f"Error filling country dropdown: {e}")
+
+                # Greenhouse Candidate Location (React-Select)
+                loc_cand = await page.query_selector("#candidate-location")
+                if loc_cand:
+                    try:
+                        await loc_cand.click()
+                        await asyncio.sleep(0.2)
+                        for char in "Chennai":
+                            await page.keyboard.press(char)
+                            await asyncio.sleep(0.08)
+                        await asyncio.sleep(1.2)
+                        for o in await page.query_selector_all(".select__option"):
+                            t = (await o.inner_text()).strip()
+                            if "chennai" in t.lower():
+                                await o.click()
+                                logger.info(f"Selected candidate-location: {t}")
+                                break
+                        await page.keyboard.press("Escape")
+                        await asyncio.sleep(0.3)
+                    except Exception as e:
+                        logger.warning(f"Error filling candidate-location: {e}")
+
+                # Location (Lever / Ashby generic - strictly ignore Greenhouse candidate-location)
+                loc_el = await page.query_selector("input[name='location']:not(#candidate-location), #location-input")
                 if loc_el:
                     try:
                         await loc_el.fill("Vellore, Tamil Nadu, India")
@@ -339,7 +424,67 @@ class AutoApplyEngine:
                     except Exception:
                         pass
 
-                # Lever custom card questions (e.g. "Have you ever been previously employed by [Company]?")
+                # Lever custom card questions (e.g. screening prompts, language skills, AI consent)
+                lever_questions = await page.query_selector_all(".application-question")
+                for lq in lever_questions:
+                    label_el = await lq.query_selector(".text")
+                    if not label_el:
+                        continue
+                    q_text = (await label_el.inner_text()).strip()
+                    if not q_text:
+                        continue
+                    
+                    if "language skill" in q_text.lower():
+                        eng_lbl = await lq.query_selector('label:has-text("English")')
+                        if eng_lbl:
+                            await eng_lbl.click()
+                        continue
+                        
+                    if "ai notetakers" in q_text.lower():
+                        yes_lbl = await lq.query_selector('label:has-text("Yes, I consent")')
+                        if yes_lbl:
+                            await yes_lbl.click()
+                        continue
+                        
+                    ans_res = AnswerService.resolve_answer(db, q_text)
+                    ans = ans_res[0] if ans_res else None
+                    
+                    # Fill text / textarea
+                    txt_el = await lq.query_selector("input[type='text'], textarea")
+                    if txt_el and ans:
+                        await txt_el.fill(ans)
+                        
+                    # Select option from dropdown
+                    sel_el = await lq.query_selector("select")
+                    if sel_el:
+                        opts = await sel_el.query_selector_all("option")
+                        sel_done = False
+                        for opt in opts:
+                            ot = (await opt.inner_text()).strip()
+                            val = await opt.get_attribute("value")
+                            if not val:
+                                continue
+                            if ans and (ans.lower() in ot.lower() or ot.lower() in ans.lower()):
+                                await sel_el.select_option(value=val)
+                                sel_done = True
+                                break
+                        if not sel_done and "how you heard" in q_text.lower():
+                            for opt in opts:
+                                ot = (await opt.inner_text()).strip()
+                                val = await opt.get_attribute("value")
+                                if any(kw in ot.lower() for kw in ["linkedin", "website", "job board"]):
+                                    await sel_el.select_option(value=val)
+                                    break
+                                    
+                    # Click radio / checkbox label
+                    radio_labels = await lq.query_selector_all("label")
+                    if radio_labels and ans:
+                        for r_lbl in radio_labels:
+                            lt = (await r_lbl.inner_text()).strip()
+                            if ans.lower() == lt.lower() or ans.lower() in lt.lower():
+                                await r_lbl.click()
+                                break
+                                
                 prev_emp_labels = await page.query_selector_all(".application-question label:has-text('No'), .custom-question label:has-text('No')")
                 for lbl in prev_emp_labels:
                     t = (await lbl.inner_text()).strip()
@@ -358,17 +503,41 @@ class AutoApplyEngine:
                         pass
 
                 # Resume File Upload
-                file_input = await page.query_selector("input[type='file']")
+                file_input = await page.query_selector("input[type='file'], #_systemfield_resume, input[id*='resume']")
                 if file_input and Path(pdf_path).exists():
                     await file_input.set_input_files(pdf_path)
                     logger.info(f"Attached tailored resume: {pdf_path}")
 
+                # Voluntary Demographics (Greenhouse / Ashby React-Select)
+                for dem_id, dem_val in [
+                    ("#gender", "Male"),
+                    ("#hispanic_ethnicity", "No"),
+                    ("#veteran_status", "I am not a protected veteran"),
+                    ("#disability_status", "No, I do not have a disability")
+                ]:
+                    try:
+                        el = await page.query_selector(dem_id)
+                        if el:
+                            await el.click()
+                            await asyncio.sleep(0.3)
+                            for o in await page.query_selector_all(".select__option"):
+                                ot = (await o.inner_text()).strip()
+                                if dem_val.lower() in ot.lower() or ot.lower() in dem_val.lower():
+                                    await o.click()
+                                    break
+                            await page.keyboard.press("Escape")
+                            await asyncio.sleep(0.2)
+                    except Exception:
+                        pass
+
                 # 5. Dynamic Form Label Scanning & Answer Bank Resolution
-                inputs = await page.query_selector_all("input[type='text'], input[type='url'], textarea, select")
+                inputs = await page.query_selector_all("input:not([type='hidden']):not([type='submit']):not([type='button']):not([type='checkbox']):not([type='radio']):not([type='file']), textarea, select")
                 unresolved_fields = []
 
                 for inp in inputs:
                     input_id = await inp.get_attribute("id")
+                    if input_id in ["first_name", "last_name", "email", "phone", "country", "candidate-location", "iti-0__search-input"]:
+                        continue
                     label_text = ""
                     if input_id:
                         lbl = await page.query_selector(f"label[for='{input_id}']")
@@ -430,7 +599,12 @@ class AutoApplyEngine:
                         ans_val = resolved[0] if resolved else None
                         try:
                             await inp.click()
-                            await page.wait_for_timeout(250)
+                            await asyncio.sleep(0.2)
+                            if ans_val:
+                                for char in str(ans_val):
+                                    await page.keyboard.press(char)
+                                    await asyncio.sleep(0.04)
+                                await asyncio.sleep(0.6)
                             opts = await page.query_selector_all(".select__option, [class*='select__option']")
                             opt_texts = [(await o.inner_text()).strip() for o in opts if (await o.inner_text()).strip()]
 
@@ -461,13 +635,14 @@ class AutoApplyEngine:
                                     if ans_val.lower() == ot.lower() or ans_val.lower() in ot.lower() or ot.lower() in ans_val.lower():
                                         await o.click()
                                         clicked = True
+                                        await page.keyboard.press("Escape")
+                                        await asyncio.sleep(0.2)
                                         logger.info(f"Clicked React-Select option [{ot}] for [{label_text[:30]}]")
                                         break
                                 if not clicked:
-                                    await inp.fill(ans_val)
-                                    await page.wait_for_timeout(200)
                                     await page.keyboard.press("Enter")
-                                    logger.info(f"Typed and pressed Enter [{ans_val}] for [{label_text[:30]}]")
+                                    await page.keyboard.press("Escape")
+                                    logger.info(f"Pressed Enter on React-Select [{ans_val}] for [{label_text[:30]}]")
                             elif is_required:
                                 await page.keyboard.press("Escape")
                                 unresolved_fields.append({
@@ -677,11 +852,16 @@ class AutoApplyEngine:
 
                 # 8. Submit or Dry-Run
                 if is_live:
+                    # Baseline latest Greenhouse email before clicking submit
+                    baseline_email_id = AutoApplyEngine._get_latest_email_id("from:greenhouse")
+                    logger.info(f"Baseline Greenhouse email ID before submit: {baseline_email_id}")
+
                     # Visible submit buttons across Greenhouse, Lever, Ashby, Workday
                     submit_btn = await page.query_selector(
                         "#btn-submit, .template-btn-submit, #submit_app, "
                         "button[type='submit']:not(#hcaptchaSubmitBtn), input[type='submit'], "
-                        "button:has-text('Submit Application'), button:has-text('SUBMIT APPLICATION')"
+                        "button:has-text('Submit Application'), button:has-text('SUBMIT APPLICATION'), "
+                        "button:has-text('Submit application')"
                     )
                     if submit_btn:
                         try:
@@ -690,12 +870,65 @@ class AutoApplyEngine:
                         except Exception:
                             pass
                         await submit_btn.click()
-                        try:
-                            await page.wait_for_load_state("networkidle", timeout=15000)
-                        except Exception:
-                            pass
-                        await asyncio.sleep(4.0)
-                        await page.screenshot(path=str(confirm_screenshot), full_page=True)
+                        logger.info(f"Clicked initial submit button for {job.company}. Awaiting response...")
+
+                    # Wait up to 14 seconds for either confirmation redirect or Greenhouse security input boxes
+                    sec_boxes = []
+                    for wait_tick in range(7):
+                        await asyncio.sleep(2.0)
+                        sec_boxes = await page.query_selector_all("input[id^='security-input-']")
+                        if sec_boxes:
+                            break
+                        cur_url = page.url.lower()
+                        if "confirmation" in cur_url or "thanks" in cur_url:
+                            break
+
+                    if sec_boxes:
+                        num_boxes = len(sec_boxes)
+                        logger.info(f"Greenhouse verification screen detected ({num_boxes} inputs). Polling Gmail for verification code...")
+                        code = None
+                        for attempt in range(40):
+                            await asyncio.sleep(2)
+                            fresh_msg_id = AutoApplyEngine._get_latest_email_id("from:greenhouse")
+                            if fresh_msg_id and fresh_msg_id != baseline_email_id:
+                                logger.info(f"Fresh Greenhouse verification email detected: {fresh_msg_id} (attempt {attempt+1})")
+                                extracted = AutoApplyEngine._fetch_otp_from_email(fresh_msg_id, num_digits=num_boxes)
+                                if extracted and len(extracted) == num_boxes:
+                                    code = extracted
+                                    logger.info(f"Successfully extracted {len(code)}-character code from Gmail: {code}")
+                                    break
+                            else:
+                                logger.info(f"Waiting for Greenhouse security code in Gmail... ({attempt+1}/40)")
+
+                        if code:
+                            logger.info(f"Entering verification code into Greenhouse inputs...")
+                            for i, ch in enumerate(code):
+                                inp = await page.query_selector(f"#security-input-{i}")
+                                if inp:
+                                    await inp.fill(ch)
+                                    await asyncio.sleep(0.12)
+                            await asyncio.sleep(1.0)
+                            final_submit = await page.query_selector("button:has-text('Submit application'), button[type='submit']")
+                            if final_submit:
+                                logger.info("Clicking final Submit application button after entering OTP...")
+                                await final_submit.click()
+                                try:
+                                    await page.wait_for_load_state("networkidle", timeout=30000)
+                                except Exception:
+                                    pass
+                                for _ in range(6):
+                                    await asyncio.sleep(2.0)
+                                    if "confirmation" in page.url.lower() or "thanks" in page.url.lower():
+                                        break
+                        else:
+                            logger.warning(f"Could not retrieve verification code from Gmail within timeout for {job.company}.")
+
+                    try:
+                        await page.wait_for_load_state("networkidle", timeout=15000)
+                    except Exception:
+                        pass
+                    await asyncio.sleep(2.0)
+                    await page.screenshot(path=str(confirm_screenshot), full_page=True)
 
                     # Strictly verify whether the ATS accepted or rejected the submission
                     has_validation_errors = False
