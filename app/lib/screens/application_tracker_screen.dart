@@ -742,113 +742,169 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
                       // Prominent ATS Verification Proof Captured Banner & Action
                       if (latestApp != null) ...[
                         const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF102016) : const Color(0xFFE8F5EE),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: AppColors.successEmerald.withOpacity(0.35),
-                              width: 1.2,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(5),
-                                decoration: BoxDecoration(
-                                  color: AppColors.successEmerald.withOpacity(0.18),
-                                  shape: BoxShape.circle,
+                        Builder(
+                          builder: (context) {
+                            final formShot = (latestApp["form_screenshot_url"] ?? latestApp["form_screenshot"] ?? "").toString().trim();
+                            final confirmShot = (latestApp["confirmation_screenshot_url"] ?? latestApp["confirmation_screenshot"] ?? "").toString().trim();
+                            final screenshotRaw = confirmShot.isNotEmpty ? confirmShot : formShot;
+                            String? screenshotFilename;
+                            String? screenshotUrl;
+                            if (screenshotRaw.isNotEmpty) {
+                              screenshotFilename = screenshotRaw.replaceAll(r'\', '/').split('/').last;
+                              if (screenshotFilename.isNotEmpty && screenshotFilename.endsWith(".png")) {
+                                screenshotUrl = "${_api.baseUrl}/output/screenshots/$screenshotFilename";
+                              }
+                            }
+
+                            final resumeRaw = (latestApp["resume_file_url"] ?? latestApp["resume_file"] ?? "").toString().trim();
+                            final isManual = resumeRaw == "manual_tracking_submission" || (screenshotUrl == null && latestApp['status'] != 'dry_run');
+                            final isDryRun = latestApp['status'] == 'dry_run';
+                            final isLiveSubmitted = latestApp['status'] == 'submitted' && !isManual;
+
+                            final bannerColor = isManual
+                                ? (isDark ? const Color(0xFF1C1E1B) : const Color(0xFFF1F3F0))
+                                : (isDryRun
+                                    ? const Color(0xFF0284C7).withOpacity(0.08)
+                                    : (isDark ? const Color(0xFF102016) : const Color(0xFFE8F5EE)));
+                            final borderColor = isManual
+                                ? (isDark ? const Color(0xFF2E332C) : const Color(0xFFD6DAD4))
+                                : (isDryRun ? const Color(0xFF0284C7).withOpacity(0.35) : AppColors.successEmerald.withOpacity(0.35));
+                            final iconColor = isManual
+                                ? secondaryTextColor
+                                : (isDryRun ? const Color(0xFF0284C7) : AppColors.successEmerald);
+                            final titleText = isManual
+                                ? "Manual Tracking Record"
+                                : (isDryRun ? "Autonomous ATS Dry-Run Verified" : "Autonomous Application Submitted");
+                            final subtitleText = isManual
+                                ? "Lifecycle status updated manually • No autonomous submission"
+                                : (isDryRun ? "Candidate details filled • Tailored resume verified" : "Candidate details filled • Tailored resume attached");
+
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: bannerColor,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: borderColor,
+                                  width: 1.2,
                                 ),
-                                child: const Icon(Icons.verified, size: 16, color: AppColors.successEmerald),
                               ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      latestApp['status'] == 'dry_run'
-                                          ? "Autonomous ATS Dry-Run Verified"
-                                          : "Autonomous Application Submitted",
-                                      style: const TextStyle(
-                                        fontSize: 11.5,
-                                        fontWeight: FontWeight.w800,
-                                        color: AppColors.successEmerald,
-                                      ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(5),
+                                    decoration: BoxDecoration(
+                                      color: iconColor.withOpacity(0.18),
+                                      shape: BoxShape.circle,
                                     ),
-                                    const SizedBox(height: 1),
-                                    Text(
-                                      "Candidate details filled • Tailored resume attached",
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: isDark ? const Color(0xFFA0A69F) : const Color(0xFF4A554A),
-                                      ),
+                                    child: Icon(
+                                      isManual ? Icons.edit_note : (isDryRun ? Icons.science_outlined : Icons.verified),
+                                      size: 16,
+                                      color: iconColor,
                                     ),
-                                  ],
-                                ),
-                              ),
-                              InkWell(
-                                onTap: () {
-                                  HapticFeedback.lightImpact();
-                                  final formShot = (latestApp["form_screenshot_url"] ?? latestApp["form_screenshot"] ?? "").toString().trim();
-                                  final confirmShot = (latestApp["confirmation_screenshot_url"] ?? latestApp["confirmation_screenshot"] ?? "").toString().trim();
-                                  final screenshotRaw = confirmShot.isNotEmpty ? confirmShot : formShot;
-                                  String? screenshotFilename;
-                                  String? screenshotUrl;
-                                  if (screenshotRaw.isNotEmpty) {
-                                    screenshotFilename = screenshotRaw.replaceAll(r'\', '/').split('/').last;
-                                    if (screenshotFilename.isNotEmpty && screenshotFilename.endsWith(".png")) {
-                                      screenshotUrl = "${_api.baseUrl}/output/screenshots/$screenshotFilename";
-                                    }
-                                  }
-                                  if (screenshotUrl == null) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text("Screenshot is being captured by live Playwright automation...")),
-                                    );
-                                    return;
-                                  }
-                                  _openFullScreenshotViewer(
-                                    context,
-                                    screenshotUrl,
-                                    "${job['company']} Form Fill Proof",
-                                    job: job,
-                                    latestApp: latestApp,
-                                  );
-                                },
-                                borderRadius: BorderRadius.circular(8),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.successEmerald,
-                                    borderRadius: BorderRadius.circular(8),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: AppColors.successEmerald.withOpacity(0.25),
-                                        blurRadius: 6,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
                                   ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: const [
-                                      Icon(Icons.photo_camera_outlined, size: 13, color: Colors.black),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        "View Proof",
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w800,
-                                          color: Colors.black,
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          titleText,
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.w800,
+                                            color: isManual ? primaryTextColor : (isDryRun ? const Color(0xFF0284C7) : AppColors.successEmerald),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 1),
+                                        Text(
+                                          subtitleText,
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: isDark ? const Color(0xFFA0A69F) : const Color(0xFF4A554A),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (screenshotUrl != null)
+                                    InkWell(
+                                      onTap: () {
+                                        HapticFeedback.lightImpact();
+                                        _openFullScreenshotViewer(
+                                          context,
+                                          screenshotUrl!,
+                                          "${job['company']} Form Fill Proof",
+                                          job: job,
+                                          latestApp: latestApp,
+                                        );
+                                      },
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: isDryRun ? const Color(0xFF0284C7) : AppColors.successEmerald,
+                                          borderRadius: BorderRadius.circular(8),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: (isDryRun ? const Color(0xFF0284C7) : AppColors.successEmerald).withOpacity(0.25),
+                                              blurRadius: 6,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: const [
+                                            Icon(Icons.photo_camera_outlined, size: 13, color: Colors.black),
+                                            SizedBox(width: 4),
+                                            Text(
+                                              "View Proof",
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w800,
+                                                color: Colors.black,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                ),
+                                    )
+                                  else if (isManual)
+                                    InkWell(
+                                      onTap: () {
+                                        HapticFeedback.lightImpact();
+                                        _openDetailModal(job);
+                                      },
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: isDark ? AppColors.surfaceSubtleDark : AppColors.surfaceSubtleLight,
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: isDark ? const Color(0xFF2E332C) : const Color(0xFFD6DAD4)),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.folder_open, size: 13, color: primaryTextColor),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              "Dossier",
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w700,
+                                                color: primaryTextColor,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
-                            ],
-                          ),
+                            );
+                          },
                         ),
                       ],
                     ],
@@ -1309,7 +1365,9 @@ class _ApplicationDetailSheetState extends State<_ApplicationDetailSheet> {
 
                     final appStatus = (latestApp?["status"] ?? widget.job["status"] ?? "").toString().toLowerCase();
                     final isDryRun = appStatus == "dry_run";
-                    final isSubmitted = appStatus == "submitted";
+                    final isSubmitted = appStatus == "submitted" || appStatus == "applied";
+                    final isManualSubmission = isSubmitted && (resumeRaw == "manual_tracking_submission" || screenshotUrl == null);
+                    final isLiveSubmitted = isSubmitted && !isManualSubmission;
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1321,12 +1379,14 @@ class _ApplicationDetailSheetState extends State<_ApplicationDetailSheet> {
                           decoration: BoxDecoration(
                             color: isDryRun
                                 ? const Color(0xFF0284C7).withOpacity(0.08)
-                                : (isSubmitted ? AppColors.successEmerald.withOpacity(0.08) : (isDark ? AppColors.surfaceSubtleDark : AppColors.surfaceSubtleLight)),
+                                : (isLiveSubmitted
+                                    ? AppColors.successEmerald.withOpacity(0.08)
+                                    : (isDark ? AppColors.surfaceSubtleDark : AppColors.surfaceSubtleLight)),
                             borderRadius: BorderRadius.circular(AppRadii.control),
                             border: Border.all(
                               color: isDryRun
                                   ? const Color(0xFF0284C7).withOpacity(0.25)
-                                  : (isSubmitted ? AppColors.successEmerald.withOpacity(0.25) : borderColor),
+                                  : (isLiveSubmitted ? AppColors.successEmerald.withOpacity(0.25) : borderColor),
                             ),
                           ),
                           child: Column(
@@ -1335,19 +1395,27 @@ class _ApplicationDetailSheetState extends State<_ApplicationDetailSheet> {
                               Row(
                                 children: [
                                   Icon(
-                                    isDryRun ? Icons.science_outlined : (isSubmitted ? Icons.verified : Icons.help_outline),
+                                    isDryRun
+                                        ? Icons.science_outlined
+                                        : (isLiveSubmitted ? Icons.verified : (isManualSubmission ? Icons.edit_note : Icons.help_outline)),
                                     size: 16,
-                                    color: isDryRun ? const Color(0xFF0284C7) : (isSubmitted ? AppColors.successEmerald : secondaryTextColor),
+                                    color: isDryRun
+                                        ? const Color(0xFF0284C7)
+                                        : (isLiveSubmitted ? AppColors.successEmerald : secondaryTextColor),
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
                                     isDryRun
                                         ? "Simulated Dry-Run (Safety Gate Active)"
-                                        : (isSubmitted ? "Live Application Submitted" : "Tracking Record"),
+                                        : (isLiveSubmitted
+                                            ? "Live Application Submitted"
+                                            : (isManualSubmission ? "Manually Tracked Record" : "Tracking Record")),
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.bold,
-                                      color: isDryRun ? const Color(0xFF0284C7) : (isSubmitted ? AppColors.successEmerald : primaryTextColor),
+                                      color: isDryRun
+                                          ? const Color(0xFF0284C7)
+                                          : (isLiveSubmitted ? AppColors.successEmerald : primaryTextColor),
                                     ),
                                   ),
                                 ],
@@ -1356,9 +1424,11 @@ class _ApplicationDetailSheetState extends State<_ApplicationDetailSheet> {
                               Text(
                                 isDryRun
                                     ? "Form filled automatically by Playwright on ATS (Greenhouse/Lever). All fields validated. Final submit was safely halted because GO_LIVE_ENABLED is set to False."
-                                    : (isSubmitted
+                                    : (isLiveSubmitted
                                         ? "Application was submitted live to the ATS with complete candidate profile and tailored resume."
-                                        : "This role is tracked in your pipeline. Automated form execution pending."),
+                                        : (isManualSubmission
+                                            ? "This application was marked as applied manually in your tracker. No autonomous browser submission or screenshot proof was generated."
+                                            : "This role is tracked in your pipeline. Automated form execution pending.")),
                                 style: TextStyle(fontSize: 11, height: 1.35, color: secondaryTextColor),
                               ),
                             ],
