@@ -152,15 +152,15 @@ class ApplicationOut(BaseModel):
     job_id: int
     resume_version_id: Optional[int] = None
     resume_file: str
-    applied_at: datetime.datetime
-    submitted_at: datetime.datetime
-    form_screenshot: str
-    confirmation_screenshot: str
+    applied_at: Optional[datetime.datetime] = None
+    submitted_at: Optional[datetime.datetime] = None
+    form_screenshot: Optional[str] = ""
+    confirmation_screenshot: Optional[str] = ""
     form_screenshot_url: str = ""
     confirmation_screenshot_url: str = ""
     submission_evidence: Dict[str, Any] = {}
     status: str
-    failure_reason: str
+    failure_reason: Optional[str] = None
     notes: str = ""
     recruiter_info: str = ""
     follow_up_date: Optional[datetime.datetime] = None

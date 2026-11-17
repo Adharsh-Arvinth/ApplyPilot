@@ -72,13 +72,15 @@ class AutoApplyEngine:
         _consecutive_failures = 0
 
     @staticmethod
-    def _is_company_cooldown_active(db: Session, company: str) -> bool:
-        """Check if candidate already applied to this company within 30 days."""
+    def _is_company_cooldown_active(db: Session, company: str, is_live: bool = False) -> bool:
+        """Check if candidate already applied to this company within 30 days (excluding manual tracker notes)."""
         thirty_days_ago = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=30)
+        statuses = ["submitted", "applied"] if is_live else ["submitted", "dry_run", "applied"]
         recent = db.query(Application).join(Job).filter(
             Job.company.ilike(company),
             Application.submitted_at >= thirty_days_ago,
-            Application.status.in_(["submitted", "dry_run", "applied"])
+            Application.resume_file != "manual_tracking_submission",
+            Application.status.in_(statuses)
         ).first()
         return recent is not None
 
@@ -119,15 +121,26 @@ class AutoApplyEngine:
             return {"status": "assist_only", "reason": "Job is an assist-only portal listing. Please complete manually via official application link."}
 
         # 1. Deduplication & Idempotency check
+        # A dry-run simulation should NEVER block a real live application submission!
+        is_live = profile.go_live and not force_dry_run
         existing_app = db.query(Application).filter(
             Application.job_id == job.id,
-            Application.status.in_(["submitted", "dry_run", "applied"])
+            Application.status.in_(["submitted", "applied"])
         ).first()
         if existing_app:
-            logger.info(f"Skipping {job.company} — {job.title}: Already applied (Application ID: {existing_app.id}).")
+            logger.info(f"Skipping {job.company} — {job.title}: Already submitted live (Application ID: {existing_app.id}).")
             return {"status": "skipped", "reason": "already_applied", "application_id": existing_app.id}
 
-        if AutoApplyEngine._is_company_cooldown_active(db, job.company):
+        if not is_live:
+            existing_dry_run = db.query(Application).filter(
+                Application.job_id == job.id,
+                Application.status == "dry_run"
+            ).first()
+            if existing_dry_run:
+                logger.info(f"Skipping {job.company} — {job.title}: Already dry-run verified (Application ID: {existing_dry_run.id}).")
+                return {"status": "skipped", "reason": "already_dry_run", "application_id": existing_dry_run.id}
+
+        if AutoApplyEngine._is_company_cooldown_active(db, job.company, is_live=is_live):
             logger.info(f"Skipping {job.company}: Applied within 30-day cooldown window.")
             AutoApplyEngine._record_transition(db, job, "skipped", "30-day company cooldown active", "cooldown_active")
             job.status = "skipped"
@@ -286,6 +299,64 @@ class AutoApplyEngine:
                 if await page.query_selector("#phone, input[name='phone'], input[type='tel']"):
                     await AutoApplyEngine._type_human(page, "#phone, input[name='phone'], input[type='tel']", profile.phone)
 
+                # Location (Lever / Ashby / Greenhouse)
+                loc_el = await page.query_selector("input[name='location'], #location-input, input[name*='location']")
+                if loc_el:
+                    try:
+                        await loc_el.fill("Vellore, Tamil Nadu, India")
+                    except Exception:
+                        pass
+
+                # Organization / Current Company (Lever / Ashby / Greenhouse)
+                org_el = await page.query_selector("input[name='org'], input[name*='company'], input[name*='organization']")
+                if org_el:
+                    try:
+                        await org_el.fill("Vellore Institute of Technology")
+                    except Exception:
+                        pass
+
+                # LinkedIn URL
+                linkedin_el = await page.query_selector("input[name='urls[LinkedIn]'], input[name*='linkedin'], #linkedin_url")
+                if linkedin_el and profile.linkedin:
+                    try:
+                        await linkedin_el.fill(profile.linkedin)
+                    except Exception:
+                        pass
+
+                # GitHub URL
+                github_el = await page.query_selector("input[name='urls[GitHub]'], input[name*='github'], #github_url")
+                if github_el and profile.github:
+                    try:
+                        await github_el.fill(profile.github)
+                    except Exception:
+                        pass
+
+                # Portfolio URL
+                portfolio_el = await page.query_selector("input[name='urls[Portfolio]'], input[name*='portfolio'], #portfolio_url")
+                if portfolio_el and (profile.github or profile.linkedin):
+                    try:
+                        await portfolio_el.fill(profile.github or profile.linkedin)
+                    except Exception:
+                        pass
+
+                # Lever custom card questions (e.g. "Have you ever been previously employed by [Company]?")
+                prev_emp_labels = await page.query_selector_all(".application-question label:has-text('No'), .custom-question label:has-text('No')")
+                for lbl in prev_emp_labels:
+                    t = (await lbl.inner_text()).strip()
+                    if t == "No":
+                        try:
+                            await lbl.click()
+                        except Exception:
+                            pass
+
+                # Consent & Privacy Checkboxes (Lever / Greenhouse)
+                consent_box = await page.query_selector("input[name*='consent'], input[name*='privacy'], input[type='checkbox'][name*='terms']")
+                if consent_box:
+                    try:
+                        await consent_box.check(force=True)
+                    except Exception:
+                        pass
+
                 # Resume File Upload
                 file_input = await page.query_selector("input[type='file']")
                 if file_input and Path(pdf_path).exists():
@@ -336,6 +407,16 @@ class AutoApplyEngine:
                         is_required = "*" in label_text
 
                     tag = await inp.evaluate("el => el.tagName.toLowerCase()")
+
+                    # Skip if already filled with valid input
+                    if tag in ["input", "textarea"]:
+                        try:
+                            curr_val = (await inp.input_value()).strip()
+                            if curr_val:
+                                continue
+                        except Exception:
+                            pass
+
                     resolved = AnswerService.resolve_answer(db, label_text)
 
                     is_react_select = False
@@ -346,13 +427,35 @@ class AutoApplyEngine:
                             is_react_select = False
 
                     if is_react_select:
-                        if resolved:
-                            ans_val, _ = resolved
-                            try:
-                                await inp.click()
-                                await page.wait_for_timeout(200)
-                                opts = await page.query_selector_all(".select__option, [class*='select__option']")
-                                clicked = False
+                        ans_val = resolved[0] if resolved else None
+                        try:
+                            await inp.click()
+                            await page.wait_for_timeout(250)
+                            opts = await page.query_selector_all(".select__option, [class*='select__option']")
+                            opt_texts = [(await o.inner_text()).strip() for o in opts if (await o.inner_text()).strip()]
+
+                            # Smart fallback if not directly in AnswerBank
+                            if not ans_val and opt_texts:
+                                lbl_l = label_text.lower()
+                                if any(k in lbl_l for k in ["agree", "confirm", "able to", "willing", "commit", "privacy", "words", "office", "authorized"]):
+                                    if any(x.lower() == "yes" for x in opt_texts):
+                                        ans_val = "Yes"
+                                    elif any("acknowledge" in x.lower() or "confirm" in x.lower() for x in opt_texts):
+                                        ans_val = next(x for x in opt_texts if "acknowledge" in x.lower() or "confirm" in x.lower())
+                                elif "country" in lbl_l:
+                                    if any("india" in x.lower() for x in opt_texts):
+                                        ans_val = "India"
+                                elif any(k in lbl_l for k in ["mathematics", "language", "school", "high school", "grade", "performance"]):
+                                    top_opts = [x for x in opt_texts if "top 10" in x.lower() or "top 20" in x.lower() or "first" in x.lower() or "excellent" in x.lower()]
+                                    if top_opts:
+                                        ans_val = top_opts[0]
+                                elif "companies" in lbl_l:
+                                    zero_opts = [x for x in opt_texts if x in ["0", "1", "0-1", "0 - 1"]]
+                                    if zero_opts:
+                                        ans_val = zero_opts[0]
+
+                            clicked = False
+                            if ans_val:
                                 for o in opts:
                                     ot = (await o.inner_text()).strip()
                                     if ans_val.lower() == ot.lower() or ans_val.lower() in ot.lower() or ot.lower() in ans_val.lower():
@@ -365,24 +468,16 @@ class AutoApplyEngine:
                                     await page.wait_for_timeout(200)
                                     await page.keyboard.press("Enter")
                                     logger.info(f"Typed and pressed Enter [{ans_val}] for [{label_text[:30]}]")
-                            except Exception as sel_err:
-                                logger.warning(f"Failed to select React-Select option: {sel_err}")
-                        elif is_required:
-                            opt_texts = []
-                            try:
-                                await inp.click()
-                                await page.wait_for_timeout(250)
-                                opts = await page.query_selector_all(".select__option, [class*='select__option']")
-                                opt_texts = [(await o.inner_text()).strip() for o in opts if (await o.inner_text()).strip()]
+                            elif is_required:
                                 await page.keyboard.press("Escape")
-                            except Exception:
-                                pass
-                            unresolved_fields.append({
-                                "label": label_text,
-                                "type": "select",
-                                "options": opt_texts,
-                                "element": inp
-                            })
+                                unresolved_fields.append({
+                                    "label": label_text,
+                                    "type": "select",
+                                    "options": opt_texts,
+                                    "element": inp
+                                })
+                        except Exception as sel_err:
+                            logger.warning(f"Failed to process React-Select option: {sel_err}")
                     elif tag == "select":
                         # Extract all available options from the dropdown
                         options_data = await inp.evaluate("""el => {
@@ -392,6 +487,13 @@ class AutoApplyEngine:
                             })).filter(o => o.text.length > 0 && !o.text.toLowerCase().startsWith('select') && !o.text.toLowerCase().startsWith('choose') && !o.text.toLowerCase().startsWith('--'));
                         }""")
                         opt_texts = [o["text"] for o in options_data]
+
+                        if not resolved and opt_texts:
+                            lbl_l = label_text.lower()
+                            if any(k in lbl_l for k in ["country", "location", "reside", "citizenship"]) and any("india" in o["text"].lower() for o in options_data):
+                                resolved = ("India", "smart_match")
+                            elif any(k in lbl_l for k in ["agree", "confirm", "able to", "willing", "authorized"]) and any(o["text"].lower() == "yes" for o in options_data):
+                                resolved = ("Yes", "smart_match")
 
                         if resolved:
                             ans_val, _ = resolved
@@ -445,12 +547,22 @@ class AutoApplyEngine:
                             await inp.fill(ans_val)
                             logger.info(f"Filled text field [{label_text[:30]}]: {ans_val[:30]}")
                         elif is_required:
-                            unresolved_fields.append({
-                                "label": label_text,
-                                "type": "textarea" if tag == "textarea" else "text",
-                                "options": [],
-                                "element": inp
-                            })
+                            lbl_l = label_text.lower()
+                            if any(k in lbl_l for k in ["school", "university", "college", "institution", "degree", "result", "grade", "gpa", "rationale", "evidence"]):
+                                fallback_ans = "Vellore Institute of Technology - First Class with Distinction"
+                                await inp.fill(fallback_ans)
+                                logger.info(f"Filled education fallback for [{label_text[:30]}]: {fallback_ans}")
+                            elif any(k in lbl_l for k in ["experience", "linux", "python", "describe", "summary", "project"]):
+                                fallback_ans = "Experience in Linux system administration, bash scripting, Python automation, and distributed systems."
+                                await inp.fill(fallback_ans)
+                                logger.info(f"Filled technical fallback for [{label_text[:30]}]")
+                            else:
+                                unresolved_fields.append({
+                                    "label": label_text,
+                                    "type": "textarea" if tag == "textarea" else "text",
+                                    "options": [],
+                                    "element": inp
+                                })
 
                 # 5b. Radio Button Groups (Yes/No choices, multiple choice)
                 radio_inputs = await page.query_selector_all("input[type='radio']")
@@ -496,7 +608,15 @@ class AutoApplyEngine:
                         ans_val, _ = resolved
                         for opt_text, r_el in r_opts:
                             if ans_val.lower() == opt_text.lower() or ans_val.lower() in opt_text.lower() or opt_text.lower() in ans_val.lower():
-                                await r_el.check()
+                                try:
+                                    await r_el.check(force=True)
+                                except Exception:
+                                    try:
+                                        p_lbl = await r_el.evaluate_handle("el => el.closest('label')")
+                                        if p_lbl:
+                                            await p_lbl.click()
+                                    except Exception:
+                                        pass
                                 try:
                                     await r_el.evaluate("el => el.dispatchEvent(new Event('change', {bubbles: true}))")
                                 except Exception:
@@ -557,8 +677,18 @@ class AutoApplyEngine:
 
                 # 8. Submit or Dry-Run
                 if is_live:
-                    submit_btn = await page.query_selector("#submit_app, button[type='submit'], input[type='submit']")
+                    # Visible submit buttons across Greenhouse, Lever, Ashby, Workday
+                    submit_btn = await page.query_selector(
+                        "#btn-submit, .template-btn-submit, #submit_app, "
+                        "button[type='submit']:not(#hcaptchaSubmitBtn), input[type='submit'], "
+                        "button:has-text('Submit Application'), button:has-text('SUBMIT APPLICATION')"
+                    )
                     if submit_btn:
+                        try:
+                            await submit_btn.scroll_into_view_if_needed()
+                            await asyncio.sleep(0.5)
+                        except Exception:
+                            pass
                         await submit_btn.click()
                         try:
                             await page.wait_for_load_state("networkidle", timeout=15000)
