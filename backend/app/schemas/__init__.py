@@ -10,11 +10,11 @@ class ProfileBase(BaseModel):
     github: str
     education: str
     cgpa: str
-    graduation_date: str
-    notice_period: str
-    work_authorization: str
-    relocation_preference: str
-    preferred_work_mode: str
+    graduation_date: Optional[str] = None
+    notice_period: Optional[str] = None
+    work_authorization: Optional[str] = None
+    relocation_preference: Optional[str] = None
+    preferred_work_mode: Optional[str] = "Remote / Hybrid / Onsite"
     target_roles: List[str]
     locations: List[str]
     excluded_companies: List[str] = []
@@ -36,7 +36,7 @@ class ProfileBase(BaseModel):
     paused_at: Optional[datetime.datetime] = None
     pause_details: str = ""
     go_live: bool
-    proof_points_text: str
+    proof_points_text: Optional[str] = ""
     gemini_auto_answer_enabled: bool = True
     gemini_min_confidence: float = 0.85
     gemini_sensitive_categories: List[str] = ["consent_legal", "work_auth_visa", "salary_notice_relocation", "demographics_identity", "criminal_background", "legal_attestation", "ask_each_time"]

@@ -178,6 +178,11 @@ app.mount("/output", StaticFiles(directory=str(settings.OUTPUT_DIR)), name="outp
 flutter_web_dir = Path(__file__).resolve().parent.parent.parent / "app" / "build" / "web"
 if flutter_web_dir.exists():
     app.mount("/app", StaticFiles(directory=str(flutter_web_dir), html=True), name="app")
+else:
+    @app.get("/app")
+    @app.get("/app/")
+    def serve_app_stub():
+        return HTMLResponse("<!DOCTYPE html><html><body><h1>ApplyPilot Cockpit</h1><p>Web bundle not built.</p></body></html>")
 
 # Include Routers
 app.include_router(health_router, prefix="/api/v1")

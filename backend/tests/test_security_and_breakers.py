@@ -53,7 +53,11 @@ def test_security_valid_token_allows_access():
     assert res_hdr.status_code == 200
     assert res_hdr.json()["status"] == "online"
 
-    # 2. Query param ?token=... on /app
+    # 2. Query param ?token=... on API
+    res_query_api = client.get(f"/api/v1/health?token={settings.APPLYPILOT_TOKEN}")
+    assert res_query_api.status_code == 200
+
+    # 3. Query param ?token=... on /app
     res_query = client.get(f"/app/?token={settings.APPLYPILOT_TOKEN}")
     assert res_query.status_code == 200
 
