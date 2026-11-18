@@ -112,9 +112,11 @@ class _AnswerBankScreenState extends State<AnswerBankScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: isDark ? const Color(0xFF0F0F10) : AppColors.surfaceLight,
+        elevation: 0,
         title: Text(
-          "Answer Bank",
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: primaryTextColor),
+          "Answers",
+          style: TextStyle(fontFamily: 'Georgia', fontSize: 24, fontWeight: FontWeight.w400, color: primaryTextColor),
         ),
         actions: [
           IconButton(

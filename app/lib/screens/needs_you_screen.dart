@@ -365,9 +365,33 @@ class _NeedsYouScreenState extends State<NeedsYouScreen> {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(
-            "Needs You Inbox",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: primaryTextColor),
+          backgroundColor: isDark ? const Color(0xFF0F0F10) : AppColors.surfaceLight,
+          elevation: 0,
+          title: Row(
+            children: [
+              Text(
+                "Needs You",
+                style: TextStyle(
+                  fontFamily: 'Georgia',
+                  fontSize: 24,
+                  fontWeight: FontWeight.w400,
+                  color: primaryTextColor,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF18181A),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: const Color(0xFF2C2C2E)),
+                ),
+                child: const Text(
+                  "Autonomous Mode Active",
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF8E8E93)),
+                ),
+              ),
+            ],
           ),
           actions: [
             IconButton(

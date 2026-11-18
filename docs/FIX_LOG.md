@@ -2,7 +2,36 @@
 
 ---
 
-## Section 11: Stitch iOS SPA Full Rebuild (2026-11-18 23:09 IST)
+## Section 12: Flutter App (`app/lib`) Full Stitch iOS Design System Implementation (2026-11-18 23:45 IST)
+
+**Trigger**: User explicitly requested updating "the app" (`c:\Users\adhar\Desktop\job\app`), having confirmed that while the HTML web cockpit was built, the native Flutter codebase in `app/lib/` was still using the legacy green/ivory theme and old card layouts.
+
+**Flutter Codebase Modifications**:
+1. **Design Tokens & Theme Core**:
+   - `app/lib/core/theme.dart`: Updated `canvasDark` (`#0F0F10`), `surfaceDark` (`#18181A`), `surfaceSubtleDark` (`#242426`), `borderHairlineDark` (`#2C2C2E`), `accentDark` (`#F59E0B`), and Stitch tokens (`#EA580C`, `#30D158`, `#FF453A`).
+   - `app/lib/core/apple_music_theme.dart`: Synced dark surfaces and semantic accents with Stitch Neutral Monochrome tokens.
+   - `app/lib/ui_templates/theme/design_tokens.dart`: Updated `TemplateTokens` background, surface, borders, and accent tones.
+2. **Screens Upgraded to Stitch**:
+   - `app/lib/screens/home_screen.dart`:
+     - Added `_buildStitchGreetingHeader`: Uppercase formatted date, `V4.2 Autonomous Active` badge with pulsing dot, serif `Hello, Adharsh` (Georgia display).
+     - Added `_buildStitchQuotaAndKPIs`: Daily Quota donut chart with sweep gradient (`#F59E0B` to `#EA580C`), large quota number, rate cap, and 3 stacked status cards (Applied, Needs You, Leads).
+     - Added `_buildStitchWeeklyVelocity`: 7-day bar chart with warm gradient Peak badge on Thursday and `7D Avg: 36.3` pill.
+     - Added `_buildStitchConversionFunnel`: Multi-segment progression track, 2x2 grid, and recruiter leads milestone.
+     - Added `_buildStitchDispatchFrequency`: 24-hour wave curve with sunset gradient fill and timeline markers.
+     - Added `_buildStitchNowApplying`: Active Stripe card with 68% progress bar and 4-step checklist.
+     - Added `_buildStitchRecentActivity`: Chronological audit stream with Zoho, Figma, Notion 2FA, and Linear events.
+     - Added `_StitchDonutPainter` and `_StitchWavePainter` custom painters.
+   - `app/lib/screens/needs_you_screen.dart`: Serif header `Needs You`, `Autonomous Mode Active` badge.
+   - `app/lib/screens/profile_screen.dart`: Serif header `Profile` with Stitch dark canvas styling.
+   - `app/lib/screens/discover_screen.dart`: Serif header `Discover Jobs` with Stitch dark canvas styling.
+   - `app/lib/screens/application_tracker_screen.dart`: Serif header `Application Tracker` with Stitch dark canvas styling.
+   - `app/lib/screens/answer_bank_screen.dart`: Serif header `Answers` with Stitch dark canvas styling.
+3. **Cache & Service Worker Clearance**:
+   - Added `Cache-Control: no-cache, no-store, must-revalidate` meta tags and headers.
+   - Added automatic ServiceWorker unregistration and CacheStorage wipe script to prevent legacy Flutter web service workers from caching stale app bundles.
+   - Added `/flutter_service_worker.js` and `/app/flutter_service_worker.js` self-unregistering handlers in `backend/app/main.py`.
+
+---
 
 **Trigger**: User confirmed current cockpit UI does not match the Stitch ApplyPilot iOS Design System screens. Previous iteration was a custom-built dark dashboard — not the actual Stitch HTML.
 

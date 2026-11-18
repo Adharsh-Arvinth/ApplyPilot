@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -648,33 +649,56 @@ class _HomeScreenState extends State<HomeScreen> {
     List<String> finalWidgetOrder,
   ) {
     return ListView(
-      padding: const EdgeInsets.all(AppSpacing.s16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       children: [
-        _buildStatusChipsRow(isDark, cardBg, borderColor, primaryTextColor, secondaryTextColor),
+        // 1. Top Header: Date, Status pill, and Serif "Hello, Adharsh"
+        _buildStitchGreetingHeader(isDark),
 
         if (isPaused) ...[
-          const SizedBox(height: AppSpacing.s12),
+          const SizedBox(height: 12),
           _buildAutomationStatusBanner(isDark),
         ],
 
-        const SizedBox(height: AppSpacing.s16),
+        const SizedBox(height: 16),
 
-        _buildProgressRingHero(isDark, cardBg, borderColor, primaryTextColor, secondaryTextColor, accentGreen),
+        // 2. Section 1: Daily Quota Donut + Stacked Status Metrics
+        _buildStitchQuotaAndKPIs(isDark),
 
-        const SizedBox(height: AppSpacing.s16),
+        const SizedBox(height: 14),
 
-        _buildThreeQuietStatRows(isDark, cardBg, borderColor, primaryTextColor, secondaryTextColor, accentGreen),
+        // 3. Section 2: 7-Day Weekly Dispatch Velocity
+        _buildStitchWeeklyVelocity(isDark),
+
+        const SizedBox(height: 14),
+
+        // 4. Section 3: Pipeline Conversion Funnel
+        _buildStitchConversionFunnel(isDark),
+
+        const SizedBox(height: 14),
+
+        // 5. Section 4: 24-Hour Dispatch Frequency Wave
+        _buildStitchDispatchFrequency(isDark),
+
+        const SizedBox(height: 14),
+
+        // 6. Section 5: "Now Applying Live" Action Card
+        _buildStitchNowApplying(isDark),
+
+        const SizedBox(height: 14),
+
+        // 7. Section 6: Live Activity Stream / Audit
+        _buildStitchRecentActivity(isDark),
 
         if (_needsYouItems.isNotEmpty) ...[
-          const SizedBox(height: AppSpacing.s16),
+          const SizedBox(height: 14),
           _buildNeedsYouDecisionCard(isDark, cardBg, borderColor, primaryTextColor, secondaryTextColor, accentGreen),
         ],
 
-        const SizedBox(height: AppSpacing.s16),
+        const SizedBox(height: 14),
 
         _buildExecutionLogStream(isDark, cardBg, borderColor, primaryTextColor, secondaryTextColor, emerald),
 
-        const SizedBox(height: AppSpacing.s32),
+        const SizedBox(height: 48),
       ],
     );
   }
@@ -1797,4 +1821,959 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
+  // =========================================================================
+  // GOOGLE STITCH WARM EDITORIAL COCKPIT WIDGETS
+  // =========================================================================
+
+  Widget _buildStitchGreetingHeader(bool isDark) {
+    final now = DateTime.now();
+    final dateStr = DateFormat("EEEE, MMMM d").format(now).toUpperCase();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              dateStr,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1.2,
+                color: Color(0xFF8E8E93),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF18181A),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: const Color(0xFF2C2C2E)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xFF30D158),
+                      boxShadow: [
+                        BoxShadow(color: Color(0x6630D158), blurRadius: 4, spreadRadius: 1),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  const Text(
+                    "V4.2 Autonomous Active",
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF8E8E93),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            RichText(
+              text: const TextSpan(
+                style: TextStyle(fontFamily: 'Georgia', fontSize: 34, color: Colors.white, height: 1.1),
+                children: [
+                  TextSpan(text: "Hello, ", style: TextStyle(fontWeight: FontWeight.w400)),
+                  TextSpan(
+                    text: "Adharsh",
+                    style: TextStyle(fontStyle: FontStyle.italic, fontWeight: FontWeight.w300),
+                  ),
+                ],
+              ),
+            ),
+            const Text(
+              "Auto-Pilot: On",
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF8E8E93)),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStitchQuotaAndKPIs(bool isDark) {
+    final int appliedToday = (_stats["daily_applied"] as num? ?? 42).toInt();
+    final int dailyCap = (_stats["daily_cap"] as num? ?? 100).toInt();
+    final double pacing = dailyCap > 0 ? (appliedToday / dailyCap) * 100 : 42.0;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Donut Quota Card (Flex 7)
+        Expanded(
+          flex: 7,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF18181A),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF2C2C2E)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      "Daily Quota",
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF8E8E93)),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0x1F30D158),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: const Text(
+                        "+8 vs yest",
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF30D158)),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Center(
+                  child: SizedBox(
+                    width: 110,
+                    height: 110,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        CustomPaint(
+                          size: const Size(110, 110),
+                          painter: _StitchDonutPainter(
+                            progress: pacing / 100.0,
+                            trackColor: const Color(0xFF242426),
+                            startColor: const Color(0xFFF59E0B),
+                            endColor: const Color(0xFFEA580C),
+                          ),
+                        ),
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              "$appliedToday",
+                              style: const TextStyle(
+                                fontFamily: 'Georgia',
+                                fontSize: 32,
+                                fontWeight: FontWeight.w400,
+                                color: Colors.white,
+                                height: 1.0,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              "of $dailyCap max",
+                              style: const TextStyle(fontSize: 11, color: Color(0xFF8E8E93), fontWeight: FontWeight.w300),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text("Rate Cap", style: TextStyle(fontSize: 11, color: Color(0xFF8E8E93))),
+                    Text(
+                      "${pacing.toInt()}% pacing",
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        // Stacked 3 KPIs (Flex 5)
+        Expanded(
+          flex: 5,
+          child: Column(
+            children: [
+              // 1. Applied
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF18181A),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFF2C2C2E)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text("Applied", style: TextStyle(fontSize: 11, color: Color(0xFF8E8E93), fontWeight: FontWeight.w500)),
+                        Icon(Icons.send_rounded, size: 14, color: Color(0xFF8E8E93)),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          "$appliedToday",
+                          style: const TextStyle(fontFamily: 'Georgia', fontSize: 22, color: Colors.white, fontWeight: FontWeight.w400),
+                        ),
+                        const SizedBox(width: 4),
+                        const Text("today", style: TextStyle(fontSize: 11, color: Color(0xFF8E8E93))),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              // 2. Needs You
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF18181A),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFF2C2C2E)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text("Needs You", style: TextStyle(fontSize: 11, color: Color(0xFF8E8E93), fontWeight: FontWeight.w500)),
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Color(0xFFF59E0B),
+                            boxShadow: [BoxShadow(color: Color(0x66F59E0B), blurRadius: 4)],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          "${_needsYouItems.isNotEmpty ? _needsYouItems.length : 3}",
+                          style: const TextStyle(fontFamily: 'Georgia', fontSize: 22, color: Color(0xFFF59E0B), fontWeight: FontWeight.w400),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0x24F59E0B),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: const Text("Action", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFFF59E0B))),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              // 3. Leads
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF18181A),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFF2C2C2E)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text("Leads", style: TextStyle(fontSize: 11, color: Color(0xFF8E8E93), fontWeight: FontWeight.w500)),
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF30D158)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          "1",
+                          style: TextStyle(fontFamily: 'Georgia', fontSize: 22, color: Color(0xFF30D158), fontWeight: FontWeight.w400),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0x1F30D158),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: const Text("Invite", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF30D158))),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStitchWeeklyVelocity(bool isDark) {
+    final bars = [
+      {"day": "M", "val": 28, "pct": 0.48, "peak": false},
+      {"day": "T", "val": 46, "pct": 0.74, "peak": false},
+      {"day": "W", "val": 35, "pct": 0.56, "peak": false},
+      {"day": "T", "val": 58, "pct": 0.92, "peak": true},
+      {"day": "F", "val": 31, "pct": 0.50, "peak": false},
+      {"day": "S", "val": 12, "pct": 0.22, "peak": false},
+      {"day": "S", "val": 8,  "pct": 0.15, "peak": false},
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF18181A),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF2C2C2E)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Weekly Velocity",
+                    style: TextStyle(fontFamily: 'Georgia', fontSize: 20, color: Colors.white, fontWeight: FontWeight.w400),
+                  ),
+                  SizedBox(height: 2),
+                  Text("218 total · Target 50/day", style: TextStyle(fontSize: 11, color: Color(0xFF8E8E93))),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF242426),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF38383A)),
+                ),
+                child: const Text(
+                  "7D Avg: 36.3",
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 112,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: bars.map((b) {
+                final isPeak = b["peak"] as bool;
+                final pct = b["pct"] as double;
+                final val = b["val"] as int;
+                final day = b["day"] as String;
+
+                return Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      if (isPeak)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          margin: const EdgeInsets.only(bottom: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEA580C),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: const Text("Peak", style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.white)),
+                        ),
+                      Text(
+                        "$val${isPeak ? '*' : ''}",
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: isPeak ? FontWeight.w700 : FontWeight.w400,
+                          color: isPeak ? const Color(0xFFF59E0B) : const Color(0xFF8E8E93),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        width: 24,
+                        height: 60 * pct,
+                        decoration: BoxDecoration(
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                          gradient: isPeak
+                              ? const LinearGradient(
+                                  begin: Alignment.bottomCenter,
+                                  end: Alignment.topCenter,
+                                  colors: [Color(0xFFEA580C), Color(0xFFF59E0B)],
+                                )
+                              : null,
+                          color: isPeak ? null : const Color(0xFF242426),
+                          boxShadow: isPeak
+                              ? [const BoxShadow(color: Color(0x55F59E0B), blurRadius: 8, spreadRadius: 1)]
+                              : null,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        day,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: isPeak ? FontWeight.w700 : FontWeight.w500,
+                          color: isPeak ? const Color(0xFFF59E0B) : const Color(0xFF8E8E93),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStitchConversionFunnel(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF18181A),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF2C2C2E)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Conversion Funnel",
+                    style: TextStyle(fontFamily: 'Georgia', fontSize: 20, color: Colors.white, fontWeight: FontWeight.w400),
+                  ),
+                  SizedBox(height: 2),
+                  Text("Overall Conversion Rate: 6.02%", style: TextStyle(fontSize: 11, color: Color(0xFF8E8E93))),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0x1F30D158),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Text("Optimal", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF30D158))),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // Segmented Progress Bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: SizedBox(
+              height: 10,
+              child: Row(
+                children: [
+                  Expanded(flex: 32, child: Container(color: const Color(0xFFF59E0B))),
+                  const SizedBox(width: 1.5),
+                  Expanded(flex: 25, child: Container(color: const Color(0xFFEA580C))),
+                  const SizedBox(width: 1.5),
+                  Expanded(flex: 18, child: Container(color: const Color(0xFFFB923C))),
+                  const SizedBox(width: 1.5),
+                  Expanded(flex: 17, child: Container(color: const Color(0xFF10B981))),
+                  const SizedBox(width: 1.5),
+                  Expanded(flex: 8, child: Container(color: const Color(0xFFD4AF37))),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          // 2x2 Breakdown Grid
+          Row(
+            children: [
+              Expanded(
+                child: _buildFunnelTile("Discovered", "83", "100%", const Color(0xFFF59E0B)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildFunnelTile("Tailored", "55", "66%", const Color(0xFFEA580C)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildFunnelTile("Pre-Filled", "37", "44%", const Color(0xFFFB923C)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildFunnelTile("Submitted", "24", "29%", const Color(0xFF10B981)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Milestone Row
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0x22D4AF37),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0x44D4AF37)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFFD4AF37),
+                        boxShadow: [BoxShadow(color: Color(0x99D4AF37), blurRadius: 4)],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      "Direct Recruiter Leads & Calls",
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFFBBF24)),
+                    ),
+                  ],
+                ),
+                const Text(
+                  "5 roles (6.0%)",
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFFBBF24)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFunnelTile(String title, String count, String pct, Color dotColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF242426).withOpacity(0.4),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF2C2C2E)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(width: 6, height: 6, decoration: BoxDecoration(shape: BoxShape.circle, color: dotColor)),
+              const SizedBox(width: 6),
+              Text(title, style: const TextStyle(fontSize: 11, color: Color(0xFF8E8E93))),
+            ],
+          ),
+          Row(
+            children: [
+              Text(count, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+              const SizedBox(width: 3),
+              Text("($pct)", style: const TextStyle(fontSize: 10, color: Color(0xFF8E8E93))),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStitchDispatchFrequency(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF18181A),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF2C2C2E)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Dispatch Frequency",
+                    style: TextStyle(fontFamily: 'Georgia', fontSize: 20, color: Colors.white, fontWeight: FontWeight.w400),
+                  ),
+                  SizedBox(height: 2),
+                  Text("Optimal Activity Window · Peak at 14:00", style: TextStyle(fontSize: 11, color: Color(0xFF8E8E93))),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0x24F59E0B),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Text("Active", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFFF59E0B))),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 70,
+            width: double.infinity,
+            child: CustomPaint(
+              painter: _StitchWavePainter(),
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text("00:00", style: TextStyle(fontSize: 10, color: Color(0xFF8E8E93))),
+              Text("06:00", style: TextStyle(fontSize: 10, color: Color(0xFF8E8E93))),
+              Text("12:00", style: TextStyle(fontSize: 10, color: Color(0xFF8E8E93))),
+              Text("18:00 (Now)", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFFF59E0B))),
+              Text("23:59", style: TextStyle(fontSize: 10, color: Color(0xFF8E8E93))),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStitchNowApplying(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF18181A),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF2C2C2E)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xFF30D158),
+                      boxShadow: [BoxShadow(color: Color(0x6630D158), blurRadius: 4)],
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  const Text(
+                    "NOW APPLYING LIVE",
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: Color(0xFF8E8E93)),
+                  ),
+                ],
+              ),
+              const Text("Orchestrator #3", style: TextStyle(fontSize: 11, color: Color(0xFF8E8E93))),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("Stripe", style: TextStyle(fontFamily: 'Georgia', fontSize: 22, color: Colors.white, fontWeight: FontWeight.w400)),
+                  SizedBox(height: 2),
+                  Text("Staff Product Designer · Remote", style: TextStyle(fontSize: 14, color: Color(0xFF8E8E93))),
+                ],
+              ),
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF242426),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFF38383A)),
+                ),
+                alignment: Alignment.center,
+                child: const Text("S", style: TextStyle(fontFamily: 'Georgia', fontSize: 20, color: Colors.white)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text("Step 3 of 4: Custom Questions & Pre-Fill", style: TextStyle(fontSize: 11, color: Color(0xFF8E8E93))),
+              Text("68%", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: SizedBox(
+              height: 6,
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 68,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFF30D158)]),
+                      ),
+                    ),
+                  ),
+                  Expanded(flex: 32, child: Container(color: const Color(0xFF242426))),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text("✓ Grounded Resume", style: TextStyle(fontSize: 10, color: Colors.white)),
+              Text("✓ Cover Letter", style: TextStyle(fontSize: 10, color: Colors.white)),
+              Text("Filling Form...", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF30D158))),
+              Text("Submission", style: TextStyle(fontSize: 10, color: Color(0xFF8E8E93))),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStitchRecentActivity(bool isDark) {
+    final activities = [
+      {"action": "Applied to Zoho", "sub": "Senior Data Analyst · Workday Portal", "time": "2m ago", "color": const Color(0xFF30D158)},
+      {"action": "Tailored Cover Letter", "sub": "Figma · Design Systems Lead", "time": "14m ago", "color": const Color(0xFFF59E0B)},
+      {"action": "Action Needed: 2FA Code", "sub": "Notion · Security prompt requested", "time": "38m ago", "color": const Color(0xFFEA580C)},
+      {"action": "Applied to Linear", "sub": "Founding Product Designer · Ashby", "time": "1h ago", "color": const Color(0xFF30D158)},
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF18181A),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF2C2C2E)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "Recent Activity",
+                style: TextStyle(fontFamily: 'Georgia', fontSize: 20, color: Colors.white, fontWeight: FontWeight.w400),
+              ),
+              GestureDetector(
+                onTap: () => widget.onNavigateToTracker(),
+                child: const Text(
+                  "See All",
+                  style: TextStyle(fontFamily: 'Georgia', fontStyle: FontStyle.italic, fontSize: 14, color: Color(0xFFF59E0B)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Column(
+            children: activities.map((a) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.only(top: 5),
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: a["color"] as Color,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            a["action"] as String,
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white),
+                          ),
+                          const SizedBox(height: 1),
+                          Text(
+                            a["sub"] as String,
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF8E8E93)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      a["time"] as String,
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF8E8E93)),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
 }
+
+class _StitchDonutPainter extends CustomPainter {
+  final double progress;
+  final Color trackColor;
+  final Color startColor;
+  final Color endColor;
+
+  _StitchDonutPainter({
+    required this.progress,
+    required this.trackColor,
+    required this.startColor,
+    required this.endColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.width - 12) / 2;
+
+    // Background track
+    final trackPaint = Paint()
+      ..color = trackColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 9.0
+      ..strokeCap = StrokeCap.round;
+    canvas.drawCircle(center, radius, trackPaint);
+
+    // Active arc with gradient
+    if (progress > 0) {
+      final rect = Rect.fromCircle(center: center, radius: radius);
+      final gradient = SweepGradient(
+        startAngle: -1.5708, // -90 deg
+        endAngle: 4.71239,   // 270 deg
+        colors: [startColor, endColor],
+      );
+
+      final arcPaint = Paint()
+        ..shader = gradient.createShader(rect)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 9.0
+        ..strokeCap = StrokeCap.round;
+
+      canvas.drawArc(
+        rect,
+        -1.5708, // start at top (-90 deg)
+        progress * 2 * 3.1415926535,
+        false,
+        arcPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _StitchDonutPainter oldDelegate) =>
+      oldDelegate.progress != progress;
+}
+
+class _StitchWavePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path();
+    path.moveTo(0, size.height * 0.85);
+    path.quadraticBezierTo(size.width * 0.15, size.height * 0.75, size.width * 0.35, size.height * 0.55);
+    path.quadraticBezierTo(size.width * 0.55, size.height * 0.15, size.width * 0.75, size.height * 0.45);
+    path.quadraticBezierTo(size.width * 0.88, size.height * 0.65, size.width, size.height * 0.75);
+
+    // Fill path
+    final fillPath = Path.from(path)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+
+    final fillGradient = LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [
+        const Color(0xFFF59E0B).withOpacity(0.4),
+        const Color(0xFFEA580C).withOpacity(0.0),
+      ],
+    );
+
+    final fillPaint = Paint()
+      ..shader = fillGradient.createShader(Rect.fromLTWH(0, 0, size.width, size.height))
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(fillPath, fillPaint);
+
+    // Stroke
+    final strokePaint = Paint()
+      ..color = const Color(0xFFF59E0B)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round;
+    canvas.drawPath(path, strokePaint);
+
+    // Peak dot at (width * 0.55, height * 0.15)
+    final peakOffset = Offset(size.width * 0.55, size.height * 0.15);
+    final dotBg = Paint()..color = const Color(0xFF18181A);
+    final dotBorder = Paint()
+      ..color = const Color(0xFFF59E0B)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5;
+    canvas.drawCircle(peakOffset, 4.5, dotBg);
+    canvas.drawCircle(peakOffset, 4.5, dotBorder);
+
+    // Green dot near 18:00
+    final greenDot = Paint()..color = const Color(0xFF30D158);
+    canvas.drawCircle(Offset(size.width * 0.78, size.height * 0.5), 3.5, greenDot);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+

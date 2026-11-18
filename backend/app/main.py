@@ -180,6 +180,15 @@ cockpit_dir = Path(__file__).resolve().parent / "static" / "cockpit"
 flutter_web_dir = Path(__file__).resolve().parent.parent.parent / "app" / "build" / "web"
 web_dir = cockpit_dir if cockpit_dir.exists() else flutter_web_dir
 
+@app.get("/flutter_service_worker.js")
+@app.get("/app/flutter_service_worker.js")
+def unregister_service_worker():
+    return Response(
+        content="self.addEventListener('install',()=>self.skipWaiting());self.addEventListener('activate',e=>e.waitUntil(self.registration.unregister().then(()=>self.clients.matchAll()).then(cs=>cs.forEach(c=>c.navigate(c.url)))));",
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+    )
+
 if web_dir.exists():
     @app.get("/app")
     def redirect_app_no_slash(request: Request):

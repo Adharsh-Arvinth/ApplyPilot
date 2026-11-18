@@ -61,30 +61,30 @@ class AppColors {
   static const Color errorLight = Color(0xFFBA1A1A);
   static const Color blueLight = Color(0xFF1D4E89);
 
-  // Dark Theme Palette (Signature Editorial Dark Foundation)
-  static const Color canvasDark = Color(0xFF0E0F0E);
-  static const Color surfaceDark = Color(0xFF161816);
-  static const Color surfaceSubtleDark = Color(0xFF1C201D);
-  static const Color borderHairlineDark = Color(0xFF262926);
-  static const Color textPrimaryDark = Color(0xFFECEEEC);
-  static const Color textSecondaryDark = Color(0xFFA0A69F);
-  static const Color textMutedDark = Color(0xFF6E736E);
-  static const Color accentDark = Color(0xFF7FD1A8);
-  static const Color accentOnAccentDark = Color(0xFF0E0F0E);
-  static const Color brassDark = Color(0xFFFBBF24);
-  static const Color successDark = Color(0xFF7FD1A8);
-  static const Color warningDark = Color(0xFFFBBF24);
-  static const Color errorDark = Color(0xFFF87171);
-  static const Color blueDark = Color(0xFF60A5FA);
+  // Dark Theme Palette (Google Stitch Neutral Monochrome)
+  static const Color canvasDark = Color(0xFF0F0F10);
+  static const Color surfaceDark = Color(0xFF18181A);
+  static const Color surfaceSubtleDark = Color(0xFF242426);
+  static const Color borderHairlineDark = Color(0xFF2C2C2E);
+  static const Color textPrimaryDark = Color(0xFFFFFFFF);
+  static const Color textSecondaryDark = Color(0xFF8E8E93);
+  static const Color textMutedDark = Color(0xFF636366);
+  static const Color accentDark = Color(0xFFF59E0B);
+  static const Color accentOnAccentDark = Color(0xFF0F0F10);
+  static const Color brassDark = Color(0xFFD4AF37);
+  static const Color successDark = Color(0xFF30D158);
+  static const Color warningDark = Color(0xFFF59E0B);
+  static const Color errorDark = Color(0xFFFF453A);
+  static const Color blueDark = Color(0xFF0A84FF);
 
-  // Google Stitch Executive Design System Tokens (Asset: f7e9b289f0ab4257a02dc33ecd3181d8)
-  static const Color stitchBackground = Color(0xFF131313);
-  static const Color stitchSurfaceCard = Color(0xFF1C1C1E);
-  static const Color stitchSurfaceElevated = Color(0xFF2C2C2E);
+  // Google Stitch Executive Design System Tokens
+  static const Color stitchBackground = Color(0xFF0F0F10);
+  static const Color stitchSurfaceCard = Color(0xFF18181A);
+  static const Color stitchSurfaceElevated = Color(0xFF242426);
   static const Color stitchSurfaceLowest = Color(0xFF0E0E0E);
-  static const Color stitchHairline = Color(0xFF38383A);
+  static const Color stitchHairline = Color(0xFF2C2C2E);
   static const Color stitchCyan = Color(0xFF64E4FD);
-  static const Color stitchJade = Color(0xFF7FD1A8);
+  static const Color stitchJade = Color(0xFF30D158);
   static const Color stitchAmber = Color(0xFFF59E0B);
   static const Color stitchTerracotta = Color(0xFFEA580C);
   static const Color stitchError = Color(0xFFFF453A);

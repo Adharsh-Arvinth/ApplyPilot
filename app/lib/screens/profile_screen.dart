@@ -179,10 +179,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final accentGreen = isDark ? AppColors.accentDark : AppColors.racingGreen;
 
     return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0F0F10) : AppColors.canvasLight,
       appBar: AppBar(
+        backgroundColor: isDark ? const Color(0xFF0F0F10) : AppColors.surfaceLight,
+        elevation: 0,
         title: Text(
-          "Candidate Profile",
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: primaryTextColor),
+          "Profile",
+          style: TextStyle(
+            fontFamily: 'Georgia',
+            fontSize: 24,
+            fontWeight: FontWeight.w400,
+            color: primaryTextColor,
+          ),
         ),
         actions: [
           IconButton(

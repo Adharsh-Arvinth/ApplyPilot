@@ -10,42 +10,50 @@ import 'package:flutter/material.dart';
 /// - Translucent surfaces with BackdropFilter blur
 /// - Compact controls, table-style list rows, no repetitive cards-in-cards
 class AppleMusicTheme {
-  // 1. Dark Surfaces & Foundations
-  static const Color background = Color(0xFF0E0F0E);
-  static const Color surface = Color(0xFF161816);
-  static const Color surfaceElevated = Color(0xFF1C201D);
-  static const Color surfaceSubtle = Color(0xFF121412);
-  static const Color frostedGlass = Color(0xCC161816);
-  static const Color hairline = Color(0xFF262926);
-  static const Color hairlineProminent = Color(0xFF353935);
+  // 1. Dark Surfaces & Foundations (Google Stitch Neutral Monochrome)
+  static const Color background = Color(0xFF0F0F10);
+  static const Color surface = Color(0xFF18181A);
+  static const Color surfaceElevated = Color(0xFF242426);
+  static const Color surfaceSubtle = Color(0xFF0E0E0E);
+  static const Color frostedGlass = Color(0xCC18181A);
+  static const Color hairline = Color(0xFF2C2C2E);
+  static const Color hairlineProminent = Color(0xFF38383A);
 
   // 2. High-Fidelity Typography
-  static const Color textPrimary = Color(0xFFECEEEC);
-  static const Color textSecondary = Color(0xFFA0A69F);
-  static const Color textTertiary = Color(0xFF6E736E);
+  static const Color textPrimary = Color(0xFFFFFFFF);
+  static const Color textSecondary = Color(0xFF8E8E93);
+  static const Color textTertiary = Color(0xFF636366);
 
-  // 3. Restrained Semantic Color System
-  static const Color emerald = Color(0xFF7FD1A8); // Signature Accent & Successful operations
-  static const Color emeraldSubtle = Color(0x1F7FD1A8);
+  // 3. Restrained Semantic Color System (Stitch Palette)
+  static const Color emerald = Color(0xFF30D158); // Signature Accent & Successful operations
+  static const Color emeraldSubtle = Color(0x1F30D158);
 
-  static const Color coral = Color(0xFFF87171); // Critical errors, pause, rejection
-  static const Color coralSubtle = Color(0x1FF87171);
+  static const Color coral = Color(0xFFFF453A); // Critical errors, pause, rejection
+  static const Color coralSubtle = Color(0x1FFF453A);
 
-  static const Color violet = Color(0xFFA78BFA); // Gemini AI intelligence, copilot
-  static const Color violetSubtle = Color(0x1FA78BFA);
+  static const Color violet = Color(0xFFBF5AF2); // Gemini AI intelligence, copilot
+  static const Color violetSubtle = Color(0x1FBF5AF2);
 
-  static const Color blue = Color(0xFF60A5FA); // Discovery, links, telemetry
-  static const Color blueSubtle = Color(0x1F60A5FA);
+  static const Color blue = Color(0xFF0A84FF); // Discovery, links, telemetry
+  static const Color blueSubtle = Color(0x1F0A84FF);
 
-  static const Color amber = Color(0xFFFBBF24); // Pending approval, waiting, warnings
-  static const Color amberSubtle = Color(0x1FFBBF24);
+  static const Color amber = Color(0xFFF59E0B); // Stitch Warm Amber / Gold
+  static const Color amberSubtle = Color(0x1FF59E0B);
+  static const Color terracotta = Color(0xFFEA580C); // Stitch Terracotta
 
   // 4. Geometry & Radii
   static const double radiusControl = 8.0;
-  static const double radiusCard = 12.0;
+  static const double radiusCard = 16.0;
   static const double radiusPill = 999.0;
 
   // 5. Typography Scale
+  static const TextStyle serifDisplay = TextStyle(
+    fontSize: 34,
+    fontWeight: FontWeight.w400,
+    letterSpacing: -0.5,
+    color: textPrimary,
+    fontFamily: 'Georgia',
+  );
   static const TextStyle displayLarge = TextStyle(
     fontSize: 28,
     fontWeight: FontWeight.w700,

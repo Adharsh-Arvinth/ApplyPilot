@@ -3,46 +3,47 @@ import 'package:flutter/material.dart';
 /// Ultra-premium Dark Theme Design Tokens for ApplyPilot
 /// Combining Shadcn modern minimalism with Kite SaaS dashboard tokens.
 class TemplateTokens {
-  // 1. Core Surfaces & Backgrounds
-  static const Color background = Color(0xFF0E0F0E);
-  static const Color surface = Color(0xFF161816);
-  static const Color surfaceElevated = Color(0xFF1E211E);
-  static const Color surfaceSubtle = Color(0xFF121412);
-  static const Color border = Color(0xFF262926);
-  static const Color borderHover = Color(0xFF383D38);
+  // 1. Core Surfaces & Backgrounds (Google Stitch Neutral Monochrome)
+  static const Color background = Color(0xFF0F0F10);
+  static const Color surface = Color(0xFF18181A);
+  static const Color surfaceElevated = Color(0xFF242426);
+  static const Color surfaceSubtle = Color(0xFF0E0E0E);
+  static const Color border = Color(0xFF2C2C2E);
+  static const Color borderHover = Color(0xFF38383A);
 
   // 2. High-Contrast Typography
-  static const Color textPrimary = Color(0xFFECEEEC);
-  static const Color textSecondary = Color(0xFFA0A69F);
-  static const Color textMuted = Color(0xFF6B726A);
+  static const Color textPrimary = Color(0xFFFFFFFF);
+  static const Color textSecondary = Color(0xFF8E8E93);
+  static const Color textMuted = Color(0xFF636366);
 
-  // 3. Signature Accents & Semantic Tones
-  static const Color accent = Color(0xFF7FD1A8); // Jade / Mint Green
-  static const Color accentSubtle = Color(0x1F7FD1A8);
-  static const Color success = Color(0xFF7FD1A8);
-  static const Color successSubtle = Color(0x1F7FD1A8);
+  // 3. Signature Accents & Semantic Tones (Stitch Palette)
+  static const Color accent = Color(0xFFF59E0B); // Stitch Warm Amber / Gold
+  static const Color accentSubtle = Color(0x1FF59E0B);
+  static const Color success = Color(0xFF30D158); // Apple Success Green
+  static const Color successSubtle = Color(0x1F30D158);
   static const Color racingGreen = Color(0xFF1B4332);
   static const Color brass = Color(0xFFD4AF37); // Muted gold / brass
   static const Color brassSubtle = Color(0x1FD4AF37);
-  static const Color error = Color(0xFFF87171); // Soft Coral
-  static const Color errorSubtle = Color(0x1FF87171);
-  static const Color warning = Color(0xFFFBBF24); // Warm Amber
-  static const Color warningSubtle = Color(0x1FFBBF24);
-  static const Color info = Color(0xFF38BDF8); // Sky Blue
-  static const Color infoSubtle = Color(0x1F38BDF8);
-  static const Color aiViolet = Color(0xFFA78BFA); // Gemini AI Violet
+  static const Color error = Color(0xFFFF453A); // Stitch iOS Red
+  static const Color errorSubtle = Color(0x1FFF453A);
+  static const Color warning = Color(0xFFF59E0B); // Warm Amber
+  static const Color warningSubtle = Color(0x1FF59E0B);
+  static const Color info = Color(0xFF0A84FF); // iOS Blue
+  static const Color infoSubtle = Color(0x1F0A84FF);
+  static const Color aiViolet = Color(0xFFBF5AF2); // Stitch Review Violet
 
-  // Google Stitch Executive Design Tokens (Asset: f7e9b289f0ab4257a02dc33ecd3181d8)
-  static const Color stitchBackground = Color(0xFF131313);
-  static const Color stitchSurfaceCard = Color(0xFF1C1C1E);
-  static const Color stitchSurfaceElevated = Color(0xFF2C2C2E);
+  // Google Stitch Executive Design Tokens
+  static const Color stitchBackground = Color(0xFF0F0F10);
+  static const Color stitchSurfaceCard = Color(0xFF18181A);
+  static const Color stitchSurfaceElevated = Color(0xFF242426);
   static const Color stitchSurfaceLowest = Color(0xFF0E0E0E);
-  static const Color stitchHairline = Color(0xFF38383A);
+  static const Color stitchHairline = Color(0xFF2C2C2E);
   static const Color stitchCyan = Color(0xFF64E4FD);
-  static const Color stitchJade = Color(0xFF7FD1A8);
+  static const Color stitchJade = Color(0xFF30D158);
   static const Color stitchAmber = Color(0xFFF59E0B);
   static const Color stitchTerracotta = Color(0xFFEA580C);
   static const Color stitchError = Color(0xFFFF453A);
+  static const Color stitchZincSubtle = Color(0xFF8E8E93);
   static const Color stitchZincSubtle = Color(0xFF8E8E93);
 
   // 4. Spacing Scale (4pt Grid System)
