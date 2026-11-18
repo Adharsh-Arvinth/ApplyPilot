@@ -3,1061 +3,1938 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
-  <meta name="theme-color" content="#0F0F10"/>
-  <title>ApplyPilot - Autonomous iOS Cockpit</title>
-  
-  <!-- Google Fonts: Newsreader (Editorial Serif) + Plus Jakarta Sans + Inter + Material Symbols -->
+  <meta name="shell-type" content="mobile_tab"/>
+  <title>ApplyPilot</title>
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+  <link href="https://fonts.googleapis.com" rel="preconnect"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""/>
-  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-
-  <!-- Tailwind CSS with Stitch Design Tokens -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"/>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"/>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"/>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap"/>
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-  <script>
-    tailwind.config = {
-      darkMode: "class",
-      theme: {
-        extend: {
-          colors: {
-            "background": "#0F0F10",
-            "surface": "#0F0F10",
-            "surface-dim": "#131313",
-            "surface-bright": "#393939",
-            "surface-card": "#18181A",
-            "surface-elevated": "#242426",
-            "surface-container-lowest": "#0E0E0E",
-            "surface-container-low": "#1B1B1B",
-            "surface-container": "#1F1F1F",
-            "surface-container-high": "#2A2A2A",
-            "surface-container-highest": "#353535",
-            "primary": "#FFFFFF",
-            "on-primary": "#1A1C1C",
-            "secondary": "#C6C6CB",
-            "on-secondary": "#2F3034",
-            "zinc-subtle": "#8E8E93",
-            "hairline-separator": "#2C2C2E",
-            "silver-track": "#E5E5EA",
-            "amber-gold": "#F59E0B",
-            "terracotta": "#EA580C",
-            "rich-gold": "#D4AF37",
-            "warm-amber": "#FBBF24",
-            "status-success": "#30D158",
-            "status-warning": "#FF9F0A",
-            "status-error": "#FF453A",
-            "status-info": "#0A84FF",
-            "status-review": "#BF5AF2"
-          },
-          fontFamily: {
-            "serif-display": ["Newsreader", "Georgia", "serif"],
-            "sans": ["'Plus Jakarta Sans'", "Inter", "sans-serif"],
-            "inter": ["Inter", "sans-serif"]
-          }
-        }
+  <script id="tailwind-config">
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        "primary-container": "#e2e2e2",
+        "outline-variant": "#444748",
+        "outline": "#8e9192",
+        "surface-dim": "#131313",
+        "on-tertiary-fixed": "#1a1c1f",
+        "on-secondary": "#2f3034",
+        "on-surface-variant": "#c4c7c8",
+        "inverse-primary": "#5d5f5f",
+        "on-background": "#e2e2e2",
+        "secondary": "#c6c6cb",
+        "status-info": "#F59E0B",
+        "inverse-on-surface": "#303030",
+        "on-primary-fixed": "#1a1c1c",
+        "tertiary-container": "#e2e2e7",
+        "zinc-subtle": "#8E8E93",
+        "surface-bright": "#393939",
+        "on-tertiary-container": "#636469",
+        "secondary-container": "#46464b",
+        "surface-container-highest": "#353535",
+        "secondary-fixed": "#e3e2e7",
+        "surface-grouped": "#0B0B0D",
+        "tertiary-fixed-dim": "#c6c6cb",
+        "status-error": "#FF453A",
+        "surface-container": "#1f1f1f",
+        "on-tertiary": "#2f3034",
+        "surface-card": "#18181A",
+        "surface-container-high": "#2a2a2a",
+        "primary-fixed-dim": "#c6c6c7",
+        "on-primary": "#2f3131",
+        "inverse-surface": "#e2e2e2",
+        "on-secondary-fixed": "#1a1b1f",
+        "error": "#ffb4ab",
+        "error-container": "#93000a",
+        "tertiary": "#ffffff",
+        "on-tertiary-fixed-variant": "#45474b",
+        "surface-container-lowest": "#0e0e0e",
+        "on-secondary-fixed-variant": "#46464b",
+        "hairline-separator": "#2C2C2E",
+        "silver-track": "#E5E5EA",
+        "surface-tint": "#c6c6c7",
+        "status-review": "#BF5AF2",
+        "secondary-fixed-dim": "#c6c6cb",
+        "tertiary-fixed": "#e2e2e7",
+        "background": "#0F0F10",
+        "surface": "#0F0F10",
+        "on-surface": "#e2e2e2",
+        "status-success": "#30D158",
+        "primary": "#ffffff",
+        "surface-variant": "#353535",
+        "status-warning": "#FF9F0A",
+        "on-error": "#690005",
+        "on-error-container": "#ffdad6",
+        "surface-elevated": "#242426",
+        "on-secondary-container": "#b5b4ba",
+        "on-primary-container": "#636565",
+        "surface-container-low": "#1b1b1b",
+        "primary-fixed": "#e2e2e2",
+        "on-primary-fixed-variant": "#454747",
+        "amber-gold": "#F59E0B",
+        "terracotta": "#EA580C",
+        "rich-gold": "#D4AF37",
+        "coral-peach": "#FB923C",
+        "warm-amber": "#FBBF24"
+      },
+      borderRadius: {
+        "DEFAULT": "0.25rem",
+        "lg": "0.5rem",
+        "xl": "0.75rem",
+        "2xl": "1.25rem",
+        "full": "9999px"
+      },
+      fontFamily: {
+        "serif-display": ["Newsreader", "Georgia", "serif"],
+        "sans": ["'Plus Jakarta Sans'", "Inter", "sans-serif"],
+        "body-md": ["'Plus Jakarta Sans'", "sans-serif"],
+        "headline-xl-mobile": ["Newsreader", "Georgia", "serif"],
+        "headline-xl": ["Newsreader", "Georgia", "serif"],
+        "headline-lg": ["Newsreader", "Georgia", "serif"],
+        "headline-md": ["Newsreader", "Georgia", "serif"],
+        "label-md": ["'Plus Jakarta Sans'", "sans-serif"],
+        "label-sm": ["'Plus Jakarta Sans'", "sans-serif"],
+        "caption": ["'Plus Jakarta Sans'", "sans-serif"]
       }
-    };
+    }
+  }
+};
   </script>
-
   <style>
+    /* ── Reset & base ── */
     @layer base {
-      html, body {
-        width: 100%;
-        margin: 0;
-        padding: 0;
-        background-color: #0F0F10;
-        color: #E2E2E2;
-        font-family: 'Plus Jakarta Sans', sans-serif;
-        -webkit-font-smoothing: antialiased;
-      }
+      html, body { width: 100%; margin: 0; padding: 0; }
       body {
-        overscroll-behavior: none;
+        overscroll-behavior-y: none;
         -webkit-tap-highlight-color: transparent;
+        min-height: max(812px, 100dvh);
       }
-      .material-symbols-outlined {
-        font-variation-settings: 'FILL' 0, 'wght' 350, 'GRAD' 0, 'opsz' 24;
-        display: inline-block;
-        vertical-align: middle;
-      }
-      .material-symbols-filled {
-        font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-      }
+      .pb-safe { padding-bottom: env(safe-area-inset-bottom, 20px); }
+      .pt-safe { padding-top: env(safe-area-inset-top, 44px); }
     }
     ::-webkit-scrollbar { display: none; }
-    .pb-safe { padding-bottom: env(safe-area-inset-bottom, 20px); }
-    .pt-safe { padding-top: env(safe-area-inset-top, 44px); }
-    
-    /* Smooth tab switching transition */
-    .tab-view {
-      display: none;
-      opacity: 0;
-      transition: opacity 0.2s ease-in-out;
+
+    /* ── Tab switching ── */
+    .tab-pane { display: none; }
+    .tab-pane.block { display: block; }
+    .tab-nav-btn.active { color: var(--tw-color-on-surface, #e2e2e2); }
+
+    /* ── Bottom nav ── */
+    #bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 50;
+      background: rgba(19, 19, 19, 0.92);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-top: 1px solid #2C2C2E;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
     }
-    .tab-view.active {
-      display: block;
-      opacity: 1;
+
+    /* ── Screen body padding adjustments ── */
+    /* Each Stitch screen has pb-28 for its own nav + pt for its own header.
+       We keep those as-is since we stripped only nav/header elements. */
+    .tab-pane > * { padding-bottom: 80px !important; }
+    .tab-pane main { padding-bottom: 80px !important; }
+
+    /* Screen-specific overrides */
+    @layer base{html,body{width:100%;margin:0;padding:0;background-color:#0F0F10;}body{overscroll-behavior:none;-webkit-tap-highlight-color:transparent;font-family:'Plus Jakarta Sans',sans-serif;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}.material-symbols-outlined{font-variation-settings:'FILL' 0,'wght' 350,'GRAD' 0,'opsz' 24;display:inline-block;vertical-align:middle;}}::-webkit-scrollbar{display:none;}
+    @layer base{html,body{width:100%;margin:0;padding:0;background-color:#131313;color:#e2e2e2;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,20px);}.pt-safe{padding-top:env(safe-area-inset-top,44px);}.material-symbols-outlined{font-variation-settings:'FILL' 0,'wght' 300,'GRAD' 0,'opsz' 24;display:inline-block;vertical-align:middle;}.material-symbols-outlined.fill-icon{font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24;}}::-webkit-scrollbar{display:none;}
+    @layer base{html,body{width:100%;margin:0;padding:0;background-color:#131313;color:#e2e2e2;}body{overscroll-behavior-y:none;-webkit-tap-highlight-color:transparent;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}}::-webkit-scrollbar{display:none;}
+    @layer base{html,body{width:100%;margin:0;padding:0;}body{overscroll-behavior-y:none;-webkit-tap-highlight-color:transparent;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,20px);}.pt-safe{padding-top:env(safe-area-inset-top,44px);}}::-webkit-scrollbar{display:none;}
+    body {
+    min-height: max(884px, 100dvh);
     }
   </style>
 </head>
-<body class="bg-surface text-[#E2E2E2] min-h-screen selection:bg-amber-500/20 selection:text-white flex flex-col justify-between">
+<body class="bg-surface-grouped text-on-surface antialiased font-['Plus_Jakarta_Sans',sans-serif]">
 
-  <!-- TOP FIXED IOS HEADER -->
-  <header class="fixed top-0 w-full z-50 pt-safe bg-surface/85 backdrop-blur-xl border-b border-hairline-separator/50 shadow-[0_1px_12px_rgba(0,0,0,0.5)]">
-    <!-- iOS Time & System Status -->
-    <div class="flex justify-between items-center px-4 pt-1 pb-1 text-zinc-subtle text-xs select-none">
-      <span class="font-medium text-white tracking-tight" id="ios-clock">9:41</span>
-      <div class="flex items-center gap-1.5">
-        <span class="material-symbols-outlined text-[14px]">signal_cellular_alt</span>
-        <span class="material-symbols-outlined text-[14px]">wifi</span>
-        <span class="material-symbols-outlined text-[16px]">battery_full</span>
-      </div>
-    </div>
+  <!-- ═══════════════════════════════════════════════
+       TAB CONTENT AREA
+       ═══════════════════════════════════════════════ -->
+  <div id="app-root">
+    <div id="tab-home" class="tab-pane block" data-tab="home">
+<main class="flex flex-col relative w-full px-4 pt-14 pb-28 bg-surface min-h-screen"><div class="flex flex-col w-full space-y-4 text-on-surface antialiased">
+<!-- TOP HEADER GREETING & STATUS -->
+<div class="flex flex-col space-y-1.5 pt-3">
+<div class="flex items-center justify-between">
+<span class="text-[11px] text-zinc-subtle uppercase tracking-[0.16em] font-medium font-sans">Thursday, October 24</span>
+<div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-card border border-hairline-separator/60">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-success opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-status-success"></span>
+</span>
+<span class="text-[11px] text-zinc-subtle tracking-tight font-medium">V4.2 Autonomous Active</span>
+</div>
+</div>
+<div class="flex items-baseline justify-between">
+<h1 class="font-serif-display text-[38px] text-primary tracking-tight font-normal leading-tight">Hello, <span class="italic font-light">Adharsh</span></h1>
+<span class="text-[12px] text-zinc-subtle font-medium">Auto-Pilot: On</span>
+</div>
+</div>
+<!-- SECTION 1: DAILY QUOTA DONUT + STACKED STATUS METRICS -->
+<div class="grid grid-cols-12 gap-3">
+<!-- Donut Quota Card (7 cols) -->
+<div class="col-span-7 bg-surface-card border border-hairline-separator/60 rounded-2xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
+<div class="flex items-center justify-between">
+<span class="text-[13px] text-zinc-subtle font-medium font-sans">Daily Quota</span>
+<span class="text-[11px] text-status-success bg-status-success/10 px-1.5 py-0.5 rounded-full font-medium tabular-nums">+8 vs yest</span>
+</div>
+<!-- Visual Donut Meter: Warm Amber / Gold Gradient -->
+<div class="relative flex items-center justify-center my-2">
+<svg class="w-32 h-32 -rotate-90" viewbox="0 0 120 120">
+<circle cx="60" cy="60" fill="none" r="48" stroke="#242426" stroke-width="9"></circle>
+<defs>
+<lineargradient id="warmGoldGradientRing" x1="0%" x2="100%" y1="0%" y2="100%">
+<stop offset="0%" stop-color="#F59E0B"></stop>
+<stop offset="100%" stop-color="#EA580C"></stop>
+</lineargradient>
+</defs>
+<circle class="transition-all duration-1000 ease-out" cx="60" cy="60" fill="none" r="48" stroke="url(#warmGoldGradientRing)" stroke-dasharray="301.59" stroke-dashoffset="174.92" stroke-linecap="round" stroke-width="9"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center text-center">
+<span class="font-serif-display text-[38px] text-primary font-normal leading-none tabular-nums">42</span>
+<span class="text-[11px] text-zinc-subtle mt-1 font-light font-sans">of 100 max</span>
+</div>
+</div>
+<div class="flex items-center justify-between pt-1">
+<span class="text-[11px] text-zinc-subtle font-sans">Rate Cap</span>
+<span class="text-[12px] text-primary font-medium tabular-nums font-sans">42% pacing</span>
+</div>
+</div>
+<!-- Stacked 3 KPIs (5 cols) -->
+<div class="col-span-5 flex flex-col gap-2.5">
+<!-- Applied -->
+<div class="bg-surface-card border border-hairline-separator/60 rounded-2xl p-3 flex flex-col justify-between flex-1 shadow-sm">
+<div class="flex items-center justify-between">
+<span class="text-[11px] text-zinc-subtle font-medium">Applied</span>
+<span class="material-symbols-outlined text-[16px] text-zinc-subtle">send</span>
+</div>
+<div class="flex items-baseline gap-1.5 mt-1">
+<span class="font-serif-display text-[26px] text-primary font-normal leading-none tabular-nums">42</span>
+<span class="text-[11px] text-zinc-subtle font-sans">today</span>
+</div>
+</div>
+<!-- Needs You -->
+<div class="bg-surface-card border border-hairline-separator/60 rounded-2xl p-3 flex flex-col justify-between flex-1 shadow-sm">
+<div class="flex items-center justify-between">
+<span class="text-[11px] text-zinc-subtle font-medium">Needs You</span>
+<span class="h-2 w-2 rounded-full bg-[#F59E0B] shadow-[0_0_6px_rgba(245,158,11,0.5)]"></span>
+</div>
+<div class="flex items-baseline justify-between mt-1">
+<span class="font-serif-display text-[26px] text-[#F59E0B] font-normal leading-none tabular-nums">3</span>
+<span class="text-[11px] text-[#F59E0B] bg-[#F59E0B]/15 px-1.5 py-0.5 rounded-full font-medium font-sans">Action</span>
+</div>
+</div>
+<!-- Interviews / Leads -->
+<div class="bg-surface-card border border-hairline-separator/60 rounded-2xl p-3 flex flex-col justify-between flex-1 shadow-sm">
+<div class="flex items-center justify-between">
+<span class="text-[11px] text-zinc-subtle font-medium">Leads</span>
+<span class="h-2 w-2 rounded-full bg-status-success"></span>
+</div>
+<div class="flex items-baseline justify-between mt-1">
+<span class="font-serif-display text-[26px] text-status-success font-normal leading-none tabular-nums">1</span>
+<span class="text-[11px] text-status-success bg-status-success/10 px-1.5 py-0.5 rounded-full font-medium font-sans">Invite</span>
+</div>
+</div>
+</div>
+</div>
+<!-- SECTION 2: 7-DAY WEEKLY DISPATCH VELOCITY -->
+<div class="bg-surface-card border border-hairline-separator/60 rounded-2xl p-4 shadow-sm flex flex-col space-y-3">
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-serif-display text-[20px] text-primary font-normal tracking-tight">Weekly Velocity</span>
+<span class="text-[11px] text-zinc-subtle font-sans">218 total · Target 50/day</span>
+</div>
+<div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-elevated border border-hairline-separator/40">
+<span class="text-[11px] text-primary font-medium tabular-nums font-sans">7D Avg: 36.3</span>
+</div>
+</div>
+<!-- Warm Palette Bar Visualizer -->
+<div class="grid grid-cols-7 gap-2 pt-2 items-end h-28">
+<!-- Monday -->
+<div class="flex flex-col items-center gap-1.5 h-full justify-end">
+<span class="text-[10px] text-zinc-subtle tabular-nums font-sans">28</span>
+<div class="w-full max-w-[28px] bg-surface-elevated rounded-t-lg transition-all duration-500" style="height: 48%;"></div>
+<span class="text-[11px] text-zinc-subtle font-medium font-sans">M</span>
+</div>
+<!-- Tuesday -->
+<div class="flex flex-col items-center gap-1.5 h-full justify-end">
+<span class="text-[10px] text-zinc-subtle tabular-nums font-sans">46</span>
+<div class="w-full max-w-[28px] bg-surface-elevated rounded-t-lg transition-all duration-500" style="height: 74%;"></div>
+<span class="text-[11px] text-zinc-subtle font-medium font-sans">T</span>
+</div>
+<!-- Wednesday -->
+<div class="flex flex-col items-center gap-1.5 h-full justify-end">
+<span class="text-[10px] text-zinc-subtle tabular-nums font-sans">35</span>
+<div class="w-full max-w-[28px] bg-surface-elevated rounded-t-lg transition-all duration-500" style="height: 56%;"></div>
+<span class="text-[11px] text-zinc-subtle font-medium font-sans">W</span>
+</div>
+<!-- Thursday (TODAY - HIGHLIGHTED IN VIBRANT WARM AMBER / GOLD) -->
+<div class="flex flex-col items-center gap-1.5 h-full justify-end relative">
+<div class="absolute -top-1 px-1.5 py-0.5 rounded-full bg-[#EA580C] text-[9px] font-bold text-white shadow-sm leading-none tracking-tight">
+          Peak
+        </div>
+<span class="text-[10px] text-[#F59E0B] font-semibold tabular-nums font-sans">58*</span>
+<div class="w-full max-w-[28px] bg-gradient-to-t from-[#EA580C] to-[#F59E0B] rounded-t-lg shadow-[0_0_12px_rgba(245,158,11,0.35)] transition-all duration-700" style="height: 92%;"></div>
+<span class="text-[11px] text-[#F59E0B] font-semibold font-sans">T</span>
+</div>
+<!-- Friday -->
+<div class="flex flex-col items-center gap-1.5 h-full justify-end">
+<span class="text-[10px] text-zinc-subtle tabular-nums font-sans">31</span>
+<div class="w-full max-w-[28px] bg-surface-elevated rounded-t-lg transition-all duration-500" style="height: 50%;"></div>
+<span class="text-[11px] text-zinc-subtle font-medium font-sans">F</span>
+</div>
+<!-- Saturday -->
+<div class="flex flex-col items-center gap-1.5 h-full justify-end">
+<span class="text-[10px] text-zinc-subtle tabular-nums font-sans">12</span>
+<div class="w-full max-w-[28px] bg-surface-elevated rounded-t-lg transition-all duration-500" style="height: 22%;"></div>
+<span class="text-[11px] text-zinc-subtle font-medium font-sans">S</span>
+</div>
+<!-- Sunday -->
+<div class="flex flex-col items-center gap-1.5 h-full justify-end">
+<span class="text-[10px] text-zinc-subtle tabular-nums font-sans">8</span>
+<div class="w-full max-w-[28px] bg-surface-elevated rounded-t-lg transition-all duration-500" style="height: 15%;"></div>
+<span class="text-[11px] text-zinc-subtle font-medium font-sans">S</span>
+</div>
+</div>
+</div>
+<!-- SECTION 3: PIPELINE CONVERSION FUNNEL -->
+<div class="bg-surface-card border border-hairline-separator/60 rounded-2xl p-4 shadow-sm flex flex-col space-y-3">
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-serif-display text-[20px] text-primary font-normal tracking-tight">Conversion Funnel</span>
+<span class="text-[11px] text-zinc-subtle font-sans">Overall Conversion Rate: 6.02%</span>
+</div>
+<span class="text-[11px] text-status-success bg-status-success/10 px-2 py-0.5 rounded-full font-medium font-sans">Optimal</span>
+</div>
+<!-- Segmented Progression Track: Warm Amber -> Terracotta -> Coral Peach -> Mint/Olive -> Gold -->
+<div class="w-full h-3 bg-surface-elevated rounded-full overflow-hidden flex gap-[1.5px] p-0.5">
+<div class="h-full rounded-l-full bg-[#F59E0B]" style="width: 32%;" title="Discovered 83"></div>
+<div class="h-full bg-[#EA580C]" style="width: 25%;" title="Tailored 55"></div>
+<div class="h-full bg-[#FB923C]" style="width: 18%;" title="Pre-Filled 37"></div>
+<div class="h-full bg-[#10B981]" style="width: 17%;" title="Submitted 24"></div>
+<div class="h-full rounded-r-full bg-[#D4AF37]" style="width: 8%;" title="Leads 5"></div>
+</div>
+<!-- Funnel Stage Breakdown Grid -->
+<div class="grid grid-cols-2 gap-2 pt-1">
+<div class="flex items-center justify-between p-2 rounded-xl bg-surface-elevated/40 border border-hairline-separator/30">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-[#F59E0B]"></span>
+<span class="text-[11px] text-zinc-subtle font-sans">Discovered</span>
+</div>
+<span class="text-[12px] text-primary font-medium tabular-nums font-sans">83 <span class="text-zinc-subtle text-[11px]">(100%)</span></span>
+</div>
+<div class="flex items-center justify-between p-2 rounded-xl bg-surface-elevated/40 border border-hairline-separator/30">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-[#EA580C]"></span>
+<span class="text-[11px] text-zinc-subtle font-sans">Tailored</span>
+</div>
+<span class="text-[12px] text-primary font-medium tabular-nums font-sans">55 <span class="text-zinc-subtle text-[11px]">(66%)</span></span>
+</div>
+<div class="flex items-center justify-between p-2 rounded-xl bg-surface-elevated/40 border border-hairline-separator/30">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-[#FB923C]"></span>
+<span class="text-[11px] text-zinc-subtle font-sans">Pre-Filled</span>
+</div>
+<span class="text-[12px] text-primary font-medium tabular-nums font-sans">37 <span class="text-zinc-subtle text-[11px]">(44%)</span></span>
+</div>
+<div class="flex items-center justify-between p-2 rounded-xl bg-surface-elevated/40 border border-hairline-separator/30">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-[#10B981]"></span>
+<span class="text-[11px] text-zinc-subtle font-sans">Submitted</span>
+</div>
+<span class="text-[12px] text-primary font-medium tabular-nums font-sans">24 <span class="text-zinc-subtle text-[11px]">(29%)</span></span>
+</div>
+</div>
+<!-- Final High-Value Conversion Milestone -->
+<div class="flex items-center justify-between px-3 py-2 rounded-xl bg-[#D4AF37]/15 border border-[#D4AF37]/25">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-[#D4AF37] shadow-[0_0_6px_rgba(212,175,55,0.6)]"></span>
+<span class="text-[12px] text-[#FBBF24] font-medium font-sans">Direct Recruiter Leads &amp; Calls</span>
+</div>
+<span class="text-[13px] text-[#FBBF24] font-semibold tabular-nums font-sans">5 roles (6.0%)</span>
+</div>
+</div>
+<!-- SECTION 4: 24-HOUR DISPATCH WAVE (WARM AMBER / SUNSET GOLD) -->
+<div class="bg-surface-card border border-hairline-separator/60 rounded-2xl p-4 shadow-sm flex flex-col space-y-3">
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-serif-display text-[20px] text-primary font-normal tracking-tight">Dispatch Frequency</span>
+<span class="text-[11px] text-zinc-subtle font-sans">Optimal Activity Window · Peak at 14:00</span>
+</div>
+<span class="text-[11px] text-[#F59E0B] bg-[#F59E0B]/15 px-2 py-0.5 rounded-full font-medium font-sans">Active</span>
+</div>
+<!-- Warm Area Wave Graph -->
+<div class="relative w-full h-24 pt-2">
+<svg class="w-full h-full overflow-visible" preserveaspectratio="none" viewbox="0 0 320 80">
+<defs>
+<lineargradient id="warmSunsetWaveGradient" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#F59E0B" stop-opacity="0.45"></stop>
+<stop offset="100%" stop-color="#EA580C" stop-opacity="0.0"></stop>
+</lineargradient>
+</defs>
+<!-- Area Fill -->
+<path d="M 0,70 Q 30,68 60,60 T 120,45 T 180,12 T 240,35 T 280,48 T 320,62 L 320,80 L 0,80 Z" fill="url(#warmSunsetWaveGradient)"></path>
+<!-- Stroke Curve: Warm Amber / Terracotta -->
+<path d="M 0,70 Q 30,68 60,60 T 120,45 T 180,12 T 240,35 T 280,48 T 320,62" fill="none" stroke="#F59E0B" stroke-linecap="round" stroke-width="2.5"></path>
+<!-- Peak Dot at 180,12 in Warm Gold -->
+<circle cx="180" cy="12" fill="#18181A" r="4.5" stroke="#F59E0B" stroke-width="2.5"></circle>
+<circle cx="255" cy="40" fill="#30D158" r="3.5"></circle>
+</svg>
+</div>
+<!-- Timeline Labels -->
+<div class="flex justify-between items-center text-zinc-subtle text-[11px] pt-1 tabular-nums font-sans">
+<span>00:00</span>
+<span>06:00</span>
+<span>12:00</span>
+<span class="text-[#F59E0B] font-medium">18:00 (Now)</span>
+<span>23:59</span>
+</div>
+</div>
+<!-- SECTION 5: "NOW APPLYING" LIVE ACTION CARD -->
+<div class="bg-surface-card border border-hairline-separator/60 rounded-2xl p-4 shadow-sm flex flex-col space-y-3 relative overflow-hidden">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-success opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-status-success"></span>
+</span>
+<span class="text-[11px] text-zinc-subtle font-semibold uppercase tracking-wider font-sans">Now Applying Live</span>
+</div>
+<span class="text-[11px] text-zinc-subtle font-sans">Orchestrator #3</span>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-serif-display text-[22px] text-primary font-normal tracking-tight">Stripe</span>
+<span class="text-[15px] text-zinc-subtle font-light font-sans">Staff Product Designer · Remote</span>
+</div>
+<div class="w-10 h-10 rounded-xl bg-surface-elevated border border-hairline-separator/40 flex items-center justify-center">
+<span class="font-serif-display text-[20px] text-primary font-normal">S</span>
+</div>
+</div>
+<!-- Step Progress Micro-Indicator -->
+<div class="flex flex-col space-y-2 pt-1">
+<div class="flex items-center justify-between text-[11px] text-zinc-subtle font-sans">
+<span>Step 3 of 4: Custom Questions &amp; Pre-Fill</span>
+<span class="text-primary font-medium tabular-nums">68%</span>
+</div>
+<!-- Track -->
+<div class="w-full h-1.5 bg-surface-elevated rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-[#F59E0B] to-status-success rounded-full transition-all duration-300" style="width: 68%;"></div>
+</div>
+<div class="flex justify-between items-center text-[11px] text-zinc-subtle pt-0.5 font-sans">
+<span class="text-primary font-medium">✓ Grounded Resume</span>
+<span class="text-primary font-medium">✓ Cover Letter</span>
+<span class="text-status-success font-semibold">Filling Form...</span>
+<span>Submission</span>
+</div>
+</div>
+</div>
+<!-- SECTION 6: LIVE ACTIVITY STREAM / AUDIT -->
+<div class="bg-surface-card border border-hairline-separator/60 rounded-2xl p-4 shadow-sm flex flex-col space-y-3">
+<div class="flex items-center justify-between">
+<span class="font-serif-display text-[20px] text-primary font-normal tracking-tight">Recent Activity</span>
+<button class="font-serif-display italic text-[15px] text-[#F59E0B] hover:opacity-80 transition-opacity">See All</button>
+</div>
+<div class="flex flex-col space-y-3 pt-1">
+<!-- Item 1 -->
+<div class="flex items-start justify-between py-1">
+<div class="flex items-start gap-3">
+<span class="w-2 h-2 rounded-full bg-status-success mt-1.5 flex-shrink-0"></span>
+<div class="flex flex-col">
+<span class="text-[14px] text-primary font-medium font-sans">Applied to Zoho</span>
+<span class="text-[11px] text-zinc-subtle font-sans">Senior Data Analyst · Workday Portal</span>
+</div>
+</div>
+<span class="text-[11px] text-zinc-subtle tabular-nums font-sans">2m ago</span>
+</div>
+<!-- Item 2 (Warm Amber Dot for Tailored Cover Letter instead of Blue) -->
+<div class="flex items-start justify-between py-1">
+<div class="flex items-start gap-3">
+<span class="w-2 h-2 rounded-full bg-[#F59E0B] shadow-[0_0_5px_rgba(245,158,11,0.6)] mt-1.5 flex-shrink-0"></span>
+<div class="flex flex-col">
+<span class="text-[14px] text-primary font-medium font-sans">Tailored Cover Letter</span>
+<span class="text-[11px] text-zinc-subtle font-sans">Figma · Design Systems Lead</span>
+</div>
+</div>
+<span class="text-[11px] text-zinc-subtle tabular-nums font-sans">14m ago</span>
+</div>
+<!-- Item 3 -->
+<div class="flex items-start justify-between py-1">
+<div class="flex items-start gap-3">
+<span class="w-2 h-2 rounded-full bg-[#EA580C] mt-1.5 flex-shrink-0"></span>
+<div class="flex flex-col">
+<span class="text-[14px] text-primary font-medium font-sans">Action Needed: 2FA Code</span>
+<span class="text-[11px] text-[#EA580C] font-medium font-sans">Notion · Security prompt requested</span>
+</div>
+</div>
+<span class="text-[11px] text-zinc-subtle tabular-nums font-sans">38m ago</span>
+</div>
+<!-- Item 4 -->
+<div class="flex items-start justify-between py-1">
+<div class="flex items-start gap-3">
+<span class="w-2 h-2 rounded-full bg-status-success mt-1.5 flex-shrink-0"></span>
+<div class="flex flex-col">
+<span class="text-[14px] text-primary font-medium font-sans">Applied to Linear</span>
+<span class="text-[11px] text-zinc-subtle font-sans">Founding Product Designer · Ashby</span>
+</div>
+</div>
+<span class="text-[11px] text-zinc-subtle tabular-nums font-sans">1h ago</span>
+</div>
+</div>
+</div>
+</div></main>
+</div>
 
-    <!-- Navigation Header Bar -->
-    <div class="h-14 px-4 flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <span class="text-white font-serif-display text-[26px] tracking-tight font-normal" id="header-title">Cockpit</span>
-        <span class="px-2 py-0.5 rounded-full bg-status-success/15 text-status-success text-[11px] font-medium flex items-center gap-1">
-          <span class="w-1.5 h-1.5 rounded-full bg-status-success animate-pulse"></span>
-          <span id="header-status-badge">Auto-Pilot Active</span>
-        </span>
-      </div>
-
-      <div class="flex items-center gap-2">
-        <!-- Direct Stitch Screen Link Menu Pill -->
-        <a href="/app/stitch/today_warm_editorial_cockpit/code.html" target="_blank" title="View Raw Stitch Canvas" class="px-2 py-1 rounded-lg bg-surface-elevated text-zinc-subtle hover:text-white text-[11px] font-mono flex items-center gap-1 transition-colors">
-          <span class="material-symbols-outlined text-[13px]">palette</span>
-          <span>Stitch</span>
-        </a>
-
-        <!-- Candidate Profile Monogram Avatar -->
-        <button onclick="switchTab('profile')" class="w-8 h-8 rounded-full bg-white text-[#0F0F10] font-bold text-xs flex items-center justify-center cursor-pointer transition-transform active:scale-95 hover:opacity-90 shadow-sm" id="header-avatar-btn">
-          AA
+<div id="tab-needs" class="tab-pane hidden" data-tab="needs">
+<main class="flex flex-col relative w-full min-h-screen bg-surface px-margin pt-25 pb-24"><div class="flex flex-col w-full text-on-surface select-none pb-12">
+<!-- Title & Pending Indicator Area -->
+<div class="flex flex-col mb-4">
+<div class="flex items-center justify-between mb-1">
+<div class="flex items-center gap-1.5">
+<span class="inline-flex w-2 h-2 rounded-full bg-white animate-pulse"></span>
+<span class="font-label-md text-label-md text-on-surface font-medium">3 pending interventions</span>
+</div>
+<button class="flex items-center gap-1 text-outline hover:text-on-surface transition-colors py-1 px-2 rounded-lg bg-surface-container text-label-sm font-label-sm border border-hairline-separator" id="toggle-empty-state-btn">
+<span class="material-symbols-outlined text-[15px]">arrow_back_ios_new</span>
+<span id="empty-state-toggle-label">Preview Empty</span>
+</button>
+</div>
+<div class="flex items-baseline justify-between">
+<h2 class="font-headline-xl-mobile text-headline-xl-mobile tracking-tight text-on-surface font-semibold">Needs You</h2>
+<span class="font-label-sm text-label-sm px-2.5 py-0.5 rounded-full bg-white/10 text-white font-medium border border-white/15">Autonomous Mode Active</span>
+</div>
+</div>
+<!-- iOS Inset Segmented Control -->
+<div class="p-1 bg-surface-container-lowest rounded-xl flex items-center mb-5 border border-hairline-separator">
+<button class="flex-1 py-1.5 px-3 rounded-lg font-headline-md text-label-md font-semibold text-center transition-all bg-surface-elevated text-white shadow-sm border border-hairline-separator/60" id="tab-questions">
+      Questions <span class="ml-1 px-1.5 py-0.2 rounded-full bg-white text-black font-bold text-[11px]">3</span>
+</button>
+<button class="flex-1 py-1.5 px-3 rounded-lg font-headline-md text-label-md text-on-surface-variant text-center transition-all hover:text-on-surface" id="tab-ai-answered">
+      AI Answered <span class="ml-1 px-1.5 py-0.2 rounded-full bg-surface-variant text-on-surface-variant font-bold text-[11px]">4</span>
+</button>
+</div>
+<!-- MAIN VIEW CONTAINER -->
+<div class="relative w-full" id="content-container">
+<!-- VIEW 1: QUESTIONS CAROUSEL VIEW -->
+<div class="flex flex-col w-full transition-opacity duration-200" id="view-questions">
+<!-- Counter & Progress indicator -->
+<div class="flex items-center justify-between mb-3 px-1">
+<div class="flex items-center gap-2">
+<span class="font-body-md text-body-md text-on-surface-variant font-medium" id="carousel-counter-label">Question 1 of 3</span>
+<span class="text-outline-variant font-body-md">•</span>
+<span class="text-white font-label-sm text-label-sm bg-surface-elevated border border-hairline-separator px-2.5 py-0.5 rounded-full font-medium" id="carousel-company-pill">Zoho</span>
+</div>
+<div class="flex items-center gap-1.5" id="pagination-dots">
+<span class="w-2 h-2 rounded-full bg-white transition-all duration-300" data-dot="1"></span>
+<span class="w-2 h-2 rounded-full bg-surface-container-highest transition-all duration-300" data-dot="2"></span>
+<span class="w-2 h-2 rounded-full bg-surface-container-highest transition-all duration-300" data-dot="3"></span>
+</div>
+</div>
+<!-- Card Stack Canvas -->
+<div class="relative w-full min-h-[460px]">
+<!-- CARD 1: Single Choice (Active) -->
+<div class="absolute inset-0 w-full transition-all duration-300 transform translate-y-0 opacity-100 z-30" id="card-1">
+<div class="flex flex-col bg-surface-card border border-hairline-separator rounded-2xl p-5 shadow-2xl">
+<!-- Company / Context Row -->
+<div class="flex items-center justify-between mb-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-surface-container-high border border-hairline-separator flex items-center justify-center font-bold text-white text-headline-md shadow-inner">
+                  Z
+                </div>
+<div>
+<div class="font-headline-md text-headline-md text-on-surface">Zoho</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Data Analyst · Chennai</div>
+</div>
+</div>
+<div class="w-7 h-7 rounded-full bg-surface-container flex items-center justify-center text-outline">
+<span class="material-symbols-outlined text-[17px]">verified</span>
+</div>
+</div>
+<!-- Question prompt -->
+<h3 class="font-headline-lg text-headline-lg text-white mb-5 leading-snug">
+              Are you legally authorized to work in India?
+            </h3>
+<!-- Options Group -->
+<div class="flex flex-col gap-2.5 mb-5" id="card1-options">
+<button class="opt-btn flex items-center justify-between p-3.5 rounded-xl bg-surface-elevated border border-white/40 text-white transition-all text-left shadow-sm" data-opt="yes">
+<span class="font-headline-md text-body-md text-white font-medium">Yes, immediately</span>
+<span class="material-symbols-outlined text-white text-[20px] opt-check">check_circle</span>
+</button>
+<button class="opt-btn flex items-center justify-between p-3.5 rounded-xl bg-surface-container border border-hairline-separator/50 text-on-surface-variant hover:text-on-surface transition-all text-left" data-opt="no">
+<span class="font-body-md text-body-md">No, require sponsorship</span>
+<span class="material-symbols-outlined text-outline text-[20px] opt-check hidden">radio_button_unchecked</span>
+</button>
+<button class="opt-btn flex items-center justify-between p-3.5 rounded-xl bg-surface-container border border-hairline-separator/50 text-on-surface-variant hover:text-on-surface transition-all text-left" data-opt="discuss">
+<span class="font-body-md text-body-md">Prefer to discuss in interview</span>
+<span class="material-symbols-outlined text-outline text-[20px] opt-check hidden">radio_button_unchecked</span>
+</button>
+</div>
+<!-- Auto-fill memory switch -->
+<div class="flex items-center justify-between p-3 bg-surface-container-lowest border border-hairline-separator/60 rounded-xl mb-5">
+<div class="flex flex-col pr-2">
+<span class="font-headline-md text-label-md text-on-surface">Remember for future apps</span>
+<span class="font-label-sm text-label-sm text-zinc-subtle">ApplyPilot will auto-answer similar fields</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" id="toggle-remember-1" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-surface peer-checked:bg-silver-track after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-[#131313] after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+</label>
+</div>
+<!-- Primary Action -->
+<button class="w-full py-3.5 px-4 rounded-full bg-white hover:bg-neutral-200 text-black font-headline-md text-body-md font-bold flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.99]" onclick="advanceCard(1)">
+<span>Save &amp; Continue</span>
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- CARD 2: Legal Confirmation / Attestation -->
+<div class="absolute inset-0 w-full transition-all duration-300 transform translate-y-3 scale-[0.97] opacity-60 pointer-events-none z-20" id="card-2">
+<div class="flex flex-col bg-surface-card border border-hairline-separator rounded-2xl p-5 shadow-xl">
+<!-- Header with tag -->
+<div class="flex items-center justify-between mb-3">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-surface-elevated border border-hairline-separator text-white flex items-center justify-center font-bold text-headline-md">
+<span class="material-symbols-outlined text-[22px]">policy</span>
+</div>
+<div>
+<div class="font-headline-md text-headline-md text-on-surface">Fintech Global</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Senior Engineer · London</div>
+</div>
+</div>
+<span class="font-label-sm text-[11px] px-2.5 py-1 rounded-full bg-white/10 border border-white/15 text-white font-semibold flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px]">lock</span>
+                Requires Sign-off
+              </span>
+</div>
+<h3 class="font-headline-lg text-headline-lg text-white mb-3 leading-snug">
+              Background Verification Consent
+            </h3>
+<!-- Scrollable terms inset -->
+<div class="bg-surface-container-lowest border border-hairline-separator/60 rounded-xl p-3.5 h-36 overflow-y-auto mb-4 text-on-surface-variant font-label-md text-label-md leading-relaxed">
+<p class="mb-2">By submitting this disclosure, you authorize ApplyPilot and our hiring client to initiate pre-employment credit, identity, and standard regulatory compliance screening through accredited background inquiry agencies.</p>
+<p class="text-zinc-subtle">No automated inquiry will be conducted without your explicit signature or when local regulatory disclosures dictate manual scheduling.</p>
+</div>
+<!-- Agreement Checkbox -->
+<label class="flex items-center gap-3 p-3 bg-surface-container border border-hairline-separator/50 rounded-xl mb-4 cursor-pointer">
+<input class="w-5 h-5 rounded bg-surface-container-high border-hairline-separator text-white focus:ring-0 focus:ring-offset-0 cursor-pointer" id="consent-check" type="checkbox"/>
+<span class="font-body-md text-label-md text-on-surface">I acknowledge and agree to terms</span>
+</label>
+<!-- Action buttons -->
+<div class="flex gap-2">
+<button class="w-1/3 py-3 px-3 rounded-full bg-surface-elevated border border-hairline-separator text-on-surface-variant font-headline-md text-label-md" onclick="rewindCard(2)">
+                Previous
+              </button>
+<button class="w-2/3 py-3 px-4 rounded-full bg-white hover:bg-neutral-200 text-black font-headline-md text-body-md font-bold transition-all" id="consent-confirm-btn" onclick="advanceCard(2)">
+                Confirm &amp; Submit
+              </button>
+</div>
+</div>
+</div>
+<!-- CARD 3: 2FA Verification Code Prompt -->
+<div class="absolute inset-0 w-full transition-all duration-300 transform translate-y-6 scale-[0.94] opacity-20 pointer-events-none z-10" id="card-3">
+<div class="flex flex-col bg-surface-card border border-hairline-separator rounded-2xl p-5 shadow-xl">
+<!-- Header -->
+<div class="flex items-center justify-between mb-3">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-surface-elevated border border-hairline-separator text-white flex items-center justify-center font-bold text-headline-md">
+<span class="material-symbols-outlined text-[20px]">encrypted</span>
+</div>
+<div>
+<div class="font-headline-md text-headline-md text-on-surface">Greenhouse Portal</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Auth Challenge · Stripe Application</div>
+</div>
+</div>
+<span class="font-label-sm text-[11px] px-2 py-0.5 rounded-full bg-white/10 border border-white/15 text-white font-semibold">2FA Needed</span>
+</div>
+<h3 class="font-headline-lg text-headline-lg text-white mb-1">
+              Enter Verification PIN
+            </h3>
+<p class="font-body-md text-label-md text-on-surface-variant mb-5">Greenhouse sent a single-use 6-digit code to your inbox to authenticate submission.</p>
+<!-- 6 PIN inputs -->
+<div class="flex justify-between gap-1.5 mb-5" id="pin-container">
+<input class="pin-box w-11 h-13 text-center bg-surface-container border border-hairline-separator rounded-xl font-headline-lg text-headline-lg text-white font-bold focus:outline-none focus:border-white transition-colors" maxlength="1" type="text" value="7"/>
+<input class="pin-box w-11 h-13 text-center bg-surface-container border border-hairline-separator rounded-xl font-headline-lg text-headline-lg text-white font-bold focus:outline-none focus:border-white transition-colors" maxlength="1" type="text" value="4"/>
+<input class="pin-box w-11 h-13 text-center bg-surface-container border border-hairline-separator rounded-xl font-headline-lg text-headline-lg text-white font-bold focus:outline-none focus:border-white transition-colors" maxlength="1" type="text" value="9"/>
+<input class="pin-box w-11 h-13 text-center bg-surface-container-lowest border border-hairline-separator/50 rounded-xl font-headline-lg text-headline-lg text-on-surface font-bold focus:outline-none focus:border-white transition-colors" maxlength="1" placeholder="•" type="text"/>
+<input class="pin-box w-11 h-13 text-center bg-surface-container-lowest border border-hairline-separator/50 rounded-xl font-headline-lg text-headline-lg text-on-surface font-bold focus:outline-none focus:border-white transition-colors" maxlength="1" placeholder="•" type="text"/>
+<input class="pin-box w-11 h-13 text-center bg-surface-container-lowest border border-hairline-separator/50 rounded-xl font-headline-lg text-headline-lg text-on-surface font-bold focus:outline-none focus:border-white transition-colors" maxlength="1" placeholder="•" type="text"/>
+</div>
+<!-- Auto-detect inbox status -->
+<div class="flex items-center justify-between p-3 rounded-xl bg-surface-container-lowest border border-hairline-separator/60 mb-5">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-white text-[18px] animate-spin">sync</span>
+<span class="font-label-sm text-label-sm text-on-surface">Listening to mail webhook...</span>
+</div>
+<span class="font-label-sm text-label-sm text-zinc-subtle font-mono">0:24</span>
+</div>
+<!-- Buttons -->
+<div class="flex gap-2">
+<button class="w-1/3 py-3 px-3 rounded-full bg-surface-elevated border border-hairline-separator text-on-surface-variant font-headline-md text-label-md" onclick="rewindCard(3)">
+                Previous
+              </button>
+<button class="w-2/3 py-3.5 px-4 rounded-full bg-white hover:bg-neutral-200 text-black font-headline-md text-body-md font-bold flex items-center justify-center gap-1.5 transition-all" onclick="completeQueue()">
+<span>Verify &amp; Finish</span>
+<span class="material-symbols-outlined text-[18px]">check</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Tactile peek hint when at Card 1 -->
+<div class="mt-4 flex items-center justify-center gap-2 text-zinc-subtle py-2 cursor-pointer hover:text-white transition-colors" id="peek-indicator" onclick="advanceCard(1)">
+<span class="font-label-sm text-label-sm">Next up: Fintech Global Consent</span>
+<span class="material-symbols-outlined text-[16px]">expand_more</span>
+</div>
+</div>
+<!-- VIEW 2: AI ANSWERED (INSET GROUPED LIST) -->
+<div class="hidden flex-col w-full transition-opacity duration-200" id="view-ai-answered">
+<!-- Sub-banner explaining autonomous review -->
+<div class="flex items-center justify-between p-3 bg-surface-container-lowest border border-hairline-separator/60 rounded-xl mb-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-white text-[20px]">smart_toy</span>
+<div class="flex flex-col">
+<span class="font-headline-md text-label-md text-on-surface">4 Drafts Ready for Review</span>
+<span class="font-label-sm text-label-sm text-zinc-subtle">Generated using your portfolio knowledge graph</span>
+</div>
+</div>
+<button class="px-3 py-1 rounded-full bg-white text-black hover:bg-neutral-200 transition-colors font-label-sm text-label-sm font-semibold" onclick="approveAll()">
+          Approve All
         </button>
-      </div>
-    </div>
-  </header>
-
-  <!-- MAIN SCROLLABLE APP BODY -->
-  <main class="flex-1 w-full max-w-xl mx-auto px-4 pt-24 pb-28">
-
-    <!-- ======================================================== -->
-    <!-- TAB 0: HOME / COCKPIT (Warm Editorial Cockpit)            -->
-    <!-- ======================================================== -->
-    <section id="tab-home" class="tab-view active space-y-4">
-      
-      <!-- GREETING & RADAR -->
-      <div class="flex flex-col space-y-1 pt-1">
-        <div class="flex items-center justify-between">
-          <span class="text-[11px] text-zinc-subtle uppercase tracking-[0.16em] font-medium" id="today-date-str">Wednesday, November 18</span>
-          <span class="text-[11px] text-zinc-subtle bg-surface-card px-2 py-0.5 rounded-full border border-hairline-separator">Safe Dry-Run Mode</span>
-        </div>
-        <div class="flex items-baseline justify-between">
-          <h1 class="font-serif-display text-[36px] text-white tracking-tight font-normal leading-tight">
-            Hello, <span class="italic font-light" id="user-greeting-name">Adharsh</span>
-          </h1>
-          <span class="text-[12px] text-zinc-subtle font-medium">Cap: <strong class="text-white" id="stat-daily-cap">100</strong>/day</span>
-        </div>
-      </div>
-
-      <!-- DAILY QUOTA DONUT + METRIC KPIS -->
-      <div class="grid grid-cols-12 gap-3">
-        <!-- Donut Card (7 cols) -->
-        <div class="col-span-7 bg-surface-card border border-hairline-separator rounded-2xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
-          <div class="flex items-center justify-between">
-            <span class="text-[13px] text-zinc-subtle font-medium">Daily Quota</span>
-            <span class="text-[11px] text-status-success bg-status-success/10 px-1.5 py-0.5 rounded-full font-medium tabular-nums" id="pacing-badge">On Pace</span>
-          </div>
-
-          <!-- Circular Donut Progress -->
-          <div class="relative flex items-center justify-center my-2">
-            <svg class="w-32 h-32 -rotate-90" viewBox="0 0 120 120">
-              <circle cx="60" cy="60" fill="none" r="48" stroke="#242426" stroke-width="9"></circle>
-              <defs>
-                <linearGradient id="warmGoldGradientRing" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stop-color="#F59E0B"></stop>
-                  <stop offset="100%" stop-color="#EA580C"></stop>
-                </linearGradient>
-              </defs>
-              <circle id="quota-donut-circle" class="transition-all duration-1000 ease-out" cx="60" cy="60" fill="none" r="48" stroke="url(#warmGoldGradientRing)" stroke-dasharray="301.59" stroke-dashoffset="240" stroke-linecap="round" stroke-width="9"></circle>
-            </svg>
-            <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
-              <span class="font-serif-display text-[36px] text-white font-normal leading-none tabular-nums" id="stat-daily-applied">0</span>
-              <span class="text-[11px] text-zinc-subtle mt-1 font-light">of <span id="stat-daily-cap-sub">100</span> max</span>
-            </div>
-          </div>
-
-          <div class="flex items-center justify-between pt-1 text-[11px] text-zinc-subtle">
-            <span>Circuit Breaker</span>
-            <span class="text-status-success font-medium flex items-center gap-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-status-success"></span> Healthy (3 Streak)
+</div>
+<!-- Grouped AI Answers List -->
+<div class="flex flex-col gap-3">
+<!-- Item 1 -->
+<div class="flex flex-col bg-surface-card border border-hairline-separator rounded-2xl p-4 cursor-pointer hover:bg-surface-elevated transition-colors shadow-md" onclick="openActionSheet('Distributed SQL Experience', 'Designed and deployed CockroachDB clusters across 3 AWS regions with 99.99% uptime, implementing automatic geo-partitioning.', 'Projects &amp; GitHub sync (Fintech cluster repo)', '94%')">
+<div class="flex items-center justify-between mb-2">
+<span class="font-label-sm text-label-sm text-zinc-subtle font-medium">Databricks · Senior SRE</span>
+<span class="px-2 py-0.5 rounded-full bg-white/10 border border-white/15 text-white text-[11px] font-semibold flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-white"></span> 94% Match
             </span>
+</div>
+<h4 class="font-headline-md text-body-lg text-on-surface mb-2 font-medium">
+            What is your experience with distributed SQL databases?
+          </h4>
+<div class="p-3 bg-surface-container-lowest border border-hairline-separator/50 rounded-xl mb-3 text-on-surface-variant font-body-md text-label-md italic">
+            “Designed and deployed CockroachDB clusters across 3 AWS regions with 99.99% uptime, implementing automatic geo-partitioning.”
           </div>
-        </div>
-
-        <!-- Stacked KPIs (5 cols) -->
-        <div class="col-span-5 flex flex-col gap-2.5">
-          <!-- Applied -->
-          <div class="bg-surface-card border border-hairline-separator rounded-2xl p-3 flex flex-col justify-between flex-1 shadow-sm">
-            <div class="flex items-center justify-between">
-              <span class="text-[11px] text-zinc-subtle font-medium">Applied</span>
-              <span class="material-symbols-outlined text-[16px] text-zinc-subtle">send</span>
-            </div>
-            <div class="flex items-baseline gap-1.5 mt-1">
-              <span class="font-serif-display text-[24px] text-white font-normal leading-none tabular-nums" id="stat-total-applied">5</span>
-              <span class="text-[10px] text-zinc-subtle">dry runs</span>
-            </div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1 text-zinc-subtle font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">history_edu</span>
+<span>Source: Stripe &amp; Fintech repo</span>
+</div>
+<div class="flex gap-1.5" onclick="event.stopPropagation()">
+<button class="w-8 h-8 rounded-full bg-surface-container border border-hairline-separator flex items-center justify-center text-outline hover:text-white transition-colors" onclick="quickReject(this)">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+<button class="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center hover:bg-neutral-200 transition-colors" onclick="quickApprove(this)">
+<span class="material-symbols-outlined text-[18px]">check</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="flex flex-col bg-surface-card border border-hairline-separator rounded-2xl p-4 cursor-pointer hover:bg-surface-elevated transition-colors shadow-md" onclick="openActionSheet('Expected Salary Range', '$165,000 - $185,000 base + equity package according to San Francisco index.', 'Profile Target Compensations', '98%')">
+<div class="flex items-center justify-between mb-2">
+<span class="font-label-sm text-label-sm text-zinc-subtle font-medium">Retool · Fullstack Engineer</span>
+<span class="px-2 py-0.5 rounded-full bg-white/10 border border-white/15 text-white text-[11px] font-semibold flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-white"></span> 98% Match
+            </span>
+</div>
+<h4 class="font-headline-md text-body-lg text-on-surface mb-2 font-medium">
+            Expected salary range (USD)?
+          </h4>
+<div class="p-3 bg-surface-container-lowest border border-hairline-separator/50 rounded-xl mb-3 text-on-surface-variant font-body-md text-label-md italic">
+            “$165,000 - $185,000 base + equity package according to San Francisco index.”
           </div>
-
-          <!-- Needs You -->
-          <div onclick="switchTab('needs-you')" class="bg-surface-card border border-hairline-separator rounded-2xl p-3 flex flex-col justify-between flex-1 shadow-sm cursor-pointer hover:border-amber-gold/50 transition-colors">
-            <div class="flex items-center justify-between">
-              <span class="text-[11px] text-zinc-subtle font-medium">Needs You</span>
-              <span class="h-2 w-2 rounded-full bg-amber-gold shadow-[0_0_6px_rgba(245,158,11,0.5)]"></span>
-            </div>
-            <div class="flex items-baseline justify-between mt-1">
-              <span class="font-serif-display text-[24px] text-amber-gold font-normal leading-none tabular-nums" id="stat-needs-you-count">0</span>
-              <span class="text-[10px] text-amber-gold bg-amber-gold/15 px-1.5 py-0.5 rounded-full font-medium">Triage</span>
-            </div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1 text-zinc-subtle font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">tune</span>
+<span>Source: Profile preferences</span>
+</div>
+<div class="flex gap-1.5" onclick="event.stopPropagation()">
+<button class="w-8 h-8 rounded-full bg-surface-container border border-hairline-separator flex items-center justify-center text-outline hover:text-white transition-colors" onclick="quickReject(this)">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+<button class="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center hover:bg-neutral-200 transition-colors" onclick="quickApprove(this)">
+<span class="material-symbols-outlined text-[18px]">check</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Item 3 -->
+<div class="flex flex-col bg-surface-card border border-hairline-separator rounded-2xl p-4 cursor-pointer hover:bg-surface-elevated transition-colors shadow-md" onclick="openActionSheet('React &amp; TypeScript Tenure', '5+ years leading web architecture, micro-frontends with Vite, Module Federation, and strict TypeScript types.', 'Work History &amp; Resume bullet 3', '99%')">
+<div class="flex items-center justify-between mb-2">
+<span class="font-label-sm text-label-sm text-zinc-subtle font-medium">Linear · Lead UI</span>
+<span class="px-2 py-0.5 rounded-full bg-white/10 border border-white/15 text-white text-[11px] font-semibold flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-white"></span> 99% Match
+            </span>
+</div>
+<h4 class="font-headline-md text-body-lg text-on-surface mb-2 font-medium">
+            Years of experience with React &amp; TypeScript?
+          </h4>
+<div class="p-3 bg-surface-container-lowest border border-hairline-separator/50 rounded-xl mb-3 text-on-surface-variant font-body-md text-label-md italic">
+            “5+ years leading web architecture, micro-frontends with Vite, Module Federation, and strict TypeScript types.”
           </div>
-
-          <!-- Pipeline Queue -->
-          <div onclick="switchTab('jobs')" class="bg-surface-card border border-hairline-separator rounded-2xl p-3 flex flex-col justify-between flex-1 shadow-sm cursor-pointer hover:border-white/30 transition-colors">
-            <div class="flex items-center justify-between">
-              <span class="text-[11px] text-zinc-subtle font-medium">Queue</span>
-              <span class="material-symbols-outlined text-[16px] text-zinc-subtle">work</span>
-            </div>
-            <div class="flex items-baseline justify-between mt-1">
-              <span class="font-serif-display text-[24px] text-white font-normal leading-none tabular-nums" id="stat-queue-count">4</span>
-              <span class="text-[10px] text-zinc-subtle">ready</span>
-            </div>
-          </div>
-        </div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1 text-zinc-subtle font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">badge</span>
+<span>Source: Work History</span>
+</div>
+<div class="flex gap-1.5" onclick="event.stopPropagation()">
+<button class="w-8 h-8 rounded-full bg-surface-container border border-hairline-separator flex items-center justify-center text-outline hover:text-white transition-colors" onclick="quickReject(this)">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+<button class="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center hover:bg-neutral-200 transition-colors" onclick="quickApprove(this)">
+<span class="material-symbols-outlined text-[18px]">check</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- VIEW 3: EMPTY STATE (Hidden by default, activated via button) -->
+<div class="hidden flex-col items-center justify-center text-center p-8 bg-surface-card border border-hairline-separator rounded-2xl min-h-[380px] shadow-sm" id="view-empty-state">
+<div class="w-16 h-16 rounded-full bg-white/10 text-white flex items-center justify-center mb-4 border border-white/15">
+<span class="material-symbols-outlined text-[32px]">done_all</span>
+</div>
+<h3 class="font-headline-lg text-headline-lg text-white font-semibold mb-1">
+        All caught up
+      </h3>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-xs mb-6">
+        No manual answers or verification codes needed right now. ApplyPilot is cruising smoothly in background autopilot.
+      </p>
+<div class="flex items-center gap-2 p-3 bg-surface-container-lowest border border-hairline-separator/60 rounded-xl text-left max-w-xs w-full">
+<span class="material-symbols-outlined text-white text-[20px]">radar</span>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-medium">Scanning 24 applications</span>
+<span class="font-label-sm text-label-sm text-zinc-subtle">Next check in 4 minutes</span>
+</div>
+</div>
+<button class="mt-6 text-white font-headline-md text-label-md underline underline-offset-4" onclick="toggleEmptyState(false)">
+        Return to active queue
+      </button>
+</div>
+</div>
+<!-- iOS BOTTOM SHEET MODAL (Contextual AI Inspector) -->
+<div class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden transition-opacity duration-300 opacity-0 flex flex-col justify-end" id="ios-bottom-sheet-backdrop">
+<div class="w-full bg-surface-card border-t border-hairline-separator rounded-t-[28px] p-5 pb-8 shadow-2xl transition-transform duration-300 transform translate-y-full" id="ios-bottom-sheet">
+<!-- Apple grabber bar -->
+<div class="w-10 h-1.5 bg-zinc-subtle/50 rounded-full mx-auto mb-4"></div>
+<!-- Modal Header -->
+<div class="flex items-center justify-between mb-4">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-white"></span>
+<span class="font-label-sm text-label-sm text-white font-semibold" id="sheet-match-badge">94% Confidence</span>
+</div>
+<button class="w-7 h-7 rounded-full bg-surface-elevated border border-hairline-separator flex items-center justify-center text-on-surface-variant hover:text-white" onclick="closeActionSheet()">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+<!-- Modal Question & Proposed Content -->
+<h3 class="font-headline-lg text-headline-lg text-white mb-3 font-semibold" id="sheet-question-title">
+        Review Generated Answer
+      </h3>
+<div class="p-3.5 bg-surface-container-lowest border border-hairline-separator rounded-xl mb-3 text-on-surface font-body-md text-body-md" id="sheet-answer-text">
+        Generated response preview will appear here.
       </div>
-
-      <!-- LIVE APPLICATION ENGINE CARD -->
-      <div class="bg-surface-card border border-hairline-separator rounded-2xl p-4 shadow-sm flex flex-col space-y-3">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <div class="w-7 h-7 rounded-lg bg-surface-elevated flex items-center justify-center">
-              <span class="material-symbols-outlined text-amber-gold text-[16px]">bolt</span>
-            </div>
-            <span class="text-[13px] font-semibold text-white">Autonomous Pilot Pipeline</span>
-          </div>
-          <span class="text-[11px] text-zinc-subtle bg-surface-elevated px-2 py-0.5 rounded-full">Greenhouse · Lever · Ashby</span>
-        </div>
-
-        <!-- Target Job Context -->
-        <div class="p-3 bg-surface-elevated/60 rounded-xl flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-lg bg-surface-card flex items-center justify-center font-bold text-sm text-white" id="engine-target-monogram">
-              CF
-            </div>
-            <div>
-              <h4 class="text-[13px] font-semibold text-white" id="engine-target-company">Cloudflare</h4>
-              <p class="text-[11px] text-zinc-subtle" id="engine-target-role">Associate Data Scientist · Greenhouse</p>
-            </div>
-          </div>
-          <span class="text-[11px] font-mono text-status-success bg-status-success/10 px-2 py-1 rounded-md">Passes ₹7 LPA+</span>
-        </div>
-
-        <!-- Form Pre-Fill Progress Bar -->
-        <div class="space-y-1.5 pt-1">
-          <div class="flex items-center justify-between text-[11px] text-zinc-subtle">
-            <span>Step 3 of 4: Custom Questions & Pre-Fill</span>
-            <span class="text-white font-medium tabular-nums">68%</span>
-          </div>
-          <div class="w-full h-1.5 bg-surface-elevated rounded-full overflow-hidden">
-            <div class="h-full bg-gradient-to-r from-amber-gold to-status-success rounded-full" style="width: 68%;"></div>
-          </div>
-          <div class="flex justify-between items-center text-[10px] text-zinc-subtle pt-0.5">
-            <span class="text-white">✓ Grounded Resume</span>
-            <span class="text-white">✓ Cover Letter</span>
-            <span class="text-status-success font-medium">Filling Form...</span>
-            <span>Submission</span>
-          </div>
-        </div>
-
-        <!-- Quick Action Trigger Button -->
-        <div class="pt-2">
-          <button onclick="triggerApplyNext()" id="btn-apply-next" class="w-full h-11 rounded-xl bg-white text-[#0F0F10] font-semibold text-[13px] flex items-center justify-center gap-2 hover:bg-zinc-200 active:scale-[0.98] transition-all cursor-pointer shadow-md">
-            <span class="material-symbols-outlined text-[18px]">play_arrow</span>
-            <span>Run Next Queue Dry-Run</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- RECENT APPLICATION LOG -->
-      <div class="bg-surface-card border border-hairline-separator rounded-2xl p-4 shadow-sm flex flex-col space-y-3">
-        <div class="flex items-center justify-between">
-          <span class="font-serif-display text-[20px] text-white font-normal tracking-tight">Recent Activity</span>
-          <button onclick="switchTab('jobs')" class="font-serif-display italic text-[14px] text-amber-gold hover:opacity-80 transition-opacity">View All 378 Roles</button>
-        </div>
-        <div class="divide-y divide-hairline-separator/50" id="activity-stream-list">
-          <!-- Item 1: Cloudflare -->
-          <div class="flex items-start justify-between py-2.5">
-            <div class="flex items-start gap-3">
-              <span class="w-2 h-2 rounded-full bg-status-success mt-1.5 shrink-0"></span>
-              <div class="flex flex-col">
-                <span class="text-[13px] text-white font-medium">Cloudflare · Dry-Run Submitted</span>
-                <span class="text-[11px] text-zinc-subtle">Greenhouse Form · 8 Fields Answered · ₹12-18 LPA</span>
-              </div>
-            </div>
-            <span class="text-[11px] text-zinc-subtle tabular-nums">Today</span>
-          </div>
-          <!-- Item 2: Palantir -->
-          <div class="flex items-start justify-between py-2.5">
-            <div class="flex items-start gap-3">
-              <span class="w-2 h-2 rounded-full bg-amber-gold mt-1.5 shrink-0 shadow-[0_0_5px_rgba(245,158,11,0.6)]"></span>
-              <div class="flex flex-col">
-                <span class="text-[13px] text-white font-medium">Palantir Technologies</span>
-                <span class="text-[11px] text-zinc-subtle">Lever Portal · Needs You triage created</span>
-              </div>
-            </div>
-            <span class="text-[11px] text-zinc-subtle tabular-nums">Today</span>
-          </div>
-          <!-- Item 3: GitLab -->
-          <div class="flex items-start justify-between py-2.5">
-            <div class="flex items-start gap-3">
-              <span class="w-2 h-2 rounded-full bg-status-success mt-1.5 shrink-0"></span>
-              <div class="flex flex-col">
-                <span class="text-[13px] text-white font-medium">GitLab · Dry-Run Confirmed</span>
-                <span class="text-[11px] text-zinc-subtle">Greenhouse · Full Form Pre-Filled</span>
-              </div>
-            </div>
-            <span class="text-[11px] text-zinc-subtle tabular-nums">Yesterday</span>
-          </div>
-        </div>
-      </div>
-
-    </section>
-
-    <!-- ======================================================== -->
-    <!-- TAB 1: NEEDS YOU (Autonomous Triage Deck)                -->
-    <!-- ======================================================== -->
-    <section id="tab-needs-you" class="tab-view space-y-4">
-      
-      <!-- Sub-header context bar -->
-      <div class="flex items-center justify-between pb-1">
-        <div class="flex items-center gap-1.5">
-          <span class="text-[13px] font-semibold text-white">Pending Review</span>
-          <span class="w-2 h-2 rounded-full bg-amber-gold inline-block"></span>
-        </div>
-        <span class="text-[11px] text-zinc-subtle bg-surface-card px-2.5 py-0.5 rounded-full border border-hairline-separator">100% Grounded Rule Active</span>
-      </div>
-
-      <!-- Segmented Pill Selector -->
-      <div class="p-1 bg-surface-container rounded-xl flex items-center select-none" id="needs-you-pill-container">
-        <button onclick="toggleNeedsYouSubTab('questions')" id="btn-subtab-questions" class="w-1/2 py-2 rounded-lg bg-surface-card text-white font-semibold text-xs transition-all shadow-sm flex items-center justify-center gap-1.5">
-          <span>Questions</span>
-          <span class="px-1.5 py-0.2 bg-amber-gold/20 text-amber-gold rounded-full text-[10px]" id="badge-needs-you-q">1</span>
+<div class="flex items-center gap-1 text-zinc-subtle font-label-sm text-label-sm mb-6" id="sheet-source-text">
+<span class="material-symbols-outlined text-[15px]">source</span>
+<span>Based on uploaded data</span>
+</div>
+<!-- Action Stack -->
+<div class="flex flex-col gap-2.5">
+<button class="w-full py-3.5 rounded-full bg-white hover:bg-neutral-200 text-black font-headline-md text-body-md font-bold flex items-center justify-center gap-2" onclick="executeSheetAction('approved')">
+<span class="material-symbols-outlined text-[20px]">check</span>
+<span>Approve &amp; Save</span>
+</button>
+<button class="w-full py-3 rounded-full bg-surface-elevated border border-hairline-separator text-white font-headline-md text-body-md" onclick="executeSheetAction('edited')">
+          Edit Answer
         </button>
-        <button onclick="toggleNeedsYouSubTab('ai-answered')" id="btn-subtab-ai" class="w-1/2 py-2 rounded-lg text-zinc-subtle font-medium text-xs transition-all flex items-center justify-center gap-1.5">
-          <span>AI Answered</span>
-          <span class="px-1.5 py-0.2 bg-surface-elevated text-zinc-subtle rounded-full text-[10px]" id="badge-needs-you-ai">2</span>
+<button class="w-full py-2.5 text-zinc-subtle hover:text-white font-headline-md text-label-md" onclick="executeSheetAction('rejected')">
+          Reject AI Suggestion
         </button>
-      </div>
+</div>
+</div>
+</div>
+<!-- Toast notification banner -->
+<div class="fixed top-20 left-4 right-4 z-50 hidden bg-surface-elevated border border-hairline-separator rounded-xl p-3 shadow-2xl flex items-center gap-3 transition-transform duration-200" id="toast-banner">
+<div class="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-[18px]" id="toast-icon">check</span>
+</div>
+<div class="flex flex-col flex-1 min-w-0">
+<span class="font-headline-md text-label-md text-white font-semibold" id="toast-title">Intervention Saved</span>
+<span class="font-label-sm text-label-sm text-zinc-subtle truncate" id="toast-desc">Answer dispatched to active portal.</span>
+</div>
+</div>
+</div>
+<script>
+  // State management
+  let currentCardIndex = 1;
+  let inEmptyState = false;
 
-      <!-- Triage Items Container -->
-      <div id="needs-you-list" class="space-y-3">
-        <!-- Card 1: Legal Consent (Zoho / Lever) -->
-        <div class="bg-surface-card border border-hairline-separator rounded-2xl p-4 space-y-3 shadow-sm">
-          <div class="flex items-start justify-between">
-            <div class="flex items-center gap-2">
-              <div class="w-8 h-8 rounded-lg bg-surface-elevated flex items-center justify-center text-amber-gold">
-                <span class="material-symbols-outlined text-[18px]">verified_user</span>
-              </div>
-              <div>
-                <h4 class="text-[13px] font-semibold text-white">Legal & AI Consent Check</h4>
-                <p class="text-[11px] text-zinc-subtle">Palantir · Lever Portal Checkbox</p>
-              </div>
-            </div>
-            <span class="px-2 py-0.5 rounded-full bg-amber-gold/15 text-amber-gold text-[10px] font-semibold">Human Required</span>
+  // Segmented control tabs
+  const tabQuestions = document.getElementById('tab-questions');
+  const tabAiAnswered = document.getElementById('tab-ai-answered');
+  const viewQuestions = document.getElementById('view-questions');
+  const viewAiAnswered = document.getElementById('view-ai-answered');
+  const viewEmptyState = document.getElementById('view-empty-state');
+  const toggleEmptyStateBtn = document.getElementById('toggle-empty-state-btn');
+  const toggleEmptyLabel = document.getElementById('empty-state-toggle-label');
+
+  tabQuestions.addEventListener('click', () => switchTab('questions'));
+  tabAiAnswered.addEventListener('click', () => switchTab('ai-answered'));
+  toggleEmptyStateBtn.addEventListener('click', () => toggleEmptyState(!inEmptyState));
+
+  function switchTab(target) {
+    if (inEmptyState) toggleEmptyState(false);
+    
+    if (target === 'questions') {
+      tabQuestions.className = "flex-1 py-1.5 px-3 rounded-lg font-headline-md text-label-md font-semibold text-center transition-all bg-surface-elevated text-white shadow-sm border border-hairline-separator/60";
+      tabAiAnswered.className = "flex-1 py-1.5 px-3 rounded-lg font-headline-md text-label-md text-on-surface-variant text-center transition-all hover:text-on-surface";
+      viewQuestions.classList.remove('hidden');
+      viewAiAnswered.classList.add('hidden');
+    } else {
+      tabAiAnswered.className = "flex-1 py-1.5 px-3 rounded-lg font-headline-md text-label-md font-semibold text-center transition-all bg-surface-elevated text-white shadow-sm border border-hairline-separator/60";
+      tabQuestions.className = "flex-1 py-1.5 px-3 rounded-lg font-headline-md text-label-md text-on-surface-variant text-center transition-all hover:text-on-surface";
+      viewAiAnswered.classList.remove('hidden');
+      viewQuestions.classList.add('hidden');
+    }
+  }
+
+  // Card Switcher / Carousel Engine
+  function advanceCard(fromIndex) {
+    if (fromIndex === 1) {
+      applyCardState(2);
+    } else if (fromIndex === 2) {
+      applyCardState(3);
+    }
+  }
+
+  function rewindCard(fromIndex) {
+    if (fromIndex === 2) {
+      applyCardState(1);
+    } else if (fromIndex === 3) {
+      applyCardState(2);
+    }
+  }
+
+  function applyCardState(targetIndex) {
+    currentCardIndex = targetIndex;
+    const c1 = document.getElementById('card-1');
+    const c2 = document.getElementById('card-2');
+    const c3 = document.getElementById('card-3');
+    const counter = document.getElementById('carousel-counter-label');
+    const companyPill = document.getElementById('carousel-company-pill');
+    const peek = document.getElementById('peek-indicator');
+
+    // Update dots
+    document.querySelectorAll('[data-dot]').forEach(d => {
+      const dotNum = parseInt(d.getAttribute('data-dot'));
+      if (dotNum === targetIndex) {
+        d.className = "w-2 h-2 rounded-full bg-white transition-all duration-300";
+      } else {
+        d.className = "w-2 h-2 rounded-full bg-surface-container-highest transition-all duration-300";
+      }
+    });
+
+    counter.textContent = `Question ${targetIndex} of 3`;
+
+    if (targetIndex === 1) {
+      companyPill.textContent = "Zoho";
+      companyPill.className = "text-white font-label-sm text-label-sm bg-surface-elevated border border-hairline-separator px-2.5 py-0.5 rounded-full font-medium";
+      peek.classList.remove('hidden');
+
+      c1.className = "absolute inset-0 w-full transition-all duration-300 transform translate-y-0 opacity-100 z-30 pointer-events-auto";
+      c2.className = "absolute inset-0 w-full transition-all duration-300 transform translate-y-3 scale-[0.97] opacity-60 pointer-events-none z-20";
+      c3.className = "absolute inset-0 w-full transition-all duration-300 transform translate-y-6 scale-[0.94] opacity-20 pointer-events-none z-10";
+    } else if (targetIndex === 2) {
+      companyPill.textContent = "Fintech Global";
+      companyPill.className = "text-white font-label-sm text-label-sm bg-surface-elevated border border-hairline-separator px-2.5 py-0.5 rounded-full font-medium";
+      peek.classList.add('hidden');
+
+      c1.className = "absolute inset-0 w-full transition-all duration-300 transform -translate-y-8 opacity-0 pointer-events-none z-10";
+      c2.className = "absolute inset-0 w-full transition-all duration-300 transform translate-y-0 opacity-100 z-30 pointer-events-auto";
+      c3.className = "absolute inset-0 w-full transition-all duration-300 transform translate-y-3 scale-[0.97] opacity-60 pointer-events-none z-20";
+    } else if (targetIndex === 3) {
+      companyPill.textContent = "Greenhouse Auth";
+      companyPill.className = "text-white font-label-sm text-label-sm bg-surface-elevated border border-hairline-separator px-2.5 py-0.5 rounded-full font-medium";
+      peek.classList.add('hidden');
+
+      c1.className = "absolute inset-0 w-full transition-all duration-300 transform -translate-y-12 opacity-0 pointer-events-none z-10";
+      c2.className = "absolute inset-0 w-full transition-all duration-300 transform -translate-y-8 opacity-0 pointer-events-none z-20";
+      c3.className = "absolute inset-0 w-full transition-all duration-300 transform translate-y-0 opacity-100 z-30 pointer-events-auto";
+    }
+  }
+
+  function completeQueue() {
+    showToast("Auth code verified", "Greenhouse application successfully sent.");
+    setTimeout(() => {
+      toggleEmptyState(true);
+    }, 900);
+  }
+
+  // Option pill selection micro-interaction
+  document.querySelectorAll('#card1-options .opt-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#card1-options .opt-btn').forEach(b => {
+        b.className = "opt-btn flex items-center justify-between p-3.5 rounded-xl bg-surface-container border border-hairline-separator/50 text-on-surface-variant hover:text-on-surface transition-all text-left";
+        const icon = b.querySelector('.opt-check');
+        icon.textContent = "radio_button_unchecked";
+        icon.className = "material-symbols-outlined text-outline text-[20px] opt-check hidden";
+      });
+      btn.className = "opt-btn flex items-center justify-between p-3.5 rounded-xl bg-surface-elevated border border-white/40 text-white transition-all text-left shadow-sm";
+      const activeIcon = btn.querySelector('.opt-check');
+      activeIcon.textContent = "check_circle";
+      activeIcon.className = "material-symbols-outlined text-white text-[20px] opt-check";
+    });
+  });
+
+  // Empty State Toggle
+  function toggleEmptyState(state) {
+    inEmptyState = state;
+    if (inEmptyState) {
+      viewQuestions.classList.add('hidden');
+      viewAiAnswered.classList.add('hidden');
+      viewEmptyState.classList.remove('hidden');
+      viewEmptyState.classList.add('flex');
+      toggleEmptyLabel.textContent = "Show Queue";
+    } else {
+      viewEmptyState.classList.add('hidden');
+      viewEmptyState.classList.remove('flex');
+      toggleEmptyLabel.textContent = "Preview Empty";
+      switchTab('questions');
+    }
+  }
+
+  // Quick Inline Actions on AI list
+  function quickApprove(btn) {
+    const card = btn.closest('.flex-col');
+    card.style.opacity = '0.4';
+    showToast("Draft Approved", "Answer sent to application queue.");
+    setTimeout(() => card.remove(), 400);
+  }
+
+  function quickReject(btn) {
+    const card = btn.closest('.flex-col');
+    card.style.opacity = '0.3';
+    showToast("Draft Rejected", "Flagged for manual authoring.");
+    setTimeout(() => card.remove(), 400);
+  }
+
+  function approveAll() {
+    showToast("All 4 Drafts Approved", "Autonomous background job submitted.");
+    document.querySelectorAll('#view-ai-answered .shadow-md').forEach(el => el.remove());
+  }
+
+  // iOS Bottom Sheet Modal Engine
+  const sheetBackdrop = document.getElementById('ios-bottom-sheet-backdrop');
+  const sheetModal = document.getElementById('ios-bottom-sheet');
+  const sheetTitle = document.getElementById('sheet-question-title');
+  const sheetAnswer = document.getElementById('sheet-answer-text');
+  const sheetSource = document.getElementById('sheet-source-text');
+  const sheetBadge = document.getElementById('sheet-match-badge');
+
+  function openActionSheet(q, a, source, match) {
+    sheetTitle.textContent = q;
+    sheetAnswer.innerHTML = `&ldquo;${a}&rdquo;`;
+    sheetSource.innerHTML = `<span class="material-symbols-outlined text-[15px]">source</span><span>${source}</span>`;
+    sheetBadge.textContent = `${match} Confidence`;
+
+    sheetBackdrop.classList.remove('hidden');
+    setTimeout(() => {
+      sheetBackdrop.classList.remove('opacity-0');
+      sheetBackdrop.classList.add('opacity-100');
+      sheetModal.classList.remove('translate-y-full');
+      sheetModal.classList.add('translate-y-0');
+    }, 10);
+  }
+
+  function closeActionSheet() {
+    sheetBackdrop.classList.remove('opacity-100');
+    sheetBackdrop.classList.add('opacity-0');
+    sheetModal.classList.remove('translate-y-0');
+    sheetModal.classList.add('translate-y-full');
+    setTimeout(() => {
+      sheetBackdrop.classList.add('hidden');
+    }, 300);
+  }
+
+  function executeSheetAction(action) {
+    closeActionSheet();
+    if (action === 'approved') showToast("Response Approved", "Synchronized to application.");
+    if (action === 'edited') showToast("Editor Opened", "Opening rich markdown answer composer.");
+    if (action === 'rejected') showToast("Response Dismissed", "Removed from queue.");
+  }
+
+  // Toast System
+  function showToast(title, desc) {
+    const toast = document.getElementById('toast-banner');
+    document.getElementById('toast-title').textContent = title;
+    document.getElementById('toast-desc').textContent = desc;
+    toast.classList.remove('hidden');
+    setTimeout(() => {
+      toast.classList.add('hidden');
+    }, 2800);
+  }
+
+  // Auto PIN input jumping
+  const pinInputs = document.querySelectorAll('.pin-box');
+  pinInputs.forEach((input, idx) => {
+    input.addEventListener('keyup', (e) => {
+      if (input.value.length === 1 && idx < pinInputs.length - 1) {
+        pinInputs[idx + 1].focus();
+      }
+    });
+  });
+</script></main>
+</div>
+
+<div id="tab-jobs" class="tab-pane hidden" data-tab="jobs">
+<main class="flex-1 flex flex-col w-full pt-14 pb-20 bg-surface"><div class="flex flex-col w-full pb-10">
+<!-- TOP TITLE & SYSTEM SUMMARY -->
+<section class="px-margin pt-space-xs pb-space-sm flex items-end justify-between">
+<div>
+<div class="flex items-center gap-1.5 mb-1">
+<span class="w-1.5 h-1.5 rounded-full bg-status-success animate-pulse"></span>
+<span class="font-caption text-caption text-zinc-subtle uppercase tracking-wider font-semibold">Autonomous Pilot</span>
+</div>
+<h2 class="font-headline-xl-mobile text-headline-xl-mobile text-primary tracking-tight font-semibold">Jobs</h2>
+</div>
+<div class="flex flex-col items-end pb-1">
+<span class="font-headline-md text-headline-md text-primary font-semibold tracking-tight">56</span>
+<span class="font-caption text-caption text-zinc-subtle">tracked roles</span>
+</div>
+</section>
+<!-- SEARCH BAR -->
+<section class="px-margin py-space-xs">
+<div class="relative flex items-center w-full h-10 px-3 bg-surface-card rounded-xl">
+<span class="material-symbols-outlined text-zinc-subtle text-[19px] mr-2">search</span>
+<input class="w-full bg-transparent text-primary placeholder-zinc-subtle font-body-md text-body-md focus:outline-none" id="jobSearchInput" placeholder="Search company or role" type="text" value=""/>
+<button aria-label="Clear search" class="w-5 h-5 rounded-full bg-surface-elevated flex items-center justify-center text-zinc-subtle hover:text-primary transition-colors" id="clearSearchBtn" type="button">
+<span class="material-symbols-outlined text-[13px]">close</span>
+</button>
+</div>
+</section>
+<!-- ATS / SOURCE PILL FILTERS -->
+<section class="pt-space-xs pb-space-sm">
+<div class="flex items-center gap-2 overflow-x-auto px-margin scrollbar-none">
+<button class="shrink-0 px-3.5 py-1.5 rounded-full bg-primary text-on-primary font-label-md text-label-md font-semibold transition-all">
+        All
+      </button>
+<button class="shrink-0 px-3.5 py-1.5 rounded-full bg-surface-card text-on-surface font-label-md text-label-md hover:bg-surface-elevated transition-colors">
+        Greenhouse
+      </button>
+<button class="shrink-0 px-3.5 py-1.5 rounded-full bg-surface-card text-on-surface font-label-md text-label-md hover:bg-surface-elevated transition-colors">
+        Lever
+      </button>
+<button class="shrink-0 px-3.5 py-1.5 rounded-full bg-surface-card text-on-surface font-label-md text-label-md hover:bg-surface-elevated transition-colors">
+        Ashby
+      </button>
+<button class="shrink-0 px-3.5 py-1.5 rounded-full bg-surface-card text-on-surface font-label-md text-label-md hover:bg-surface-elevated transition-colors">
+        Assist-only
+      </button>
+</div>
+</section>
+<!-- SEGMENTED STATUS TABS -->
+<section class="px-margin pt-space-xs pb-space-md">
+<div class="bg-surface-container-low p-1 rounded-xl flex items-center gap-1 overflow-x-auto scrollbar-none">
+<button class="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-elevated text-primary font-label-md text-label-md font-medium shadow-sm">
+<span>Queue</span>
+<span class="px-1.5 py-0.2 rounded-full bg-primary text-on-primary text-[10px] font-bold leading-tight">33</span>
+</button>
+<button class="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-zinc-subtle hover:text-primary font-label-md text-label-md transition-colors">
+<span>Maybe</span>
+<span class="px-1.5 py-0.2 rounded-full bg-surface-card text-zinc-subtle text-[10px] font-semibold leading-tight">4</span>
+</button>
+<button class="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-zinc-subtle hover:text-primary font-label-md text-label-md transition-colors">
+<span>Applied</span>
+<span class="px-1.5 py-0.2 rounded-full bg-surface-card text-zinc-subtle text-[10px] font-semibold leading-tight">5</span>
+</button>
+<button class="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-zinc-subtle hover:text-primary font-label-md text-label-md transition-colors">
+<span>Skipped</span>
+<span class="px-1.5 py-0.2 rounded-full bg-surface-card text-zinc-subtle text-[10px] font-semibold leading-tight">12</span>
+</button>
+<button class="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-zinc-subtle hover:text-primary font-label-md text-label-md transition-colors">
+<span>Needs Review</span>
+<span class="px-1.5 py-0.2 rounded-full bg-status-review/20 text-status-review text-[10px] font-semibold leading-tight">2</span>
+</button>
+</div>
+</section>
+<!-- INSET GROUPED LIST: QUEUE -->
+<section class="px-margin mb-space-lg">
+<div class="flex items-center justify-between mb-2">
+<span class="font-caption text-caption uppercase text-zinc-subtle tracking-wider font-semibold">Priority Application Pipeline</span>
+<span class="font-caption text-caption text-zinc-subtle">Auto-submits in 2h</span>
+</div>
+<div class="bg-surface-card rounded-2xl overflow-hidden divide-y divide-surface-container">
+<!-- ROW 1: Cloudflare -->
+<div class="p-space-md flex items-center justify-between hover:bg-surface-elevated/40 transition-colors cursor-pointer">
+<div class="flex items-center gap-3.5 min-w-0">
+<div class="w-11 h-11 rounded-xl bg-surface-elevated flex items-center justify-center shrink-0">
+<span class="font-headline-md text-headline-md text-primary font-bold tracking-tight">CF</span>
+</div>
+<div class="min-w-0">
+<div class="flex items-center gap-2">
+<h3 class="font-headline-md text-headline-md text-primary truncate">Cloudflare</h3>
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-status-warning/10 text-status-warning text-[10px] font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-status-warning"></span>
+                Queued
+              </span>
+</div>
+<p class="font-body-md text-body-md text-zinc-subtle truncate mt-0.5">Associate Data Scientist</p>
+<p class="font-caption text-caption text-zinc-subtle mt-0.5 truncate">Bengaluru · Greenhouse · ₹8–12 LPA</p>
+</div>
+</div>
+<div class="flex flex-col items-end shrink-0 pl-3">
+<div class="flex items-center gap-1 px-2 py-1 rounded-full bg-surface-elevated">
+<span class="w-1.5 h-1.5 rounded-full bg-status-success"></span>
+<span class="font-label-md text-label-md text-primary font-semibold">4.8</span>
+</div>
+<span class="font-caption text-caption text-zinc-subtle mt-1">Match</span>
+</div>
+</div>
+<!-- ROW 2: Zomato (INTERACTIVE SWIPE DEMO WITH VISIBLE ACTIONS) -->
+<div class="relative overflow-hidden bg-surface-container-lowest">
+<!-- Underlaid Swipe Action Buttons -->
+<div class="absolute inset-0 flex justify-between items-stretch">
+<div class="w-20 bg-status-success flex flex-col items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">check_circle</span>
+<span class="font-caption text-caption font-semibold mt-0.5">Approve</span>
+</div>
+<div class="w-20 bg-secondary-container flex flex-col items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">close</span>
+<span class="font-caption text-caption font-semibold mt-0.5">Skip</span>
+</div>
+</div>
+<!-- Shifted Row Content -->
+<div class="relative bg-surface-card p-space-md flex items-center justify-between translate-x-4 shadow-xl">
+<div class="flex items-center gap-3.5 min-w-0">
+<div class="w-11 h-11 rounded-xl bg-surface-elevated flex items-center justify-center shrink-0">
+<span class="font-headline-md text-headline-md text-primary font-bold tracking-tight">ZB</span>
+</div>
+<div class="min-w-0">
+<div class="flex items-center gap-2">
+<h3 class="font-headline-md text-headline-md text-primary truncate">Zomato</h3>
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-status-info/10 text-status-info text-[10px] font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-status-info"></span>
+                  Assist Draft
+                </span>
+</div>
+<p class="font-body-md text-body-md text-zinc-subtle truncate mt-0.5">ML Engineer, New Grad</p>
+<p class="font-caption text-caption text-zinc-subtle mt-0.5 truncate">Gurugram / Remote · Lever · ₹10–14 LPA</p>
+</div>
+</div>
+<div class="flex flex-col items-end shrink-0 pl-3">
+<div class="flex items-center gap-1 px-2 py-1 rounded-full bg-surface-elevated">
+<span class="w-1.5 h-1.5 rounded-full bg-status-success"></span>
+<span class="font-label-md text-label-md text-primary font-semibold">4.6</span>
+</div>
+<span class="font-caption text-caption text-zinc-subtle mt-1">Match</span>
+</div>
+</div>
+</div>
+<!-- ROW 3: Rippling -->
+<div class="p-space-md flex items-center justify-between hover:bg-surface-elevated/40 transition-colors cursor-pointer">
+<div class="flex items-center gap-3.5 min-w-0">
+<div class="w-11 h-11 rounded-xl bg-surface-elevated flex items-center justify-center shrink-0">
+<span class="font-headline-md text-headline-md text-primary font-bold tracking-tight">RD</span>
+</div>
+<div class="min-w-0">
+<div class="flex items-center gap-2">
+<h3 class="font-headline-md text-headline-md text-primary truncate">Rippling</h3>
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-status-review/10 text-status-review text-[10px] font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-status-review"></span>
+                Needs Review
+              </span>
+</div>
+<p class="font-body-md text-body-md text-zinc-subtle truncate mt-0.5">Python Developer</p>
+<p class="font-caption text-caption text-zinc-subtle mt-0.5 truncate">Bengaluru · Ashby · ₹9–13 LPA</p>
+</div>
+</div>
+<div class="flex flex-col items-end shrink-0 pl-3">
+<div class="flex items-center gap-1 px-2 py-1 rounded-full bg-surface-elevated">
+<span class="w-1.5 h-1.5 rounded-full bg-status-success"></span>
+<span class="font-label-md text-label-md text-primary font-semibold">4.5</span>
+</div>
+<span class="font-caption text-caption text-zinc-subtle mt-1">Match</span>
+</div>
+</div>
+<!-- ROW 4: Swiggy -->
+<div class="p-space-md flex items-center justify-between hover:bg-surface-elevated/40 transition-colors cursor-pointer">
+<div class="flex items-center gap-3.5 min-w-0">
+<div class="w-11 h-11 rounded-xl bg-surface-elevated flex items-center justify-center shrink-0">
+<span class="font-headline-md text-headline-md text-primary font-bold tracking-tight">SW</span>
+</div>
+<div class="min-w-0">
+<div class="flex items-center gap-2">
+<h3 class="font-headline-md text-headline-md text-primary truncate">Swiggy</h3>
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-status-success/10 text-status-success text-[10px] font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-status-success"></span>
+                Submitted
+              </span>
+</div>
+<p class="font-body-md text-body-md text-zinc-subtle truncate mt-0.5">Data Analyst</p>
+<p class="font-caption text-caption text-zinc-subtle mt-0.5 truncate">Bengaluru · Greenhouse · ₹8–11 LPA</p>
+</div>
+</div>
+<div class="flex flex-col items-end shrink-0 pl-3">
+<div class="flex items-center gap-1 px-2 py-1 rounded-full bg-surface-elevated">
+<span class="w-1.5 h-1.5 rounded-full bg-status-success"></span>
+<span class="font-label-md text-label-md text-primary font-semibold">4.2</span>
+</div>
+<span class="font-caption text-caption text-zinc-subtle mt-1">Match</span>
+</div>
+</div>
+</div>
+</section>
+<!-- MAYBE TRIAGE DECK PREVIEW -->
+<section class="px-margin mb-space-lg">
+<div class="flex items-center justify-between mb-2">
+<div class="flex items-center gap-1.5">
+<span class="font-caption text-caption uppercase text-zinc-subtle tracking-wider font-semibold">Maybe Triage Deck</span>
+<span class="px-1.5 py-0.2 rounded-full bg-surface-elevated text-primary text-[10px] font-bold">4 cards</span>
+</div>
+<span class="font-caption text-caption text-zinc-subtle">Quick decisions</span>
+</div>
+<!-- Stack Container -->
+<div class="relative w-full pt-2 pb-1">
+<!-- Backing Card 2 (Bottom depth) -->
+<div class="absolute inset-x-5 top-0 h-44 rounded-2xl bg-surface-container-lowest opacity-40 transform scale-90"></div>
+<!-- Backing Card 1 (Mid depth) -->
+<div class="absolute inset-x-3 top-1 h-44 rounded-2xl bg-surface-container-low opacity-70 transform scale-95"></div>
+<!-- Active Interactive Top Card -->
+<div class="relative bg-surface-card rounded-2xl p-space-md transition-transform duration-300" id="deckCard">
+<!-- Top card row -->
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-surface-elevated flex items-center justify-center shrink-0">
+<span class="font-headline-md text-headline-md text-primary font-bold">FR</span>
+</div>
+<div>
+<h4 class="font-headline-md text-headline-md text-primary leading-tight font-semibold">Fractal Analytics</h4>
+<p class="font-caption text-caption text-zinc-subtle">Bengaluru · ₹8–10 LPA</p>
+</div>
+</div>
+<div class="flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-elevated">
+<span class="w-1.5 h-1.5 rounded-full bg-status-success"></span>
+<span class="font-label-md text-label-md text-primary font-semibold">4.4</span>
+</div>
+</div>
+<!-- Role & Match requirement notes -->
+<div class="mt-3">
+<p class="font-body-md text-body-md text-primary font-medium">Junior Data Scientist (NLP)</p>
+<p class="font-label-md text-label-md text-zinc-subtle mt-1">Requires 0-1 yrs exp · Python, SQL, Transformers</p>
+</div>
+<!-- Gesture Hint Badges -->
+<div class="mt-3.5 flex items-center justify-between text-caption font-caption">
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-secondary-container/40 text-on-secondary-container">
+<span class="material-symbols-outlined text-[13px]">arrow_back</span>
+            Swipe left to Dismiss
+          </span>
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-status-success/15 text-status-success font-medium">
+            Swipe right to Queue
+            <span class="material-symbols-outlined text-[13px]">arrow_forward</span>
+</span>
+</div>
+<!-- Quick Tap Action Controls -->
+<div class="mt-4 pt-3 border-t border-surface-container flex items-center justify-around">
+<button class="flex items-center gap-1.5 px-4 py-2 rounded-full bg-surface-elevated text-on-surface hover:text-status-error hover:bg-status-error/10 transition-colors" id="dismissCardBtn" type="button">
+<span class="material-symbols-outlined text-[18px]">close</span>
+<span class="font-label-md text-label-md font-medium">Dismiss</span>
+</button>
+<button class="flex items-center gap-1.5 px-5 py-2 rounded-full bg-primary text-on-primary font-label-md text-label-md font-semibold hover:bg-silver-track transition-colors shadow-sm" id="queueCardBtn" type="button">
+<span class="material-symbols-outlined text-[18px]">playlist_add_check</span>
+<span>Move to Queue</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<!-- LOADING SKELETON STATE PREVIEW -->
+<section class="px-margin mb-space-lg">
+<div class="flex items-center justify-between mb-2">
+<span class="font-caption text-caption uppercase text-zinc-subtle tracking-wider font-semibold">Live Scraper Sync State</span>
+<span class="font-caption text-caption text-zinc-subtle flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-status-info animate-ping"></span>
+        Parsing ATS
+      </span>
+</div>
+<div class="bg-surface-card rounded-2xl p-space-md space-y-4">
+<!-- Skeleton Row 1 -->
+<div class="flex items-center justify-between animate-pulse">
+<div class="flex items-center gap-3 w-3/4">
+<div class="w-11 h-11 rounded-xl bg-surface-elevated shrink-0"></div>
+<div class="w-full space-y-2">
+<div class="h-3.5 bg-surface-elevated rounded-md w-28"></div>
+<div class="h-3 bg-surface-elevated rounded-md w-40"></div>
+<div class="h-2.5 bg-surface-elevated rounded-md w-32"></div>
+</div>
+</div>
+<div class="w-10 h-6 bg-surface-elevated rounded-full"></div>
+</div>
+<!-- Skeleton Row 2 -->
+<div class="flex items-center justify-between animate-pulse pt-2 border-t border-surface-container">
+<div class="flex items-center gap-3 w-2/3">
+<div class="w-11 h-11 rounded-xl bg-surface-elevated shrink-0"></div>
+<div class="w-full space-y-2">
+<div class="h-3.5 bg-surface-elevated rounded-md w-32"></div>
+<div class="h-3 bg-surface-elevated rounded-md w-44"></div>
+<div class="h-2.5 bg-surface-elevated rounded-md w-24"></div>
+</div>
+</div>
+<div class="w-10 h-6 bg-surface-elevated rounded-full"></div>
+</div>
+</div>
+</section>
+<!-- EMPTY FILTER STATE PREVIEW -->
+<section class="px-margin">
+<div class="bg-surface-card rounded-2xl p-space-xl flex flex-col items-center text-center">
+<div class="w-12 h-12 rounded-full bg-surface-elevated flex items-center justify-center mb-3">
+<span class="material-symbols-outlined text-zinc-subtle text-[24px]">folder_off</span>
+</div>
+<h4 class="font-headline-md text-headline-md text-primary font-semibold">Nothing here yet</h4>
+<p class="font-body-md text-body-md text-zinc-subtle max-w-xs mt-1">
+        No jobs match your current filters. Clear filters or trigger a fresh autonomous scrape.
+      </p>
+<div class="mt-4 flex items-center gap-2">
+<button class="px-3.5 py-1.5 rounded-full bg-surface-elevated text-primary font-label-md text-label-md hover:bg-surface-container-high transition-colors">
+          Reset Filters
+        </button>
+<button class="px-3.5 py-1.5 rounded-full bg-primary text-on-primary font-label-md text-label-md font-semibold hover:bg-silver-track transition-colors">
+          Scrape Now
+        </button>
+</div>
+</div>
+</section>
+</div>
+<script>
+  // Simple micro-interactions for search and card actions
+  const searchInput = document.getElementById('jobSearchInput');
+  const clearBtn = document.getElementById('clearSearchBtn');
+  const deckCard = document.getElementById('deckCard');
+  const dismissBtn = document.getElementById('dismissCardBtn');
+  const queueBtn = document.getElementById('queueCardBtn');
+
+  if (clearBtn && searchInput) {
+    clearBtn.addEventListener('click', () => {
+      searchInput.value = '';
+      searchInput.focus();
+    });
+  }
+
+  if (dismissBtn && deckCard) {
+    dismissBtn.addEventListener('click', () => {
+      deckCard.style.transform = 'translateX(-120%) rotate(-8deg)';
+      deckCard.style.opacity = '0';
+      setTimeout(() => {
+        deckCard.style.transform = 'translateX(0) rotate(0)';
+        deckCard.style.opacity = '1';
+      }, 700);
+    });
+  }
+
+  if (queueBtn && deckCard) {
+    queueBtn.addEventListener('click', () => {
+      deckCard.style.transform = 'translateX(120%) rotate(8deg)';
+      deckCard.style.opacity = '0';
+      setTimeout(() => {
+        deckCard.style.transform = 'translateX(0) rotate(0)';
+        deckCard.style.opacity = '1';
+      }, 700);
+    });
+  }
+</script></main>
+</div>
+
+<div id="tab-answers" class="tab-pane hidden" data-tab="answers">
+<div class="w-full min-h-screen bg-[#131313] text-white flex justify-center selection:bg-[#38383A]"><div class="w-full max-w-[393px] min-h-[852px] bg-[#131313] flex flex-col relative pb-28 antialiased"><main class="flex-1 px-5 pt-5 space-y-6"><section class="space-y-2"><h2 class="text-[13px] font-semibold text-[#8E8E93] tracking-wide uppercase px-1">Education</h2><div class="bg-[#1C1C1E] border border-[#38383A] rounded-2xl overflow-hidden divide-y divide-[#38383A]"><div class="p-4 space-y-1.5"><div class="flex items-start justify-between gap-3"><h3 class="text-[15px] font-semibold text-white leading-snug">Degree &amp; University</h3><span class="shrink-0 text-[12px] font-medium text-[#8E8E93] bg-[#2C2C2E] px-2 py-0.5 rounded-md">Always use</span></div><p class="text-[14px] text-[#8E8E93] leading-relaxed">MTech Integrated CSE (Data Science), Vellore Institute of Technology (VIT), CGPA 7.62/10</p></div></div></section><section class="space-y-2"><h2 class="text-[13px] font-semibold text-[#8E8E93] tracking-wide uppercase px-1">Patents</h2><div class="bg-[#1C1C1E] border border-[#38383A] rounded-2xl overflow-hidden divide-y divide-[#38383A]"><div class="p-4 space-y-1.5"><div class="flex items-start justify-between gap-3"><div class="flex items-center gap-2"><h3 class="text-[15px] font-semibold text-white leading-snug">A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver</h3></div><div class="flex items-center gap-1.5 shrink-0"><span class="text-[12px] font-medium text-[#30D158] bg-[#30D158]/15 px-2 py-0.5 rounded-md">Published</span><span class="text-[12px] font-medium text-[#8E8E93] bg-[#2C2C2E] px-2 py-0.5 rounded-md">Always use</span></div></div></div><div class="relative overflow-hidden bg-[#2C2C2E]"><div class="absolute inset-y-0 right-0 flex items-stretch z-0"><button aria-label="Edit patent" type="button" class="w-16 bg-[#38383A] text-white flex flex-col items-center justify-center gap-1 text-[12px] font-medium active:opacity-80"><span class="material-symbols-outlined text-[18px]">edit</span>Edit</button><button aria-label="Delete patent" type="button" class="w-16 bg-[#E0674F] text-white flex flex-col items-center justify-center gap-1 text-[12px] font-medium active:opacity-80"><span class="material-symbols-outlined text-[18px]">delete</span>Delete</button></div><div class="relative z-10 bg-[#1C1C1E] p-4 flex flex-col space-y-1.5 transform -translate-x-32 transition-transform duration-280"><div class="flex items-start justify-between gap-3"><h3 class="text-[15px] font-semibold text-white leading-snug">Acoustic Doppler Session Guard</h3><div class="flex items-center gap-1.5 shrink-0"><span class="text-[12px] font-medium text-[#30D158] bg-[#30D158]/15 px-2 py-0.5 rounded-md">Published</span><span class="text-[12px] font-medium text-[#8E8E93] bg-[#2C2C2E] px-2 py-0.5 rounded-md">Always use</span></div></div><div class="flex items-center gap-1 text-[12px] text-[#8E8E93] pt-0.5"><span class="material-symbols-outlined text-[14px]">swipe_left</span><span>Swiped to reveal actions</span></div></div></div></div></section><section class="space-y-2"><h2 class="text-[13px] font-semibold text-[#8E8E93] tracking-wide uppercase px-1">Links</h2><div class="bg-[#1C1C1E] border border-[#38383A] rounded-2xl overflow-hidden divide-y divide-[#38383A]"><div class="p-4 flex items-center justify-between gap-3"><div class="space-y-0.5"><div class="text-[15px] font-semibold text-white">GitHub</div><div class="text-[13px] text-[#8E8E93] break-all">https://github.com/Adharsh-Arvinth</div></div><span class="shrink-0 text-[12px] font-medium text-[#8E8E93] bg-[#2C2C2E] px-2 py-0.5 rounded-md">Always use</span></div><div class="p-4 flex items-center justify-between gap-3"><div class="space-y-0.5"><div class="text-[15px] font-semibold text-white">LinkedIn</div><div class="text-[13px] text-[#8E8E93] break-all">https://linkedin.com/in/Adharsh-Arvinth</div></div><span class="shrink-0 text-[12px] font-medium text-[#8E8E93] bg-[#2C2C2E] px-2 py-0.5 rounded-md">Always use</span></div></div></section><section class="space-y-2"><h2 class="text-[13px] font-semibold text-[#8E8E93] tracking-wide uppercase px-1">Application Rules</h2><div class="bg-[#1C1C1E] border border-[#38383A] rounded-2xl overflow-hidden divide-y divide-[#38383A]"><div class="p-4 flex items-center justify-between gap-3"><div><div class="text-[15px] font-semibold text-white">Minimum Pay</div><div class="text-[14px] text-[#8E8E93] tabular-nums">₹7,00,000</div></div><span class="shrink-0 text-[12px] font-medium text-[#8E8E93] bg-[#2C2C2E] px-2 py-0.5 rounded-md">Always use</span></div><div class="p-4 flex items-center justify-between gap-3"><div><div class="text-[15px] font-semibold text-white">Daily Cap</div><div class="text-[14px] text-[#8E8E93] tabular-nums">100 / day</div></div><span class="shrink-0 text-[12px] font-medium text-[#8E8E93] bg-[#2C2C2E] px-2 py-0.5 rounded-md">Always use</span></div></div></section><section class="space-y-2"><h2 class="text-[13px] font-semibold text-[#8E8E93] tracking-wide uppercase px-1">Unreviewed AI Draft</h2><div class="bg-[#1C1C1E] border border-[#38383A] rounded-2xl p-4 space-y-2"><div class="flex items-start justify-between gap-3"><h3 class="text-[15px] font-semibold text-white leading-snug">Experience with AST parsing and code embeddings?</h3><span class="shrink-0 text-[12px] font-medium text-[#8C70D1] bg-[#8C70D1]/15 px-2 py-0.5 rounded-md border border-[#8C70D1]/20">AI draft</span></div><p class="text-[14px] text-[#8E8E93] leading-relaxed">In my Agentic Code Intelligence research, I combined AST token analysis, BM25, and dense embeddings across 8,765 Python programs (25.59% NDCG@10).</p><div class="flex items-center gap-2 pt-2"><button type="button" class="flex-1 h-9 rounded-xl bg-[#2C2C2E] border border-[#38383A] text-white text-[13px] font-semibold active:scale-95 transition-transform flex items-center justify-center gap-1.5"><span class="material-symbols-outlined text-[16px]">edit</span>Edit draft</button><button type="button" class="flex-1 h-9 rounded-xl bg-white text-[#131313] text-[13px] font-semibold active:scale-95 transition-transform flex items-center justify-center gap-1.5"><span class="material-symbols-outlined text-[16px]">check</span>Approve</button></div></div></section><footer class="pt-4 pb-2 px-3"><p class="text-[12px] text-[#636366] text-center leading-normal">Motion Specs: 280 ms spring page transitions · swipe-revealed actions with spring release · action sheet transition · button press scale 0.97 with light haptic · reduced-motion fallback.</p></footer></main></div></div>
+</div>
+
+<div id="tab-profile" class="tab-pane hidden" data-tab="profile">
+<main class="flex-1 flex flex-col w-full pt-14 pb-20 bg-surface"><div class="flex flex-col w-full pb-12">
+<div class="px-margin pt-4 pb-2">
+<h2 class="font-headline-xl-mobile text-headline-xl-mobile text-primary tracking-tight">Profile</h2>
+</div>
+<div class="px-margin mb-6">
+<div class="bg-surface-card rounded-[18px] p-space-md shadow-sm">
+<div class="flex items-start gap-space-md">
+<div class="relative shrink-0">
+<div class="w-16 h-16 rounded-full bg-surface-elevated flex items-center justify-center text-primary font-headline-md text-headline-md tracking-wider">
+            AA
           </div>
-
-          <p class="text-[12px] text-zinc-300 leading-relaxed bg-surface-elevated/40 p-3 rounded-xl border border-hairline-separator/40">
-            "I consent to the collection and processing of my candidate data and autonomous ATS verification."
+<div class="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-status-success flex items-center justify-center text-surface-grouped shadow-sm">
+<span class="material-symbols-outlined text-[13px] font-bold" style="font-variation-settings: 'FILL' 1;">check</span>
+</div>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center gap-2">
+<h3 class="font-headline-md text-headline-md text-primary truncate">Adharsh Arvinth</h3>
+<span class="px-2 py-0.5 rounded-full bg-surface-elevated text-status-success font-caption text-caption uppercase tracking-wider font-medium shrink-0">
+              Verified
+            </span>
+</div>
+<p class="font-body-md text-body-md text-zinc-subtle mt-0.5 truncate">
+            MTech Integrated CSE · VIT Vellore
           </p>
-
-          <div class="flex items-center gap-2 pt-1">
-            <button onclick="alert('Consent confirmed for this application.')" class="flex-1 h-10 rounded-xl bg-white text-[#0F0F10] font-semibold text-xs flex items-center justify-center hover:bg-zinc-200 active:scale-95 transition-all">
-              Authorize Once
-            </button>
-            <button onclick="alert('Skipping this consent item.')" class="px-3 h-10 rounded-xl bg-surface-elevated text-zinc-subtle hover:text-white font-medium text-xs transition-colors">
-              Skip
-            </button>
-          </div>
-        </div>
-
-        <!-- Card 2: AI Drafted Answer (Rippling / Python AST) -->
-        <div class="bg-surface-card border border-hairline-separator rounded-2xl p-4 space-y-3 shadow-sm">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-1.5">
-              <span class="w-2 h-2 rounded-full bg-status-info"></span>
-              <span class="text-[12px] font-semibold text-white">AI Drafted · 94% Confidence</span>
-            </div>
-            <span class="text-[10px] text-zinc-subtle bg-surface-elevated px-2 py-0.5 rounded-full">Grounded</span>
-          </div>
-
-          <div>
-            <span class="text-[11px] text-zinc-subtle">Cloudflare · Associate Data Scientist</span>
-            <h4 class="text-[13px] font-semibold text-white mt-0.5">Describe your experience with multimodal models or accident prediction systems.</h4>
-          </div>
-
-          <div class="p-3 bg-surface-elevated rounded-xl border border-hairline-separator/50 text-[12px] text-zinc-200 leading-relaxed">
-            "Invented and granted Patent #202441052840: 'A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver' using camera streams, temporal fusion, and driver state signals at VIT Vellore."
-          </div>
-
-          <div class="flex items-center gap-1 text-[11px] text-zinc-subtle">
-            <span class="material-symbols-outlined text-[14px] text-status-success">verified</span>
-            <span>Source: Locked Patent Vault (#202441052840)</span>
-          </div>
-
-          <div class="flex items-center gap-2 pt-1">
-            <button onclick="approveAnswer(1)" class="flex-1 h-10 rounded-xl bg-white text-[#0F0F10] font-semibold text-xs flex items-center justify-center hover:bg-zinc-200 active:scale-95 transition-all">
-              Approve & Save to Bank
-            </button>
-            <button onclick="editAnswer(1)" class="px-4 h-10 rounded-xl bg-surface-elevated text-white font-medium text-xs hover:bg-surface-container transition-colors">
-              Edit
-            </button>
-          </div>
-        </div>
-      </div>
-
-    </section>
-
-    <!-- ======================================================== -->
-    <!-- TAB 2: JOBS (Pipeline & Discovery)                        -->
-    <!-- ======================================================== -->
-    <section id="tab-jobs" class="tab-view space-y-4">
-      
-      <!-- Top Title & Summary -->
-      <div class="flex items-baseline justify-between pt-1">
-        <div>
-          <span class="text-[11px] text-zinc-subtle uppercase tracking-wider font-semibold">Priority Application Pipeline</span>
-          <h2 class="font-serif-display text-[32px] text-white tracking-tight font-normal">Jobs</h2>
-        </div>
-        <div class="text-right">
-          <span class="font-serif-display text-[26px] text-white font-normal" id="jobs-tracked-count">378</span>
-          <p class="text-[11px] text-zinc-subtle">tracked</p>
-        </div>
-      </div>
-
-      <!-- Live Search Bar -->
-      <div class="relative flex items-center w-full h-11 px-3 bg-surface-card border border-hairline-separator rounded-xl">
-        <span class="material-symbols-outlined text-zinc-subtle text-[18px] mr-2">search</span>
-        <input oninput="filterJobs(this.value)" class="w-full bg-transparent text-white placeholder-zinc-subtle text-xs focus:outline-none" placeholder="Search company, title, or portal (e.g. Cloudflare, Lever)..." type="text" id="job-search-input"/>
-      </div>
-
-      <!-- Filter Chips -->
-      <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs select-none">
-        <button onclick="selectJobFilter('all')" class="job-chip px-3 py-1.5 rounded-full bg-white text-[#0F0F10] font-semibold shrink-0">All Portals</button>
-        <button onclick="selectJobFilter('greenhouse')" class="job-chip px-3 py-1.5 rounded-full bg-surface-card text-zinc-subtle hover:text-white border border-hairline-separator shrink-0">Greenhouse</button>
-        <button onclick="selectJobFilter('lever')" class="job-chip px-3 py-1.5 rounded-full bg-surface-card text-zinc-subtle hover:text-white border border-hairline-separator shrink-0">Lever</button>
-        <button onclick="selectJobFilter('ashby')" class="job-chip px-3 py-1.5 rounded-full bg-surface-card text-zinc-subtle hover:text-white border border-hairline-separator shrink-0">Ashby</button>
-        <button onclick="selectJobFilter('assist')" class="job-chip px-3 py-1.5 rounded-full bg-surface-card text-zinc-subtle hover:text-white border border-hairline-separator shrink-0">Assist-Only</button>
-      </div>
-
-      <!-- Segmented Status Tabs -->
-      <div class="bg-surface-container-low p-1 rounded-xl flex items-center gap-1 overflow-x-auto">
-        <button class="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-surface-elevated text-white font-semibold text-xs shadow-sm">
-          <span>Queue</span>
-          <span class="px-1.5 py-0.2 rounded-full bg-white text-[#0F0F10] text-[10px] font-bold">4</span>
-        </button>
-        <button class="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-zinc-subtle hover:text-white text-xs">
-          <span>Maybe</span>
-          <span class="px-1.5 py-0.2 rounded-full bg-surface-card text-zinc-subtle text-[10px]">14</span>
-        </button>
-        <button class="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-zinc-subtle hover:text-white text-xs">
-          <span>Applied</span>
-          <span class="px-1.5 py-0.2 rounded-full bg-surface-card text-zinc-subtle text-[10px]">5</span>
-        </button>
-        <button class="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-zinc-subtle hover:text-white text-xs">
-          <span>Skipped</span>
-          <span class="px-1.5 py-0.2 rounded-full bg-surface-card text-zinc-subtle text-[10px]">294</span>
-        </button>
-      </div>
-
-      <!-- Grouped Job Cards List -->
-      <div class="bg-surface-card border border-hairline-separator rounded-2xl overflow-hidden divide-y divide-hairline-separator/50" id="jobs-cards-container">
-        <!-- Job 1 -->
-        <div onclick="openJobDetail('Cloudflare', 'Associate Data Scientist', 'Greenhouse', '₹14-18 LPA', 'Bengaluru / Remote', '98%')" class="p-4 flex items-center justify-between hover:bg-surface-elevated/50 transition-colors cursor-pointer">
-          <div class="flex items-center gap-3 min-w-0">
-            <div class="w-11 h-11 rounded-xl bg-surface-elevated flex items-center justify-center font-bold text-sm text-white shrink-0">CF</div>
-            <div class="min-w-0">
-              <div class="flex items-center gap-2">
-                <h3 class="text-[13px] font-semibold text-white truncate">Cloudflare</h3>
-                <span class="px-1.5 py-0.5 rounded-full bg-status-warning/10 text-status-warning text-[10px] font-medium">Queued</span>
-              </div>
-              <p class="text-[11px] text-zinc-subtle truncate mt-0.5">Associate Data Scientist · Bengaluru / Remote</p>
-              <div class="flex items-center gap-2 mt-1">
-                <span class="text-[10px] text-status-success font-medium">₹14 - ₹18 LPA</span>
-                <span class="text-[10px] text-zinc-subtle">• Greenhouse ATS</span>
-              </div>
-            </div>
-          </div>
-          <span class="material-symbols-outlined text-zinc-subtle text-[20px]">chevron_right</span>
-        </div>
-
-        <!-- Job 2 -->
-        <div onclick="openJobDetail('Palantir', 'Forward Deployed Software Engineer', 'Lever', '₹20-30 LPA', 'Bengaluru', '95%')" class="p-4 flex items-center justify-between hover:bg-surface-elevated/50 transition-colors cursor-pointer">
-          <div class="flex items-center gap-3 min-w-0">
-            <div class="w-11 h-11 rounded-xl bg-surface-elevated flex items-center justify-center font-bold text-sm text-white shrink-0">PL</div>
-            <div class="min-w-0">
-              <div class="flex items-center gap-2">
-                <h3 class="text-[13px] font-semibold text-white truncate">Palantir Technologies</h3>
-                <span class="px-1.5 py-0.5 rounded-full bg-status-info/10 text-status-info text-[10px] font-medium">Evaluating</span>
-              </div>
-              <p class="text-[11px] text-zinc-subtle truncate mt-0.5">Forward Deployed Software Engineer · Bengaluru</p>
-              <div class="flex items-center gap-2 mt-1">
-                <span class="text-[10px] text-status-success font-medium">₹20 - ₹30 LPA</span>
-                <span class="text-[10px] text-zinc-subtle">• Lever ATS</span>
-              </div>
-            </div>
-          </div>
-          <span class="material-symbols-outlined text-zinc-subtle text-[20px]">chevron_right</span>
-        </div>
-
-        <!-- Job 3 -->
-        <div onclick="openJobDetail('GitLab', 'Junior Backend Engineer', 'Greenhouse', '₹16-22 LPA', 'Remote India', '92%')" class="p-4 flex items-center justify-between hover:bg-surface-elevated/50 transition-colors cursor-pointer">
-          <div class="flex items-center gap-3 min-w-0">
-            <div class="w-11 h-11 rounded-xl bg-surface-elevated flex items-center justify-center font-bold text-sm text-white shrink-0">GL</div>
-            <div class="min-w-0">
-              <div class="flex items-center gap-2">
-                <h3 class="text-[13px] font-semibold text-white truncate">GitLab</h3>
-                <span class="px-1.5 py-0.5 rounded-full bg-status-success/10 text-status-success text-[10px] font-medium">Applied Dry-Run</span>
-              </div>
-              <p class="text-[11px] text-zinc-subtle truncate mt-0.5">Junior Backend Engineer · Remote (India)</p>
-              <div class="flex items-center gap-2 mt-1">
-                <span class="text-[10px] text-status-success font-medium">₹16 - ₹22 LPA</span>
-                <span class="text-[10px] text-zinc-subtle">• Greenhouse ATS</span>
-              </div>
-            </div>
-          </div>
-          <span class="material-symbols-outlined text-zinc-subtle text-[20px]">chevron_right</span>
-        </div>
-      </div>
-
-    </section>
-
-    <!-- ======================================================== -->
-    <!-- TAB 3: ANSWERS (Grounded Answer Bank)                     -->
-    <!-- ======================================================== -->
-    <section id="tab-answers" class="tab-view space-y-4">
-      
-      <div class="flex items-baseline justify-between pt-1">
-        <div>
-          <span class="text-[11px] text-zinc-subtle uppercase tracking-wider font-semibold">100% Grounded Facts</span>
-          <h2 class="font-serif-display text-[32px] text-white tracking-tight font-normal">Answer Bank</h2>
-        </div>
-        <button onclick="alert('Add Grounded Fact modal')" class="px-3 py-1 rounded-xl bg-surface-elevated text-white hover:bg-surface-container font-semibold text-xs flex items-center gap-1 transition-colors">
-          <span class="material-symbols-outlined text-[15px]">add</span>
-          <span>New Fact</span>
-        </button>
-      </div>
-
-      <!-- Categories from Stitch answers/code.html -->
-      <div class="space-y-4">
-        <!-- Section: Education -->
-        <div class="space-y-2">
-          <h3 class="text-[12px] font-semibold text-zinc-subtle uppercase tracking-wide px-1">Education</h3>
-          <div class="bg-surface-card border border-hairline-separator rounded-2xl p-4 space-y-1.5 shadow-sm">
-            <div class="flex items-center justify-between">
-              <span class="text-[13px] font-semibold text-white">Vellore Institute of Technology (VIT)</span>
-              <span class="px-2 py-0.5 rounded-full bg-status-success/10 text-status-success text-[10px] font-medium">Verified</span>
-            </div>
-            <p class="text-[12px] text-zinc-300">Integrated MTech in Computer Science and Engineering (Data Science)</p>
-            <div class="flex items-center gap-2 text-[11px] text-zinc-subtle pt-1">
-              <span>CGPA: <strong class="text-white">7.62 / 10</strong></span>
-              <span>•</span>
-              <span>Graduation: <strong class="text-white">May 2026</strong></span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Section: Patents -->
-        <div class="space-y-2">
-          <h3 class="text-[12px] font-semibold text-zinc-subtle uppercase tracking-wide px-1">Patents</h3>
-          <div class="bg-surface-card border border-hairline-separator rounded-2xl overflow-hidden divide-y divide-hairline-separator/50 shadow-sm">
-            <div class="p-4 space-y-1.5">
-              <div class="flex items-start justify-between">
-                <span class="text-[13px] font-semibold text-white">Patent #202441052840 (Granted)</span>
-                <span class="px-2 py-0.5 rounded-full bg-status-success/10 text-status-success text-[10px] font-semibold">Granted</span>
-              </div>
-              <p class="text-[12px] text-zinc-300">A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver</p>
-            </div>
-            <div class="p-4 space-y-1.5">
-              <div class="flex items-start justify-between">
-                <span class="text-[13px] font-semibold text-white">Patent #202441066601 (Published)</span>
-                <span class="px-2 py-0.5 rounded-full bg-status-info/10 text-status-info text-[10px] font-semibold">Published</span>
-              </div>
-              <p class="text-[12px] text-zinc-300">Acoustic Doppler Session Guard</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Section: Work Authorization -->
-        <div class="space-y-2">
-          <h3 class="text-[12px] font-semibold text-zinc-subtle uppercase tracking-wide px-1">Work Authorization</h3>
-          <div class="bg-surface-card border border-hairline-separator rounded-2xl p-4 space-y-2 shadow-sm">
-            <div class="flex items-center justify-between">
-              <span class="text-[12px] text-zinc-300">Legally authorized to work in India</span>
-              <span class="text-[11px] text-status-success font-semibold">Yes</span>
-            </div>
-            <div class="flex items-center justify-between">
-              <span class="text-[12px] text-zinc-300">Requires visa sponsorship now or in future</span>
-              <span class="text-[11px] text-zinc-subtle font-semibold">No</span>
-            </div>
-            <div class="flex items-center justify-between">
-              <span class="text-[12px] text-zinc-300">Notice Period</span>
-              <span class="text-[11px] text-white font-semibold">Immediate / Fresher</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-    </section>
-
-    <!-- ======================================================== -->
-    <!-- TAB 4: PROFILE (Candidate & Safety Controls)              -->
-    <!-- ======================================================== -->
-    <section id="tab-profile" class="tab-view space-y-4">
-      
-      <div class="flex items-baseline justify-between pt-1">
-        <h2 class="font-serif-display text-[32px] text-white tracking-tight font-normal">Profile & Safety</h2>
-        <span class="text-[11px] text-status-success bg-status-success/10 px-2.5 py-0.5 rounded-full font-medium">Grounded Vault</span>
-      </div>
-
-      <!-- Candidate Header Card -->
-      <div class="bg-surface-card border border-hairline-separator rounded-2xl p-4 shadow-sm">
-        <div class="flex items-start gap-4">
-          <div class="relative shrink-0">
-            <div class="w-16 h-16 rounded-full bg-surface-elevated flex items-center justify-center text-white font-serif-display text-xl">
-              AA
-            </div>
-            <div class="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-status-success flex items-center justify-center text-[#0F0F10] shadow-sm">
-              <span class="material-symbols-outlined text-[13px] font-bold">check</span>
-            </div>
-          </div>
-
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2">
-              <h3 class="text-[16px] font-semibold text-white truncate" id="profile-full-name">Adharsh Arvinth</h3>
-              <span class="px-2 py-0.5 rounded-full bg-surface-elevated text-status-success text-[10px] font-semibold">Verified</span>
-            </div>
-            <p class="text-[12px] text-zinc-subtle mt-0.5" id="profile-headline">MTech Integrated CSE · VIT Vellore</p>
-            
-            <div class="flex items-center gap-2 mt-3 overflow-x-auto">
-              <a href="mailto:adharsharvinth2108@gmail.com" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-elevated text-zinc-200 text-[11px] hover:bg-surface-container transition-colors">
-                <span class="material-symbols-outlined text-[13px]">mail</span>
-                <span>Email</span>
-              </a>
-              <a href="https://github.com/Adharsh-Arvinth" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-elevated text-zinc-200 text-[11px] hover:bg-surface-container transition-colors">
-                <span class="material-symbols-outlined text-[13px]">code</span>
-                <span>GitHub</span>
-              </a>
-              <a href="https://linkedin.com" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-elevated text-zinc-200 text-[11px] hover:bg-surface-container transition-colors">
-                <span class="material-symbols-outlined text-[13px]">link</span>
-                <span>LinkedIn</span>
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Autonomous Go-Live Safety Switch -->
-      <div class="bg-surface-card border border-hairline-separator rounded-2xl p-4 shadow-sm space-y-3">
-        <div class="flex items-center justify-between">
-          <div>
-            <div class="flex items-center gap-2">
-              <span class="material-symbols-outlined text-amber-gold text-[18px]">security</span>
-              <h4 class="text-[13px] font-semibold text-white">Autonomous Go-Live Submission</h4>
-            </div>
-            <p class="text-[11px] text-zinc-subtle mt-0.5">When OFF, the engine performs complete dry-runs without pressing final submit.</p>
-          </div>
-
-          <!-- Switch Toggle Button -->
-          <button onclick="toggleGoLive()" id="btn-golive-toggle" class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-surface-elevated transition-colors duration-200 ease-in-out focus:outline-none">
-            <span id="golive-toggle-knob" class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out translate-x-0"></span>
-          </button>
-        </div>
-
-        <div class="flex items-center justify-between pt-2 border-t border-hairline-separator/50 text-[11px] text-zinc-subtle">
-          <span>Current Mode</span>
-          <span class="font-semibold text-status-warning" id="golive-status-text">SAFE DRY-RUN ONLY</span>
-        </div>
-      </div>
-
-      <!-- Safety Rails & Breaker Settings -->
-      <div class="bg-surface-card border border-hairline-separator rounded-2xl p-4 shadow-sm space-y-3">
-        <div class="flex items-center justify-between">
-          <span class="text-[13px] font-semibold text-white">Safety Rails & Architecture</span>
-          <span class="text-[11px] text-status-success font-medium">All Enforced</span>
-        </div>
-
-        <div class="space-y-2 text-[12px] text-zinc-300">
-          <div class="flex items-center justify-between py-1 border-b border-hairline-separator/40">
-            <span>Gemini Circuit Breaker</span>
-            <span class="text-white font-medium">3 Failures (Never pauses queue)</span>
-          </div>
-          <div class="flex items-center justify-between py-1 border-b border-hairline-separator/40">
-            <span>30-Day Portal Cooldown</span>
-            <span class="text-status-success font-medium">Active (Bypass via Override)</span>
-          </div>
-          <div class="flex items-center justify-between py-1 border-b border-hairline-separator/40">
-            <span>Network Host Binding</span>
-            <span class="text-white font-medium">Localhost + Tailscale (100.64.0.0/10)</span>
-          </div>
-          <div class="flex items-center justify-between py-1">
-            <span>Zero-Consent Checkboxes</span>
-            <span class="text-status-success font-medium">Strict (Requires Human Triage)</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Raw Stitch Design System Preview Link -->
-      <div class="bg-surface-card border border-hairline-separator rounded-2xl p-4 shadow-sm">
-        <h4 class="text-[13px] font-semibold text-white mb-2">Google Stitch Raw Views</h4>
-        <div class="grid grid-cols-2 gap-2 text-xs">
-          <a href="/app/stitch/today_warm_editorial_cockpit/code.html" target="_blank" class="p-2 rounded-xl bg-surface-elevated text-zinc-300 hover:text-white flex items-center gap-1.5 transition-colors">
-            <span class="material-symbols-outlined text-[14px]">open_in_new</span>
-            <span>Warm Editorial</span>
-          </a>
-          <a href="/app/stitch/needs_you_1/code.html" target="_blank" class="p-2 rounded-xl bg-surface-elevated text-zinc-300 hover:text-white flex items-center gap-1.5 transition-colors">
-            <span class="material-symbols-outlined text-[14px]">open_in_new</span>
-            <span>Needs You (Light)</span>
-          </a>
-          <a href="/app/stitch/needs_you_2/code.html" target="_blank" class="p-2 rounded-xl bg-surface-elevated text-zinc-300 hover:text-white flex items-center gap-1.5 transition-colors">
-            <span class="material-symbols-outlined text-[14px]">open_in_new</span>
-            <span>Needs You (Dark)</span>
-          </a>
-          <a href="/app/stitch/jobs_1/code.html" target="_blank" class="p-2 rounded-xl bg-surface-elevated text-zinc-300 hover:text-white flex items-center gap-1.5 transition-colors">
-            <span class="material-symbols-outlined text-[14px]">open_in_new</span>
-            <span>Jobs Pipeline</span>
-          </a>
-          <a href="/app/stitch/answers/code.html" target="_blank" class="p-2 rounded-xl bg-surface-elevated text-zinc-300 hover:text-white flex items-center gap-1.5 transition-colors">
-            <span class="material-symbols-outlined text-[14px]">open_in_new</span>
-            <span>Answers Bank</span>
-          </a>
-          <a href="/app/stitch/job_detail/code.html" target="_blank" class="p-2 rounded-xl bg-surface-elevated text-zinc-300 hover:text-white flex items-center gap-1.5 transition-colors">
-            <span class="material-symbols-outlined text-[14px]">open_in_new</span>
-            <span>Job Detail Sheet</span>
-          </a>
-        </div>
-      </div>
-
-    </section>
-
-  </main>
-
-  <!-- JOB DETAIL BOTTOM SHEET MODAL -->
-  <div id="job-detail-sheet" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex-col justify-end">
-    <div class="bg-[#18181A] border-t border-hairline-separator rounded-t-3xl max-h-[85vh] overflow-y-auto p-5 space-y-4 max-w-xl mx-auto w-full shadow-2xl">
-      <!-- Drag handle -->
-      <div class="w-12 h-1 bg-surface-container rounded-full mx-auto cursor-pointer" onclick="closeJobDetail()"></div>
-
-      <div class="flex items-start justify-between">
-        <div>
-          <span class="text-[11px] text-zinc-subtle uppercase tracking-wider font-semibold" id="sheet-company">Cloudflare</span>
-          <h3 class="font-serif-display text-[22px] text-white" id="sheet-title">Associate Data Scientist</h3>
-        </div>
-        <button onclick="closeJobDetail()" class="w-8 h-8 rounded-full bg-surface-elevated flex items-center justify-center text-zinc-subtle hover:text-white transition-colors">
-          <span class="material-symbols-outlined text-[16px]">close</span>
-        </button>
-      </div>
-
-      <div class="flex items-center gap-2 text-xs">
-        <span class="px-2.5 py-1 rounded-full bg-status-success/15 text-status-success font-semibold" id="sheet-salary">₹14 - ₹18 LPA</span>
-        <span class="px-2.5 py-1 rounded-full bg-surface-elevated text-zinc-300" id="sheet-portal">Greenhouse</span>
-        <span class="px-2.5 py-1 rounded-full bg-surface-elevated text-zinc-300" id="sheet-location">Bengaluru / Remote</span>
-      </div>
-
-      <div class="p-4 bg-surface-elevated rounded-2xl border border-hairline-separator/50 space-y-2">
-        <h4 class="text-[12px] font-semibold text-white">Grounded Resume Tailoring</h4>
-        <p class="text-[11px] text-zinc-300 leading-relaxed">
-          Tailored strictly to candidate facts: VIT Vellore Integrated MTech, CGPA 7.62, Accident Predictor Patent #202441052840, BM25 Code Benchmark. Zero hallucinations.
+<div class="flex items-center gap-2 mt-3 overflow-x-auto pb-0.5">
+<a class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-elevated text-silver-track font-caption text-caption hover:bg-surface-variant transition-colors shrink-0" href="mailto:adharsharvinth2108@gmail.com">
+<span class="material-symbols-outlined text-[14px] text-zinc-subtle">mail</span>
+<span>Email</span>
+</a>
+<a class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-elevated text-silver-track font-caption text-caption hover:bg-surface-variant transition-colors shrink-0" href="https://github.com" target="_blank">
+<span class="material-symbols-outlined text-[14px] text-zinc-subtle">code</span>
+<span>GitHub</span>
+</a>
+<a class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-elevated text-silver-track font-caption text-caption hover:bg-surface-variant transition-colors shrink-0" href="https://linkedin.com" target="_blank">
+<span class="material-symbols-outlined text-[14px] text-zinc-subtle">link</span>
+<span>LinkedIn</span>
+</a>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="px-margin mb-6">
+<div class="flex items-center gap-1.5 px-1 pb-2">
+<span class="material-symbols-outlined text-zinc-subtle text-[16px]">lock</span>
+<span class="font-caption text-caption uppercase tracking-wider text-zinc-subtle font-semibold">Facts the AI can use</span>
+</div>
+<div class="bg-surface-card rounded-[18px] overflow-hidden">
+<div class="p-space-md bg-surface-card">
+<div class="flex items-center justify-between mb-1">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-zinc-subtle font-medium">Education</span>
+<span class="font-caption text-caption text-zinc-subtle">Primary</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface leading-snug">
+          MTech Integrated CSE (Data Science), Vellore Institute of Technology
         </p>
-      </div>
-
-      <div class="space-y-2 pt-2">
-        <button onclick="alert('Triggering manual single-job cooldown bypass override and dry-run submission for ' + document.getElementById('sheet-company').innerText)" class="w-full h-12 rounded-xl bg-white text-[#0F0F10] font-semibold text-xs flex items-center justify-center gap-2 hover:bg-zinc-200 active:scale-95 transition-all">
-          <span class="material-symbols-outlined text-[16px]">replay</span>
-          <span>Re-submit Corrected Resume (Bypass Cooldown)</span>
-        </button>
-        <button onclick="closeJobDetail()" class="w-full h-11 text-zinc-subtle hover:text-white font-medium text-xs flex items-center justify-center transition-colors">
-          Dismiss
-        </button>
-      </div>
+<div class="mt-1 flex items-center gap-2">
+<span class="px-2 py-0.5 rounded-md bg-surface-elevated text-silver-track font-caption text-caption">CGPA 7.62 / 10</span>
+</div>
+</div>
+<div class="h-[1px] bg-hairline-separator ml-4"></div>
+<div class="p-space-md bg-surface-card">
+<div class="flex items-center justify-between mb-1">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-zinc-subtle font-medium">Patent</span>
+<span class="font-caption text-caption text-status-success font-medium">Granted</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface leading-snug">
+          A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver
+        </p>
+</div>
+<div class="h-[1px] bg-hairline-separator ml-4"></div>
+<div class="p-space-md bg-surface-card">
+<div class="flex items-center justify-between mb-1">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-zinc-subtle font-medium">Patent</span>
+<span class="font-caption text-caption text-zinc-subtle font-medium">Published</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface leading-snug">
+          Acoustic Doppler Session Guard
+        </p>
+</div>
+<div class="h-[1px] bg-hairline-separator ml-4"></div>
+<div class="p-space-md bg-surface-card">
+<div class="flex items-center justify-between mb-1">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-zinc-subtle font-medium">Project</span>
+<span class="font-caption text-caption text-status-info font-medium">Evaluation</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface leading-snug">
+          Agentic Code Intelligence, 25.59% NDCG@10 (embeddings + BM25 + AST; 8,765 Python programs)
+        </p>
+</div>
+<div class="h-[1px] bg-hairline-separator ml-4"></div>
+<div class="p-space-md bg-surface-card">
+<div class="flex items-center justify-between mb-1">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-zinc-subtle font-medium">Certifications</span>
+<span class="font-caption text-caption text-zinc-subtle">2 Records</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface leading-snug">
+          AWS Cloud Solutions Architect; Generative AI for Data Analysts
+        </p>
+</div>
+</div>
+<div class="flex items-center gap-1.5 px-2 pt-2 text-zinc-subtle">
+<span class="material-symbols-outlined text-[14px]">info</span>
+<span class="font-caption text-caption">Read-only ground truth. Used strictly for compiling tailored resumes and cover responses.</span>
+</div>
+</div>
+<div class="px-margin mb-6">
+<div class="flex items-center justify-between px-1 pb-2">
+<span class="font-caption text-caption uppercase tracking-wider text-zinc-subtle font-semibold">Skills</span>
+<span class="font-caption text-caption text-zinc-subtle">20 Verified</span>
+</div>
+<div class="bg-surface-card rounded-[18px] p-space-md">
+<div class="flex flex-wrap gap-2">
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">Python</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">SQL</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">Java</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">JavaScript</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">HTML/CSS</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">NumPy</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">Pandas</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">Scikit-learn</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">Matplotlib</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">Seaborn</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">OpenCV</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">MediaPipe</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">Tableau</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">ELK Stack</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">Kibana</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">Jupyter</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">Git</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">GitHub</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">AWS</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">Linux</span>
+</div>
+</div>
+</div>
+<div class="px-margin mb-6">
+<div class="flex items-center justify-between px-1 pb-2">
+<span class="font-caption text-caption uppercase tracking-wider text-zinc-subtle font-semibold">Application Preferences</span>
+</div>
+<div class="bg-surface-card rounded-[18px] overflow-hidden">
+<button class="w-full text-left p-space-md flex items-center justify-between hover:bg-surface-elevated transition-colors" type="button">
+<span class="font-body-md text-body-md text-on-surface">Graduation Date</span>
+<div class="flex items-center gap-2">
+<span class="font-body-md text-body-md text-zinc-subtle">Select graduation date</span>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-status-warning/15 text-status-warning">Required</span>
+<span class="material-symbols-outlined text-zinc-subtle text-[18px]">chevron_right</span>
+</div>
+</button>
+<div class="h-[1px] bg-hairline-separator ml-4"></div>
+<button class="w-full text-left p-space-md flex items-center justify-between hover:bg-surface-elevated transition-colors" type="button">
+<span class="font-body-md text-body-md text-on-surface">Notice Period</span>
+<div class="flex items-center gap-2">
+<span class="font-body-md text-body-md text-zinc-subtle">Select notice period</span>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-status-warning/15 text-status-warning">Required</span>
+<span class="material-symbols-outlined text-zinc-subtle text-[18px]">chevron_right</span>
+</div>
+</button>
+<div class="h-[1px] bg-hairline-separator ml-4"></div>
+<button class="w-full text-left p-space-md flex items-center justify-between hover:bg-surface-elevated transition-colors" type="button">
+<span class="font-body-md text-body-md text-on-surface">Work Authorization</span>
+<div class="flex items-center gap-2">
+<span class="font-body-md text-body-md text-zinc-subtle">Select status</span>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-status-warning/15 text-status-warning">Required</span>
+<span class="material-symbols-outlined text-zinc-subtle text-[18px]">chevron_right</span>
+</div>
+</button>
+<div class="h-[1px] bg-hairline-separator ml-4"></div>
+<button class="w-full text-left p-space-md flex items-center justify-between hover:bg-surface-elevated transition-colors" type="button">
+<span class="font-body-md text-body-md text-on-surface">Relocation</span>
+<div class="flex items-center gap-2">
+<span class="font-body-md text-body-md text-zinc-subtle">Select preference</span>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-status-warning/15 text-status-warning">Required</span>
+<span class="material-symbols-outlined text-zinc-subtle text-[18px]">chevron_right</span>
+</div>
+</button>
+<div class="h-[1px] bg-hairline-separator ml-4"></div>
+<button class="w-full text-left p-space-md flex items-center justify-between hover:bg-surface-elevated transition-colors" type="button">
+<span class="font-body-md text-body-md text-on-surface">Minimum Pay</span>
+<div class="flex items-center gap-2">
+<span class="font-body-md text-body-md text-primary font-medium">₹7,00,000</span>
+<span class="material-symbols-outlined text-zinc-subtle text-[18px]">chevron_right</span>
+</div>
+</button>
+<div class="h-[1px] bg-hairline-separator ml-4"></div>
+<button class="w-full text-left p-space-md flex items-center justify-between hover:bg-surface-elevated transition-colors" type="button">
+<span class="font-body-md text-body-md text-on-surface">Daily Cap</span>
+<div class="flex items-center gap-2">
+<span class="font-body-md text-body-md text-primary font-medium">100 / day</span>
+<span class="material-symbols-outlined text-zinc-subtle text-[18px]">chevron_right</span>
+</div>
+</button>
+</div>
+<div class="px-2 pt-2 text-zinc-subtle font-caption text-caption">
+      Tapping a row opens a picker sheet. Complete required items to unblock full queue automation.
     </div>
+</div>
+<div class="px-margin mb-8">
+<div class="flex items-center justify-between px-1 pb-2">
+<span class="font-caption text-caption uppercase tracking-wider text-zinc-subtle font-semibold">Safety</span>
+</div>
+<div class="bg-surface-card rounded-[18px] p-space-md">
+<div class="flex items-center justify-between">
+<div>
+<span class="font-body-md text-body-md text-primary font-medium block">Live Auto-Apply</span>
+<span class="font-caption text-caption text-zinc-subtle mt-0.5 block">Off = dry run only. Applications staged for manual review.</span>
+</div>
+<button aria-label="Toggle Live Auto-Apply" class="w-12 h-7 rounded-full bg-surface-elevated p-0.5 flex items-center transition-colors relative cursor-pointer" id="toggle-safety" type="button">
+<div class="w-6 h-6 rounded-full bg-primary shadow-sm transform transition-transform" id="toggle-thumb"></div>
+</button>
+</div>
+</div>
+</div>
+<div class="fixed inset-0 z-50 bg-surface-dim/80 backdrop-blur-md hidden items-center justify-center p-space-md" id="safety-modal-backdrop">
+<div class="bg-surface-elevated w-full max-w-sm rounded-[22px] p-space-xl shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+<div class="w-12 h-12 rounded-full bg-status-error/15 flex items-center justify-center text-status-error mb-4 mx-auto">
+<span class="material-symbols-outlined text-[28px]">warning</span>
+</div>
+<h3 class="font-headline-md text-headline-md text-primary text-center tracking-tight mb-2">
+        Enable Live Autonomous Applying?
+      </h3>
+<div class="space-y-2.5 my-4 text-left">
+<div class="flex items-start gap-2.5">
+<span class="material-symbols-outlined text-zinc-subtle text-[18px] shrink-0 mt-0.5">send</span>
+<p class="font-label-md text-label-md text-on-surface-variant leading-snug">
+            Real submissions will be dispatched to Greenhouse, Lever &amp; Ashby portals on your behalf.
+          </p>
+</div>
+<div class="flex items-start gap-2.5">
+<span class="material-symbols-outlined text-zinc-subtle text-[18px] shrink-0 mt-0.5">verified_user</span>
+<p class="font-label-md text-label-md text-on-surface-variant leading-snug">
+            Grounded resumes compiled solely with your locked single-source facts.
+          </p>
+</div>
+<div class="flex items-start gap-2.5">
+<span class="material-symbols-outlined text-zinc-subtle text-[18px] shrink-0 mt-0.5">speed</span>
+<p class="font-label-md text-label-md text-on-surface-variant leading-snug">
+            Rate limited to 100 applications/day with 180s human pacing intervals.
+          </p>
+</div>
+</div>
+<div class="flex flex-col gap-2 pt-2">
+<button class="w-full h-11 rounded-xl bg-status-error text-primary font-headline-md text-headline-md font-semibold hover:opacity-90 active:scale-[0.98] transition-all" id="btn-turn-on" type="button">
+          Turn On
+        </button>
+<button class="w-full h-11 rounded-xl bg-surface-card text-silver-track font-headline-md text-headline-md font-normal hover:bg-surface-variant active:scale-[0.98] transition-all" id="btn-cancel" type="button">
+          Cancel
+        </button>
+</div>
+</div>
+</div>
+</div>
+<script>
+  (function() {
+    const toggle = document.getElementById('toggle-safety');
+    const thumb = document.getElementById('toggle-thumb');
+    const modal = document.getElementById('safety-modal-backdrop');
+    const btnCancel = document.getElementById('btn-cancel');
+    const btnTurnOn = document.getElementById('btn-turn-on');
+
+    let isLiveActive = false;
+
+    function openModal() {
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeModal() {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function renderToggle() {
+      if (isLiveActive) {
+        toggle.classList.remove('bg-surface-elevated');
+        toggle.classList.add('bg-status-success');
+        thumb.classList.add('translate-x-5');
+      } else {
+        toggle.classList.remove('bg-status-success');
+        toggle.classList.add('bg-surface-elevated');
+        thumb.classList.remove('translate-x-5');
+      }
+    }
+
+    toggle.addEventListener('click', () => {
+      if (!isLiveActive) {
+        openModal();
+      } else {
+        isLiveActive = false;
+        renderToggle();
+      }
+    });
+
+    btnCancel.addEventListener('click', () => {
+      closeModal();
+    });
+
+    btnTurnOn.addEventListener('click', () => {
+      isLiveActive = true;
+      renderToggle();
+      closeModal();
+    });
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        closeModal();
+      }
+    });
+  })();
+</script></main>
+</div>
   </div>
 
-  <!-- FIXED BOTTOM IOS GLASSMORPHISM NAVIGATION BAR -->
-  <nav class="fixed bottom-0 w-full z-40 pb-safe bg-surface/90 backdrop-blur-xl border-t border-hairline-separator/60 shadow-[0_-1px_12px_rgba(0,0,0,0.5)]">
-    <div class="max-w-xl mx-auto flex justify-around items-center h-16 px-1">
+  <!-- ═══════════════════════════════════════════════
+       UNIFIED BOTTOM NAV (iOS Tab Bar style)
+       ═══════════════════════════════════════════════ -->
+  <nav id="bottom-nav" role="tablist" aria-label="Main navigation">
+    <div class="flex items-stretch h-[49px]">
       
-      <!-- Home -->
-      <button onclick="switchTab('home')" id="nav-btn-home" class="nav-tab flex flex-col items-center justify-center min-w-[56px] min-h-[44px] transition-colors text-white font-semibold">
-        <span class="material-symbols-outlined text-[24px]">dashboard</span>
-        <span class="text-[11px] mt-0.5 tracking-tight">Cockpit</span>
-      </button>
+        <button onclick="switchTab('home', this)" 
+                class="tab-nav-btn relative flex flex-col items-center justify-center gap-0.5 flex-1 py-2 text-on-surface transition-colors duration-200 active:scale-95"
+                data-tab="home">
+          <div class="relative">
+            <span class="material-symbols-outlined text-[24px]" style="font-variation-settings:'FILL' 1,'wght' 400">home</span>
+            
+          </div>
+          <span class="text-[10px] font-medium leading-none">Home</span>
+          <span class="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-on-surface mb-0.5"></span>
+        </button>
 
-      <!-- Needs You -->
-      <button onclick="switchTab('needs-you')" id="nav-btn-needs-you" class="nav-tab relative flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-zinc-subtle transition-colors hover:text-white">
-        <div class="relative flex items-center justify-center">
-          <span class="material-symbols-outlined text-[24px]">priority_high</span>
-          <span id="nav-needs-you-badge" class="absolute -top-1 -right-2 px-1 min-w-[15px] h-[15px] rounded-full bg-status-error text-white text-[10px] leading-[15px] text-center font-bold">1</span>
-        </div>
-        <span class="text-[11px] mt-0.5 tracking-tight">Needs You</span>
-      </button>
+        <button onclick="switchTab('needs', this)" 
+                class="tab-nav-btn relative flex flex-col items-center justify-center gap-0.5 flex-1 py-2 text-zinc-subtle transition-colors duration-200 active:scale-95"
+                data-tab="needs">
+          <div class="relative">
+            <span class="material-symbols-outlined text-[24px]" style="font-variation-settings:'FILL' 0,'wght' 400">notification_important</span>
+            <span id="needs-badge" class="absolute -top-1 -right-1 bg-status-error text-white text-[10px] font-bold rounded-full px-1 min-w-[16px] text-center hidden">0</span>
+          </div>
+          <span class="text-[10px] font-medium leading-none">Needs You</span>
+          
+        </button>
 
-      <!-- Jobs -->
-      <button onclick="switchTab('jobs')" id="nav-btn-jobs" class="nav-tab flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-zinc-subtle transition-colors hover:text-white">
-        <span class="material-symbols-outlined text-[24px]">work</span>
-        <span class="text-[11px] mt-0.5 tracking-tight">Jobs</span>
-      </button>
+        <button onclick="switchTab('jobs', this)" 
+                class="tab-nav-btn relative flex flex-col items-center justify-center gap-0.5 flex-1 py-2 text-zinc-subtle transition-colors duration-200 active:scale-95"
+                data-tab="jobs">
+          <div class="relative">
+            <span class="material-symbols-outlined text-[24px]" style="font-variation-settings:'FILL' 0,'wght' 400">work</span>
+            
+          </div>
+          <span class="text-[10px] font-medium leading-none">Jobs</span>
+          
+        </button>
 
-      <!-- Answers -->
-      <button onclick="switchTab('answers')" id="nav-btn-answers" class="nav-tab flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-zinc-subtle transition-colors hover:text-white">
-        <span class="material-symbols-outlined text-[24px]">forum</span>
-        <span class="text-[11px] mt-0.5 tracking-tight">Answers</span>
-      </button>
+        <button onclick="switchTab('answers', this)" 
+                class="tab-nav-btn relative flex flex-col items-center justify-center gap-0.5 flex-1 py-2 text-zinc-subtle transition-colors duration-200 active:scale-95"
+                data-tab="answers">
+          <div class="relative">
+            <span class="material-symbols-outlined text-[24px]" style="font-variation-settings:'FILL' 0,'wght' 400">forum</span>
+            
+          </div>
+          <span class="text-[10px] font-medium leading-none">Answers</span>
+          
+        </button>
 
-      <!-- Profile -->
-      <button onclick="switchTab('profile')" id="nav-btn-profile" class="nav-tab flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-zinc-subtle transition-colors hover:text-white">
-        <span class="material-symbols-outlined text-[24px]">account_circle</span>
-        <span class="text-[11px] mt-0.5 tracking-tight">Profile</span>
-      </button>
-
+        <button onclick="switchTab('profile', this)" 
+                class="tab-nav-btn relative flex flex-col items-center justify-center gap-0.5 flex-1 py-2 text-zinc-subtle transition-colors duration-200 active:scale-95"
+                data-tab="profile">
+          <div class="relative">
+            <span class="material-symbols-outlined text-[24px]" style="font-variation-settings:'FILL' 0,'wght' 400">person</span>
+            
+          </div>
+          <span class="text-[10px] font-medium leading-none">Profile</span>
+          
+        </button>
     </div>
   </nav>
 
-  <!-- LIVE SYNC JAVASCRIPT LOGIC -->
+  <!-- ═══════════════════════════════════════════════
+       JAVASCRIPT — Tab switching & live API polling
+       ═══════════════════════════════════════════════ -->
   <script>
-    // Extract Token from URL or storage
-    const urlParams = new URLSearchParams(window.location.search);
-    let token = urlParams.get('token') || sessionStorage.getItem('applypilot_token') || localStorage.getItem('applypilot_token') || 'mApIGVEyORqpXbJzPhrhLPk9pRaS_vPOFyxH07nuPV4';
-    if (token) {
-      sessionStorage.setItem('applypilot_token', token);
-      localStorage.setItem('applypilot_token', token);
+    // ── Auth token from URL / cookie ──────────────────────
+    const TOKEN = (() => {
+      const p = new URLSearchParams(location.search).get('token');
+      if (p) { document.cookie = `applypilot_token=${p};path=/;SameSite=Lax`; return p; }
+      const m = document.cookie.match(/applypilot_token=([^;]+)/);
+      return m ? m[1] : '';
+    })();
+
+    const headers = TOKEN ? { 'Authorization': `Bearer ${TOKEN}` } : {};
+
+    // ── Tab switching ─────────────────────────────────────
+    let currentTab = 'home';
+
+    function switchTab(tabId, btn) {
+      // Hide all panes
+      document.querySelectorAll('.tab-pane').forEach(p => {
+        p.classList.remove('block');
+        p.classList.add('hidden');
+      });
+      // Show target
+      const pane = document.getElementById('tab-' + tabId);
+      if (pane) { pane.classList.remove('hidden'); pane.classList.add('block'); }
+
+      // Update nav button states
+      document.querySelectorAll('.tab-nav-btn').forEach(b => {
+        const isActive = b.dataset.tab === tabId;
+        b.classList.toggle('text-on-surface', isActive);
+        b.classList.toggle('text-zinc-subtle', !isActive);
+        // Update icon fill
+        const icon = b.querySelector('.material-symbols-outlined');
+        if (icon) icon.style.fontVariationSettings = `'FILL' ${isActive ? 1 : 0},'wght' 400`;
+        // Update indicator dot
+        b.querySelectorAll('.tab-indicator').forEach(d => d.remove());
+        if (isActive) {
+          const dot = document.createElement('span');
+          dot.className = 'tab-indicator absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-on-surface mb-0.5';
+          b.appendChild(dot);
+        }
+      });
+
+      currentTab = tabId;
     }
 
-    // Dynamic Clock
+    // ── API polling ───────────────────────────────────────
+    async function fetchStats() {
+      try {
+        const r = await fetch('/api/v1/jobs/stats', { headers });
+        if (!r.ok) return;
+        const d = await r.json();
+
+        // Update needs-you badge
+        const needsCount = d.needs_you_count ?? 0;
+        const badge = document.getElementById('needs-badge');
+        if (badge) {
+          badge.textContent = needsCount;
+          badge.classList.toggle('hidden', needsCount === 0);
+        }
+      } catch(e) { /* offline */ }
+    }
+
+    async function fetchProfile() {
+      try {
+        const r = await fetch('/api/v1/profile', { headers });
+        if (!r.ok) return;
+        const d = await r.json();
+        // Could update go_live status indicator here
+      } catch(e) { /* offline */ }
+    }
+
+    // ── Clock update (for screens that show 9:41 / time) ──
     function updateClock() {
       const now = new Date();
-      const hours = now.getHours().toString().padStart(2, '0');
-      const minutes = now.getMinutes().toString().padStart(2, '0');
-      const clockEl = document.getElementById('ios-clock');
-      if (clockEl) clockEl.innerText = `${hours}:${minutes}`;
-    }
-    setInterval(updateClock, 1000);
-    updateClock();
-
-    // Tab Switching
-    function switchTab(tabName) {
-      document.querySelectorAll('.tab-view').forEach(el => el.classList.remove('active'));
-      document.querySelectorAll('.nav-tab').forEach(el => {
-        el.classList.remove('text-white', 'font-semibold');
-        el.classList.add('text-zinc-subtle');
-      });
-
-      const targetView = document.getElementById(`tab-${tabName}`);
-      const targetNav = document.getElementById(`nav-btn-${tabName}`);
-      const headerTitle = document.getElementById('header-title');
-
-      if (targetView) targetView.classList.add('active');
-      if (targetNav) {
-        targetNav.classList.remove('text-zinc-subtle');
-        targetNav.classList.add('text-white', 'font-semibold');
-      }
-
-      const titles = {
-        'home': 'Cockpit',
-        'needs-you': 'Needs You',
-        'jobs': 'Jobs Pipeline',
-        'answers': 'Answer Bank',
-        'profile': 'Profile & Safety'
-      };
-      if (headerTitle) headerTitle.innerText = titles[tabName] || 'ApplyPilot';
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      const t = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      document.querySelectorAll('[data-clock], .status-bar-time').forEach(el => el.textContent = t);
     }
 
-    // Sub-tab toggle in Needs You
-    function toggleNeedsYouSubTab(type) {
-      const btnQ = document.getElementById('btn-subtab-questions');
-      const btnAI = document.getElementById('btn-subtab-ai');
-      if (type === 'questions') {
-        btnQ.className = "w-1/2 py-2 rounded-lg bg-surface-card text-white font-semibold text-xs transition-all shadow-sm flex items-center justify-center gap-1.5";
-        btnAI.className = "w-1/2 py-2 rounded-lg text-zinc-subtle font-medium text-xs transition-all flex items-center justify-center gap-1.5";
-      } else {
-        btnAI.className = "w-1/2 py-2 rounded-lg bg-surface-card text-white font-semibold text-xs transition-all shadow-sm flex items-center justify-center gap-1.5";
-        btnQ.className = "w-1/2 py-2 rounded-lg text-zinc-subtle font-medium text-xs transition-all flex items-center justify-center gap-1.5";
-      }
-    }
+    // ── Boot ─────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+      // Activate first tab
+      switchTab('home', document.querySelector('[data-tab="home"]'));
+      updateClock();
+      setInterval(updateClock, 30000);
 
-    // Job Detail Sheet
-    function openJobDetail(company, title, portal, salary, location, score) {
-      document.getElementById('sheet-company').innerText = company;
-      document.getElementById('sheet-title').innerText = title;
-      document.getElementById('sheet-portal').innerText = portal;
-      document.getElementById('sheet-salary').innerText = salary;
-      document.getElementById('sheet-location').innerText = location;
-      const sheet = document.getElementById('job-detail-sheet');
-      sheet.classList.remove('hidden');
-      sheet.classList.add('flex');
-    }
-    function closeJobDetail() {
-      const sheet = document.getElementById('job-detail-sheet');
-      sheet.classList.add('hidden');
-      sheet.classList.remove('flex');
-    }
-
-    // Live API Fetching
-    let isGoLive = false;
-    async function syncBackendData() {
-      if (!token) return;
-      const headers = { 'Authorization': `Bearer ${token}` };
-
-      // 1. Stats
-      try {
-        const statsRes = await fetch('/api/v1/jobs/stats', { headers });
-        if (statsRes.ok) {
-          const stats = await statsRes.json();
-          document.getElementById('stat-daily-applied').innerText = stats.daily_applied || 0;
-          document.getElementById('stat-daily-cap').innerText = stats.daily_cap || 100;
-          document.getElementById('stat-daily-cap-sub').innerText = stats.daily_cap || 100;
-          document.getElementById('stat-total-applied').innerText = stats.total_dry_run || 5;
-          document.getElementById('stat-needs-you-count').innerText = stats.needs_you_count || 0;
-          document.getElementById('stat-queue-count').innerText = stats.queue_count || 4;
-          document.getElementById('jobs-tracked-count').innerText = stats.total_tracked || 378;
-
-          // Donut math
-          const cap = stats.daily_cap || 100;
-          const applied = stats.daily_applied || 0;
-          const pct = Math.min(applied / cap, 1);
-          const circle = document.getElementById('quota-donut-circle');
-          if (circle) {
-            const circumference = 301.59;
-            circle.style.strokeDashoffset = (circumference * (1 - pct)).toString();
-          }
-        }
-      } catch (e) {
-        console.warn('Stats fetch:', e);
-      }
-
-      // 2. Profile
-      try {
-        const profRes = await fetch('/api/v1/profile', { headers });
-        if (profRes.ok) {
-          const prof = await profRes.json();
-          if (prof.full_name) {
-            document.getElementById('profile-full-name').innerText = prof.full_name;
-            const firstName = prof.full_name.split(' ')[0];
-            document.getElementById('user-greeting-name').innerText = firstName;
-          }
-          isGoLive = !!prof.go_live;
-          updateGoLiveUI();
-        }
-      } catch (e) {
-        console.warn('Profile fetch:', e);
-      }
-    }
-
-    function updateGoLiveUI() {
-      const knob = document.getElementById('golive-toggle-knob');
-      const btn = document.getElementById('btn-golive-toggle');
-      const text = document.getElementById('golive-status-text');
-      if (isGoLive) {
-        knob.style.transform = 'translateX(20px)';
-        btn.classList.remove('bg-surface-elevated');
-        btn.classList.add('bg-status-success');
-        text.innerText = 'LIVE AUTONOMOUS SUBMISSIONS ACTIVE';
-        text.className = 'font-semibold text-status-success';
-      } else {
-        knob.style.transform = 'translateX(0px)';
-        btn.classList.remove('bg-status-success');
-        btn.classList.add('bg-surface-elevated');
-        text.innerText = 'SAFE DRY-RUN ONLY (ZERO SUBMISSIONS)';
-        text.className = 'font-semibold text-status-warning';
-      }
-    }
-
-    async function toggleGoLive() {
-      const nextState = !isGoLive;
-      const conf = confirm(nextState 
-        ? "CAUTION: Turn ON live autonomous submissions? The pilot will submit real applications." 
-        : "Switch back to Safe Dry-Run Mode?");
-      if (!conf) return;
-
-      try {
-        const res = await fetch('/api/v1/profile/go-live', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ go_live: nextState })
-        });
-        if (res.ok) {
-          isGoLive = nextState;
-          updateGoLiveUI();
-        }
-      } catch (e) {
-        alert('Failed to update Go-Live status: ' + e);
-      }
-    }
-
-    async function triggerApplyNext() {
-      const btn = document.getElementById('btn-apply-next');
-      const origText = btn.innerHTML;
-      btn.innerHTML = '<span class="material-symbols-outlined text-[18px] animate-spin">refresh</span><span>Running Dry-Run Cycle...</span>';
-      btn.disabled = true;
-
-      try {
-        const res = await fetch('/api/v1/jobs/apply-next', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const data = await res.json();
-        alert('Autonomous Dry-Run Completed: ' + (data.detail || JSON.stringify(data)));
-        syncBackendData();
-      } catch (e) {
-        alert('Dry-run request failed: ' + e);
-      } finally {
-        btn.innerHTML = origText;
-        btn.disabled = false;
-      }
-    }
-
-    function approveAnswer(id) {
-      alert('Answer approved and added to candidate verified facts.');
-    }
-    function editAnswer(id) {
-      const cur = prompt('Edit Answer:', 'Invented and granted Patent #202441052840: A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver at VIT Vellore.');
-      if (cur) alert('Saved custom response.');
-    }
-
-    // Filter jobs
-    function filterJobs(query) {
-      const cards = document.querySelectorAll('#jobs-cards-container > div');
-      cards.forEach(card => {
-        const text = card.innerText.toLowerCase();
-        card.style.display = text.includes(query.toLowerCase()) ? 'flex' : 'none';
-      });
-    }
-
-    function selectJobFilter(type) {
-      document.querySelectorAll('.job-chip').forEach(c => {
-        c.className = 'job-chip px-3 py-1.5 rounded-full bg-surface-card text-zinc-subtle hover:text-white border border-hairline-separator shrink-0';
-      });
-      event.target.className = 'job-chip px-3 py-1.5 rounded-full bg-white text-[#0F0F10] font-semibold shrink-0';
-      const input = document.getElementById('job-search-input');
-      if (type === 'all') input.value = '';
-      else input.value = type;
-      filterJobs(input.value);
-    }
-
-    // Initial sync and loop
-    syncBackendData();
-    setInterval(syncBackendData, 10000);
+      // Poll API
+      fetchStats();
+      fetchProfile();
+      setInterval(fetchStats, 30000);
+    });
   </script>
 </body>
 </html>
