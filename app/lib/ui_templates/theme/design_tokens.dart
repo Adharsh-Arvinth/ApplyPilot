@@ -44,7 +44,6 @@ class TemplateTokens {
   static const Color stitchTerracotta = Color(0xFFEA580C);
   static const Color stitchError = Color(0xFFFF453A);
   static const Color stitchZincSubtle = Color(0xFF8E8E93);
-  static const Color stitchZincSubtle = Color(0xFF8E8E93);
 
   // 4. Spacing Scale (4pt Grid System)
   static const double s2 = 2.0;

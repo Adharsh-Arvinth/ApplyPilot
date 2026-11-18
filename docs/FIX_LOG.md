@@ -2,7 +2,19 @@
 
 ---
 
-## Section 12: Flutter App (`app/lib`) Full Stitch iOS Design System Implementation (2026-11-18 23:45 IST)
+## Section 13: CI Fix - Remove Duplicate Constant in Flutter Design Tokens (2026-11-18 23:52 IST)
+
+**Trigger**: CI Run `44367960007` on commit `4f70a98` showed Backend Test Suite passed (2m 53s), but Flutter Test Suite failed with:
+`lib/ui_templates/theme/design_tokens.dart:47:22: Error: 'stitchZincSubtle' is already declared in this scope.`
+
+**Root Cause**:
+In `app/lib/ui_templates/theme/design_tokens.dart`, lines 46 and 47 both declared `static const Color stitchZincSubtle = Color(0xFF8E8E93);` due to an accidental duplicate line during the Stitch token merge.
+
+**Fix Applied**:
+- Removed the duplicate `stitchZincSubtle` declaration from `app/lib/ui_templates/theme/design_tokens.dart`.
+- Scanned all `.dart` files in `app/lib/` for any other duplicate declarations or unbalanced braces — verified zero duplicate members across all classes.
+
+---
 
 **Trigger**: User explicitly requested updating "the app" (`c:\Users\adhar\Desktop\job\app`), having confirmed that while the HTML web cockpit was built, the native Flutter codebase in `app/lib/` was still using the legacy green/ivory theme and old card layouts.
 
