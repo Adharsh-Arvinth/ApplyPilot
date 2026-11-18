@@ -1,5 +1,45 @@
 # ApplyPilot Fix & Audit Execution Log (`docs/FIX_LOG.md`)
 
+---
+
+## Section 11: Stitch iOS SPA Full Rebuild (2026-11-18 23:09 IST)
+
+**Trigger**: User confirmed current cockpit UI does not match the Stitch ApplyPilot iOS Design System screens. Previous iteration was a custom-built dark dashboard — not the actual Stitch HTML.
+
+**Root Cause**: Previous `build_stitch_spa.py` was building a custom dashboard with Stitch color tokens but NOT using the verbatim Stitch HTML bodies. The Stitch screens contain:
+- **Home**: Newsreader serif font, editorial warm cockpit, donut chart, bar chart (Weekly Velocity), Conversion Funnel progress bar, Dispatch Frequency wave chart, "Now Applying Live" section
+- **Needs You**: Swipeable question cards with radio options, company monogram, AI Answered tab, "Save & Continue" button
+- **Jobs**: Priority Application Pipeline queue with status badges, Maybe Triage Deck swipe cards, portal filter chips (Greenhouse/Lever/Ashby)
+- **Answers**: Answer bank with Education/Patents/Links/Application Rules sections, Unreviewed AI Draft approval panel
+- **Profile**: Verified identity card (AA monogram), Facts the AI Can Use, 20 skill chips, Application Preferences (REQUIRED fields), Safety switch (Live Auto-Apply toggle)
+
+**Fix Applied**:
+1. Wrote `scratch/rebuild_stitch_spa.py` — extracts verbatim `<body>` HTML from each Stitch `code.html`
+2. Strips per-screen `<nav>` and `<header>` elements only
+3. Assembles all 5 screens as `<div id="tab-{id}">` panes
+4. Adds unified bottom nav (iOS Tab Bar style): Home | Needs You | Jobs | Answers | Profile
+5. Merges all font imports: Newsreader, Plus Jakarta Sans, Inter, Material Symbols Outlined
+6. Uses `today_warm_editorial_cockpit` Tailwind config (richest color palette)
+7. JS: tab switching, needs-you badge polling, clock update, API polling
+
+**Verification**:
+- Output: 115,800 bytes (113 KB)
+- All 13 sanity checks pass: Newsreader ✓, Weekly Velocity ✓, Conversion Funnel ✓, Dispatch Frequency ✓, all 5 tab panes ✓, bottom-nav ✓, switchTab ✓, fetchStats ✓, Adharsh ✓
+- Browser subagent visual audit completed across all 5 tabs:
+  - Tab 1 (Home): Editorial serif (`Newsreader`), `Hello, Adharsh`, Daily Quota donut ring, Weekly Velocity peak bar, Conversion Funnel, Dispatch Frequency wave, Now Applying Live card, Recent Activity.
+  - Tab 2 (Needs You): Interventions triage, segmented controls (`Questions 3` / `AI Answered 4`), Zoho authorization card, radio selectors, "Remember for future apps" toggle, Save & Continue.
+  - Tab 3 (Jobs): Priority Pipeline (`Cloudflare`, `Zomato`, `Rippling`, `Swiggy`), ATS filters, match scores (`4.8`, `4.6`, `4.5`), Maybe Triage Deck.
+  - Tab 4 (Answers): Categorized ground-truth banks (Education, Patents with interactive swipe action demo, Links, Rules, AI Drafts).
+  - Tab 5 (Profile): Verified profile header (`AA` avatar, Adharsh Arvinth, VIT Vellore), Facts the AI can use, 20 verified skill chips, Application preferences, Safety toggle.
+- Backend tests: **99/99 passed** (155.48s)
+- Server restarted, `GET /app/?token=...` → 200, 114,816 bytes
+- Bottom padding updated to 120px to provide full clearance above the iOS bottom navigation bar.
+
+**Commit**: `62e0b71` & `4a9d745` — pushed to `origin main`
+- CI run `44361299126` for commit `62e0b71`: **COMPLETED: SUCCESS** (100% green)
+
+---
+
 ## Master Log of System Modifications
 
 This log records every architectural adjustment, security lock, test result, and rule verification performed across ApplyPilot in exact accordance with the Lead Engineer & Product Designer specification.
