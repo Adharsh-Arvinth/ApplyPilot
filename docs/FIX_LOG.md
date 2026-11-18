@@ -2,7 +2,19 @@
 
 ---
 
-## Section 13: CI Fix - Remove Duplicate Constant in Flutter Design Tokens (2026-11-18 23:52 IST)
+## Section 14: CI Fix - Prevent RenderFlex Overflow in HomeScreen Weekly Velocity (2026-11-18 23:56 IST)
+
+**Trigger**: CI Run `44369200573` failed with `A RenderFlex overflowed by 0.200 pixels on the bottom` at `home_screen.dart:2209` inside test `ApplyPilotApp boots to MainNavigationShell when onboarding is complete`.
+
+**Root Cause**:
+In `_buildStitchWeeklyVelocity`, the bar chart row was enclosed in a strict `SizedBox(height: 112)`. In headless Linux test font rendering, the column elements (Peak badge + label + bar + day label) totaled 112.2px, overflowing by 0.2px.
+
+**Fix Applied**:
+- Increased chart container height to `125` (providing 13px extra headroom).
+- Scaled maximum bar height to `50 * pct`.
+- Wrapped each day column in `FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.bottomCenter)` to prevent any render flex overflow across any screen density or font metrics.
+
+---
 
 **Trigger**: CI Run `44367960007` on commit `4f70a98` showed Backend Test Suite passed (2m 53s), but Flutter Test Suite failed with:
 `lib/ui_templates/theme/design_tokens.dart:47:22: Error: 'stitchZincSubtle' is already declared in this scope.`

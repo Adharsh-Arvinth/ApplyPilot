@@ -2193,9 +2193,9 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
           SizedBox(
-            height: 112,
+            height: 125,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -2206,56 +2206,60 @@ class _HomeScreenState extends State<HomeScreen> {
                 final day = b["day"] as String;
 
                 return Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      if (isPeak)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                          margin: const EdgeInsets.only(bottom: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEA580C),
-                            borderRadius: BorderRadius.circular(999),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.bottomCenter,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        if (isPeak)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                            margin: const EdgeInsets.only(bottom: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEA580C),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: const Text("Peak", style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.white)),
                           ),
-                          child: const Text("Peak", style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.white)),
+                        Text(
+                          "$val${isPeak ? '*' : ''}",
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: isPeak ? FontWeight.w700 : FontWeight.w400,
+                            color: isPeak ? const Color(0xFFF59E0B) : const Color(0xFF8E8E93),
+                          ),
                         ),
-                      Text(
-                        "$val${isPeak ? '*' : ''}",
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: isPeak ? FontWeight.w700 : FontWeight.w400,
-                          color: isPeak ? const Color(0xFFF59E0B) : const Color(0xFF8E8E93),
+                        const SizedBox(height: 4),
+                        Container(
+                          width: 24,
+                          height: 50 * pct,
+                          decoration: BoxDecoration(
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                            gradient: isPeak
+                                ? const LinearGradient(
+                                    begin: Alignment.bottomCenter,
+                                    end: Alignment.topCenter,
+                                    colors: [Color(0xFFEA580C), Color(0xFFF59E0B)],
+                                  )
+                                : null,
+                            color: isPeak ? null : const Color(0xFF242426),
+                            boxShadow: isPeak
+                                ? [const BoxShadow(color: Color(0x55F59E0B), blurRadius: 8, spreadRadius: 1)]
+                                : null,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Container(
-                        width: 24,
-                        height: 60 * pct,
-                        decoration: BoxDecoration(
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
-                          gradient: isPeak
-                              ? const LinearGradient(
-                                  begin: Alignment.bottomCenter,
-                                  end: Alignment.topCenter,
-                                  colors: [Color(0xFFEA580C), Color(0xFFF59E0B)],
-                                )
-                              : null,
-                          color: isPeak ? null : const Color(0xFF242426),
-                          boxShadow: isPeak
-                              ? [const BoxShadow(color: Color(0x55F59E0B), blurRadius: 8, spreadRadius: 1)]
-                              : null,
+                        const SizedBox(height: 6),
+                        Text(
+                          day,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: isPeak ? FontWeight.w700 : FontWeight.w500,
+                            color: isPeak ? const Color(0xFFF59E0B) : const Color(0xFF8E8E93),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        day,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: isPeak ? FontWeight.w700 : FontWeight.w500,
-                          color: isPeak ? const Color(0xFFF59E0B) : const Color(0xFF8E8E93),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 );
               }).toList(),
