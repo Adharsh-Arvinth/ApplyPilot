@@ -156,6 +156,7 @@ async def security_and_token_middleware(request: Request, call_next):
         response.set_cookie(
             key="applypilot_token",
             value=token,
+            path="/",
             httponly=True,
             samesite="lax",
             max_age=86400 * 30
@@ -177,6 +178,13 @@ app.mount("/output", StaticFiles(directory=str(settings.OUTPUT_DIR)), name="outp
 # Mount Flutter Web Application Cockpit
 flutter_web_dir = Path(__file__).resolve().parent.parent.parent / "app" / "build" / "web"
 if flutter_web_dir.exists():
+    @app.get("/app")
+    def redirect_app_no_slash(request: Request):
+        token = request.query_params.get("token")
+        if token:
+            return RedirectResponse(url=f"/app/?token={token}")
+        return RedirectResponse(url="/app/")
+
     app.mount("/app", StaticFiles(directory=str(flutter_web_dir), html=True), name="app")
 else:
     @app.get("/app")
@@ -196,8 +204,11 @@ app.include_router(ai_router, prefix="/api/v1")
 app.include_router(firebase_router, prefix="/api/v1")
 
 @app.get("/")
-def root():
+def root(request: Request):
     if flutter_web_dir.exists():
+        token = request.query_params.get("token")
+        if token:
+            return RedirectResponse(url=f"/app/?token={token}")
         return RedirectResponse(url="/app/")
     return {
         "app": "ApplyPilot",
