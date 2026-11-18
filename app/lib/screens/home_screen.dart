@@ -1066,8 +1066,6 @@ class _HomeScreenState extends State<HomeScreen> {
               final qLower = question.toLowerCase();
               if (qLower.contains("visa") || qLower.contains("sponsor") || qLower.contains("authorized") || qLower.contains("relocate") || qLower.contains("remote") || qLower.contains("require") || qLower.contains("are you") || qLower.contains("will you") || qLower.contains("do you")) {
                 displayOptions = ["No", "Yes"];
-              } else if (qLower.contains("notice")) {
-                displayOptions = ["Immediate", "15 Days", "30 Days"];
               }
             }
 

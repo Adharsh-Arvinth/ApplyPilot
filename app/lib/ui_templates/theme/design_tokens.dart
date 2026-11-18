@@ -32,6 +32,19 @@ class TemplateTokens {
   static const Color infoSubtle = Color(0x1F38BDF8);
   static const Color aiViolet = Color(0xFFA78BFA); // Gemini AI Violet
 
+  // Google Stitch Executive Design Tokens (Asset: f7e9b289f0ab4257a02dc33ecd3181d8)
+  static const Color stitchBackground = Color(0xFF131313);
+  static const Color stitchSurfaceCard = Color(0xFF1C1C1E);
+  static const Color stitchSurfaceElevated = Color(0xFF2C2C2E);
+  static const Color stitchSurfaceLowest = Color(0xFF0E0E0E);
+  static const Color stitchHairline = Color(0xFF38383A);
+  static const Color stitchCyan = Color(0xFF64E4FD);
+  static const Color stitchJade = Color(0xFF7FD1A8);
+  static const Color stitchAmber = Color(0xFFF59E0B);
+  static const Color stitchTerracotta = Color(0xFFEA580C);
+  static const Color stitchError = Color(0xFFFF453A);
+  static const Color stitchZincSubtle = Color(0xFF8E8E93);
+
   // 4. Spacing Scale (4pt Grid System)
   static const double s2 = 2.0;
   static const double s4 = 4.0;

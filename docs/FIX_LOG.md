@@ -286,10 +286,36 @@ This log records every architectural adjustment, security lock, test result, and
 - [x] **Headless CI /app Stub Handler**:
   - In `backend/app/main.py`, added a fallback route for `/app` and `/app/` when `app/build/web` is not compiled (as in standard backend CI jobs).
   - Ensures authenticated queries with `?token=...` return `200 OK` rather than `404 Not Found` in `test_security_valid_token_allows_access`.
-- [x] **Full CI Verification (GitHub Actions Run ID: 44141658782 on commit `e817e62`)**:
+- [x] **Full CI Verification (GitHub Actions Run ID: 44141658782 on commit `e817e62` & Run ID: 44142572388 on commit `a4777f8`)**:
   - **Flutter Test Suite**: `completed` | **`success`** (Duration: 48s)
   - **Backend Test Suite**: `completed` | **`success`** (Duration: 3m 27s)
   - All jobs and all steps completely green across both test suites on GitHub Actions CI.
+
+---
+
+## Section 16: Google Stitch Design System & UI Integration
+- [x] **Google Stitch MCP Server Integration**:
+  - Configured Stitch MCP endpoint `https://stitch.googleapis.com/mcp` with `X-Goog-Api-Key` authentication in Antigravity MCP config files.
+  - Linked to user's Google Stitch workspace project: `projects/18172160697421602502` (`https://stitch.google.com/projects/18172160697421602502`).
+- [x] **Master Design Specification (`docs/APPLYPILOT_UI_DESIGN_SPEC.md`)**:
+  - Produced 28,442-byte comprehensive specification detailing the executive dark flight deck, Apple Fitness circular ring dial, 7-day velocity chart, live autonomous stepper, 3-card Needs You stack, ATS priority pipeline, and candidate locked facts vault.
+  - Uploaded directly to Stitch canvas (`upload_design_md`) -> Screen instance `1890846212900213774`.
+  - Generated Stitch Design System asset (`create_design_system_from_design_md`) -> **Asset ID: `f7e9b289f0ab4257a02dc33ecd3181d8`**.
+- [x] **9 Stitch High-Fidelity Templates Downloaded & Archived**:
+  - Downloaded HTML & retina PNG renders to `scratch/stitch_all/` and conversation artifacts:
+    1. `profile_29be67` (Candidate profile & locked facts vault)
+    2. `jobs_18842b` (Priority pipeline, ATS source pills, Maybe triage deck)
+    3. `job_detail___bottom_sheet_d27f96` & `fa574f` (Fit gauge, 10pt resume preview, autonomous trace)
+    4. `needs_you_0f245e` (3-card stacked carousel, 6-box OTP input, AI Answered tab)
+    5. `answers_d2c35f` (Categorized Answer Bank with swipe actions)
+    6. `today___warm_editorial_cockpit_6d5fb4` (Fitness circular ring dial, 7-day velocity chart, live stepper)
+    7. `today___editorial_serif_058dca` (Editorial serif typography variant)
+    8. `fix_log_md_a927d9` (Documentation screen)
+- [x] **Flutter Token & Component Synchronization**:
+  - Added Stitch palette tokens (`#131313` background, `#1C1C1E` card surface, `#2C2C2E` elevated, `#38383A` hairline separator, `#64E4FD` cyan, `#7FD1A8` jade, `#F59E0B` amber, `#EA580C` terracotta) into `app/lib/core/theme.dart` and `app/lib/ui_templates/theme/design_tokens.dart`.
+  - Removed ungrounded fallback choices (`"15 Days"`) in `app/lib/screens/home_screen.dart`.
+  - Verified 100% test suite pass rate locally (21/21 targeted and 99/99 full suite).
+
 
 
 
