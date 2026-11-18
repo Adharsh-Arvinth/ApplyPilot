@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+<meta content="mobile_tab" name="shell-type"/>
+<title>Today</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            surface: 'var(--app-bg)',
+            'surface-card': 'var(--card-bg)',
+            'surface-elevated': 'var(--elevated-bg)',
+            'hairline-separator': 'var(--border-color)',
+            indigo: {
+              accent: '#4B5FD6'
+            },
+            status: {
+              amber: '#E3A33B',
+              teal: '#1F9E8F',
+              error: '#FF453A'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif']
+          }
+        }
+      }
+    };
+  </script>
+<style>
+    :root {
+      --app-bg: #F5F4F1;
+      --card-bg: #FFFFFF;
+      --elevated-bg: #EAE9E4;
+      --border-color: #E2E0D8;
+      --text-primary: #1C1C1E;
+      --text-secondary: #636366;
+      --text-tertiary: #8E8E93;
+      --nav-bg: rgba(245, 244, 241, 0.88);
+      --chip-bg: #EAE9E5;
+      --bar-bg: #E2E1DC;
+    }
+    html.dark {
+      --app-bg: #131313;
+      --card-bg: #1C1C1E;
+      --elevated-bg: #2C2C2E;
+      --border-color: #38383A;
+      --text-primary: #FFFFFF;
+      --text-secondary: #8E8E93;
+      --text-tertiary: #636366;
+      --nav-bg: rgba(19, 19, 19, 0.85);
+      --chip-bg: #1C1C1E;
+      --bar-bg: #2C2C2E;
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      min-height: 100vh;
+      min-height: 100dvh;
+      background-color: var(--app-bg);
+      color: var(--text-primary);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      overscroll-behavior-y: none;
+    }
+    .pb-safe {
+      padding-bottom: max(env(safe-area-inset-bottom, 20px), 16px);
+    }
+    .pt-safe {
+      padding-top: env(safe-area-inset-top, 44px);
+    }
+    ::-webkit-scrollbar {
+      display: none;
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+  </style>
+</head>
+<body class="bg-[#131313] text-white font-sans antialiased selection:bg-[#4B5FD6]/30">
+<!-- Header -->
+<header class="fixed top-0 inset-x-0 z-50 pt-safe bg-[var(--nav-bg)] backdrop-blur-xl border-b border-[var(--border-color)] transition-colors duration-200">
+<div class="max-w-[420px] mx-auto px-4 pt-2 pb-3 flex items-start justify-between">
+<div class="flex flex-col">
+<span class="text-[12px] font-normal text-[var(--text-secondary)] tracking-tight">Thursday, October 24</span>
+<div class="flex items-center gap-2.5 mt-0.5">
+<h1 class="text-[32px] font-semibold text-[var(--text-primary)] tracking-tight leading-none">Today</h1>
+<div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[var(--chip-bg)] border border-[var(--border-color)] text-[var(--text-secondary)] text-[11px] font-normal tracking-tight">
+<span class="w-1.5 h-1.5 rounded-full bg-[#1F9E8F]"></span>
+<span>Dry run · PC online</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-2 mt-1">
+<!-- Day/Night Switcher Button -->
+<button aria-label="Toggle Night/Day Mode" class="w-9 h-9 rounded-full bg-[var(--elevated-bg)] border border-[var(--border-color)] text-[var(--text-primary)] flex items-center justify-center active:scale-95 transition-transform duration-150 focus:outline-none" id="theme-toggle-btn" title="Switch theme">
+<span class="material-symbols-outlined text-[19px]" id="theme-toggle-icon">light_mode</span>
+</button>
+<!-- User Avatar -->
+<button aria-label="User Profile" class="w-9 h-9 rounded-full bg-[#2C2C2E] border border-[var(--border-color)] text-white flex items-center justify-center text-xs font-semibold tracking-wider active:scale-95 transition-transform duration-150 focus:outline-none">
+          AA
+        </button>
+</div>
+</div>
+</header>
+<!-- Main Scrollable Content -->
+<main class="max-w-[420px] mx-auto flex flex-col px-4 pt-[116px] pb-28 gap-4 bg-[var(--app-bg)] transition-colors duration-200">
+<!-- Hero KPI Card -->
+<section class="w-full bg-[var(--card-bg)] rounded-[20px] p-5 border border-[var(--border-color)] flex flex-col gap-3.5 shadow-sm">
+<div class="flex items-center gap-5">
+<!-- Circular Progress Ring (42 of 100) -->
+<div class="relative w-[104px] h-[104px] flex-shrink-0 flex items-center justify-center">
+<svg aria-hidden="true" class="w-full h-full -rotate-90" viewbox="0 0 100 100">
+<!-- Background Track -->
+<circle cx="50" cy="50" fill="none" r="41" stroke="var(--elevated-bg)" stroke-width="7.5"></circle>
+<!-- 42% progress = 2 * pi * 41 = 257.61; offset = 257.61 * (1 - 0.42) = 149.41 -->
+<circle cx="50" cy="50" fill="none" r="41" stroke="#4B5FD6" stroke-dasharray="257.61" stroke-dashoffset="149.41" stroke-linecap="round" stroke-width="7.5"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center select-none pointer-events-none">
+<span class="text-[28px] font-semibold text-[var(--text-primary)] tabular-nums leading-none">42</span>
+<span class="text-[11px] text-[var(--text-secondary)] mt-1">of 100</span>
+</div>
+</div>
+<!-- 3 Plain Stat Rows -->
+<div class="flex-1 flex flex-col justify-center py-0.5 divide-y divide-[var(--border-color)]">
+<div class="flex items-center justify-between pb-2">
+<span class="text-[13px] text-[var(--text-secondary)]">Applied</span>
+<span class="text-[15px] font-semibold text-[var(--text-primary)] tabular-nums">42</span>
+</div>
+<div class="flex items-center justify-between py-2">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-[#E3A33B] flex-shrink-0"></span>
+<span class="text-[13px] text-[var(--text-secondary)]">Needs You</span>
+</div>
+<span class="text-[15px] font-semibold text-[var(--text-primary)] tabular-nums">3</span>
+</div>
+<div class="flex items-center justify-between pt-2">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-[#1F9E8F] flex-shrink-0"></span>
+<span class="text-[13px] text-[var(--text-secondary)]">Interviews</span>
+</div>
+<span class="text-[15px] font-semibold text-[var(--text-primary)] tabular-nums">1</span>
+</div>
+</div>
+</div>
+<!-- Trend sub-row -->
+<div class="flex items-center gap-1.5 pt-3 border-t border-[var(--border-color)] text-[var(--text-secondary)] text-[12px]">
+<span class="material-symbols-outlined text-[15px] text-[#4B5FD6] font-semibold">north</span>
+<span class="tabular-nums font-normal">+8 vs yesterday</span>
+</div>
+</section>
+<!-- Card: This Week -->
+<section class="w-full bg-[var(--card-bg)] rounded-[20px] p-5 border border-[var(--border-color)] flex flex-col gap-4 shadow-sm">
+<div class="flex items-baseline justify-between select-none">
+<h2 class="text-[17px] font-semibold text-[var(--text-primary)] tracking-tight">This week</h2>
+<span class="text-[12px] text-[var(--text-secondary)] tabular-nums font-normal">218 total</span>
+</div>
+<div class="relative w-full pt-6 pb-1">
+<!-- Target 50 Dashed Line -->
+<div class="absolute inset-x-0 top-7 flex items-center pointer-events-none">
+<div class="flex-1 border-b border-dashed border-[var(--border-color)]"></div>
+<span class="text-[11px] text-[var(--text-secondary)] pl-2 bg-[var(--card-bg)]">Target 50</span>
+</div>
+<!-- Slim vertical bar chart -->
+<div class="flex items-end justify-between h-32 px-1">
+<div class="flex flex-col items-center gap-2">
+<div class="w-2.5 h-20 bg-[#4B5FD6]/35 rounded-full"></div>
+<span class="text-[11px] text-[var(--text-secondary)]">M</span>
+</div>
+<div class="flex flex-col items-center gap-2">
+<div class="w-2.5 h-24 bg-[#4B5FD6]/35 rounded-full"></div>
+<span class="text-[11px] text-[var(--text-secondary)]">T</span>
+</div>
+<div class="flex flex-col items-center gap-2">
+<div class="w-2.5 h-20 bg-[#4B5FD6]/35 rounded-full"></div>
+<span class="text-[11px] text-[var(--text-secondary)]">W</span>
+</div>
+<!-- Today: solid bar with dot indicator -->
+<div class="flex flex-col items-center gap-2 relative">
+<div class="w-1.5 h-1.5 rounded-full bg-[#4B5FD6] mb-[-4px]"></div>
+<div class="w-2.5 h-[104px] bg-[#4B5FD6] rounded-full"></div>
+<span class="text-[11px] text-[var(--text-primary)] font-semibold">T</span>
+</div>
+<div class="flex flex-col items-center gap-2">
+<div class="w-2.5 h-32 bg-[var(--bar-bg)] rounded-full"></div>
+<span class="text-[11px] text-[var(--text-secondary)]">F</span>
+</div>
+<div class="flex flex-col items-center gap-2">
+<div class="w-2.5 h-32 bg-[var(--bar-bg)] rounded-full"></div>
+<span class="text-[11px] text-[var(--text-secondary)]">S</span>
+</div>
+<div class="flex flex-col items-center gap-2">
+<div class="w-2.5 h-32 bg-[var(--bar-bg)] rounded-full"></div>
+<span class="text-[11px] text-[var(--text-secondary)]">S</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Card: Pipeline -->
+<section class="w-full bg-[var(--card-bg)] rounded-[20px] p-5 border border-[var(--border-color)] flex flex-col gap-4 shadow-sm">
+<div class="flex items-center justify-between">
+<h2 class="text-[17px] font-semibold text-[var(--text-primary)] tracking-tight">Pipeline</h2>
+<span class="text-[12px] text-[var(--text-secondary)] tabular-nums">199 candidates</span>
+</div>
+<!-- 4-Stage stacked bar with 2px gaps -->
+<div class="flex items-center w-full h-2.5 gap-0.5 rounded-full overflow-hidden bg-[var(--bar-bg)] p-0.5">
+<div class="h-full rounded-l-full bg-[#6B7A90]" style="width: 41.7%;" title="Discovered"></div>
+<div class="h-full bg-[#4B5FD6]" style="width: 27.6%;" title="Screened"></div>
+<div class="h-full bg-[#E3A33B]" style="width: 18.6%;" title="Queued"></div>
+<div class="h-full rounded-r-full bg-[#1F9E8F]" style="width: 12.1%;" title="Submitted"></div>
+</div>
+<!-- Legend Grid -->
+<div class="grid grid-cols-2 gap-x-4 gap-y-2.5 pt-0.5">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-[#6B7A90]"></span>
+<span class="text-[12px] text-[var(--text-secondary)]">Discovered</span>
+</div>
+<span class="text-[12px] font-semibold text-[var(--text-primary)] tabular-nums">83 <span class="font-normal text-[var(--text-secondary)]">(42%)</span></span>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-[#4B5FD6]"></span>
+<span class="text-[12px] text-[var(--text-secondary)]">Screened</span>
+</div>
+<span class="text-[12px] font-semibold text-[var(--text-primary)] tabular-nums">55 <span class="font-normal text-[var(--text-secondary)]">(28%)</span></span>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-[#E3A33B]"></span>
+<span class="text-[12px] text-[var(--text-secondary)]">Queued</span>
+</div>
+<span class="text-[12px] font-semibold text-[var(--text-primary)] tabular-nums">37 <span class="font-normal text-[var(--text-secondary)]">(18%)</span></span>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-[#1F9E8F]"></span>
+<span class="text-[12px] text-[var(--text-secondary)]">Submitted</span>
+</div>
+<span class="text-[12px] font-semibold text-[var(--text-primary)] tabular-nums">24 <span class="font-normal text-[var(--text-secondary)]">(12%)</span></span>
+</div>
+</div>
+</section>
+<!-- Card: Activity by hour -->
+<section class="w-full bg-[var(--card-bg)] rounded-[20px] p-5 border border-[var(--border-color)] flex flex-col gap-4 shadow-sm">
+<div class="flex items-baseline justify-between select-none">
+<h2 class="text-[17px] font-semibold text-[var(--text-primary)] tracking-tight">Activity by hour</h2>
+<span class="text-[11px] text-[var(--text-secondary)]">Peak at 14:00 (8 sub)</span>
+</div>
+<div class="relative w-full h-36 flex flex-col justify-end pt-5">
+<!-- Floating peak tooltip indicator -->
+<div class="absolute left-[58%] top-0 -translate-x-1/2 flex flex-col items-center pointer-events-none">
+<div class="px-2 py-0.5 rounded-full bg-[var(--elevated-bg)] border border-[var(--border-color)] text-[var(--text-primary)] text-[10px] whitespace-nowrap tabular-nums font-medium shadow-sm">
+            14:00 · 8 submissions
+          </div>
+<div class="w-1.5 h-1.5 rotate-45 bg-[var(--elevated-bg)] border-r border-b border-[var(--border-color)] -mt-0.5"></div>
+</div>
+<!-- Smooth Teal curved area line chart -->
+<svg class="w-full h-24 overflow-visible" preserveaspectratio="none" viewbox="0 0 320 90">
+<defs>
+<lineargradient id="tealFadeGrad" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#1F9E8F" stop-opacity="0.32"></stop>
+<stop offset="100%" stop-color="#1F9E8F" stop-opacity="0.0"></stop>
+</lineargradient>
+</defs>
+<path d="M 0,85 C 40,85 50,80 80,72 C 110,65 130,55 160,35 C 175,25 185,10 192,10 C 200,10 210,40 230,55 C 255,75 285,82 320,84 L 320,90 L 0,90 Z" fill="url(#tealFadeGrad)"></path>
+<path d="M 0,85 C 40,85 50,80 80,72 C 110,65 130,55 160,35 C 175,25 185,10 192,10 C 200,10 210,40 230,55 C 255,75 285,82 320,84" fill="none" stroke="#1F9E8F" stroke-linecap="round" stroke-width="2.2"></path>
+<circle cx="192" cy="10" fill="var(--card-bg)" r="3.5" stroke="#1F9E8F" stroke-width="2.5"></circle>
+</svg>
+<div class="flex justify-between items-center pt-2 border-t border-[var(--border-color)] text-[var(--text-secondary)] text-[11px] tabular-nums">
+<span>00:00</span>
+<span>06:00</span>
+<span>12:00</span>
+<span>18:00</span>
+<span>24:00</span>
+</div>
+</div>
+</section>
+<!-- Card: Now Applying -->
+<section class="w-full bg-[var(--card-bg)] rounded-[20px] p-5 border border-[var(--border-color)] flex flex-col gap-4 shadow-sm">
+<div class="flex items-center justify-between">
+<span class="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Now Applying</span>
+<span class="flex h-2 w-2 relative">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#4B5FD6] opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-[#4B5FD6]"></span>
+</span>
+</div>
+<div class="flex flex-col">
+<h3 class="text-[17px] font-semibold text-[var(--text-primary)] tracking-tight">Associate Data Scientist</h3>
+<span class="text-[13px] text-[var(--text-secondary)] mt-0.5">Zoho · Chennai · Greenhouse</span>
+</div>
+<!-- Slim Indigo Progress Bar -->
+<div class="w-full h-1.5 rounded-full bg-[var(--elevated-bg)] overflow-hidden">
+<div class="h-full bg-[#4B5FD6] rounded-full" style="width: 68%;"></div>
+</div>
+<!-- 4 Stages -->
+<div class="flex items-center justify-between pt-0.5">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[15px] text-[#4B5FD6]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="text-[11px] text-[var(--text-secondary)]">Found</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[15px] text-[#4B5FD6]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="text-[11px] text-[var(--text-secondary)]">Tailoring</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-[#4B5FD6]"></span>
+<span class="text-[11px] font-semibold text-[var(--text-primary)]">Filling</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-[var(--border-color)]"></span>
+<span class="text-[11px] text-[var(--text-tertiary)]">Verifying</span>
+</div>
+</div>
+</section>
+<!-- Card: Recent Activity -->
+<section class="w-full bg-[var(--card-bg)] rounded-[20px] p-5 border border-[var(--border-color)] flex flex-col gap-3 shadow-sm">
+<div class="flex items-center justify-between select-none">
+<h2 class="text-[17px] font-semibold text-[var(--text-primary)] tracking-tight">Recent activity</h2>
+<button class="text-[13px] font-semibold text-[#4B5FD6] active:opacity-60 transition-opacity">See All</button>
+</div>
+<div class="flex flex-col divide-y divide-[var(--border-color)]">
+<div class="flex items-start gap-3 py-3">
+<span class="w-2 h-2 rounded-full bg-[#1F9E8F] mt-1.5 flex-shrink-0" title="Submitted"></span>
+<div class="flex-1 min-w-0">
+<p class="text-[13px] text-[var(--text-primary)] truncate">Submitted to Zoho · Associate Data Scientist</p>
+</div>
+<span class="text-[11px] text-[var(--text-secondary)] tabular-nums flex-shrink-0">2m ago</span>
+</div>
+<div class="flex items-start gap-3 py-3">
+<span class="w-2 h-2 rounded-full bg-[#4B5FD6] mt-1.5 flex-shrink-0" title="Tailored"></span>
+<div class="flex-1 min-w-0">
+<p class="text-[13px] text-[var(--text-primary)] truncate">Tailored resume for Rippling · Python Developer</p>
+</div>
+<span class="text-[11px] text-[var(--text-secondary)] tabular-nums flex-shrink-0">14m ago</span>
+</div>
+<div class="flex items-start gap-3 py-3">
+<span class="w-2 h-2 rounded-full bg-[#E3A33B] mt-1.5 flex-shrink-0" title="Action Needed"></span>
+<div class="flex-1 min-w-0">
+<p class="text-[13px] text-[var(--text-primary)] truncate">Needs review: Legal consent for Cloudflare</p>
+</div>
+<span class="text-[11px] text-[var(--text-secondary)] tabular-nums flex-shrink-0">38m ago</span>
+</div>
+<div class="flex items-start gap-3 py-3">
+<span class="w-2 h-2 rounded-full bg-[#1F9E8F] mt-1.5 flex-shrink-0" title="Submitted"></span>
+<div class="flex-1 min-w-0">
+<p class="text-[13px] text-[var(--text-primary)] truncate">Submitted to Swiggy · Data Analyst</p>
+</div>
+<span class="text-[11px] text-[var(--text-secondary)] tabular-nums flex-shrink-0">1h ago</span>
+</div>
+</div>
+</section>
+<!-- Motion Specs Annotation Card -->
+<aside class="w-full bg-[var(--card-bg)] rounded-[20px] p-4 border border-[var(--border-color)] select-none shadow-sm">
+<p class="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+<strong class="font-semibold text-[var(--text-primary)]">Motion Specs:</strong> 280 ms spring page transitions · shared-element zoom from list row to sheet · ring sweep with count-up · cards fading in 40 ms apart · bars growing from baseline · area line drawing left to right · sliding segmented-control indicator · 0.97 press scale with light haptic · skeleton shimmer · reduced-motion fallback of plain fades.
+      </p>
+</aside>
+</main>
+<!-- Frosted Translucent Bottom Tab Bar -->
+<nav class="fixed bottom-0 inset-x-0 z-50 pb-safe bg-[var(--nav-bg)] backdrop-blur-xl border-t border-[var(--border-color)] transition-colors duration-200">
+<div class="max-w-[420px] mx-auto flex justify-around items-center h-16 px-2">
+<!-- Tab 1: Today (Active) -->
+<a aria-current="page" class="min-w-[48px] min-h-[44px] flex flex-col items-center justify-center gap-1 transition-colors text-[var(--text-primary)]" href="#">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="text-[10px] leading-none font-semibold">Today</span>
+</a>
+<!-- Tab 2: Needs You (Badge 3) -->
+<a class="min-w-[48px] min-h-[44px] flex flex-col items-center justify-center gap-1 relative text-[var(--text-secondary)] hover:text-[var(--text-primary)] active:opacity-70 transition-colors" href="#">
+<div class="relative flex items-center justify-center">
+<span class="material-symbols-outlined text-[24px]">notifications</span>
+<span class="absolute -top-1 -right-2 bg-[#FF453A] text-white font-semibold text-[9px] min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center leading-none tabular-nums shadow-sm">3</span>
+</div>
+<span class="text-[10px] leading-none font-medium">Needs You</span>
+</a>
+<!-- Tab 3: Jobs -->
+<a class="min-w-[48px] min-h-[44px] flex flex-col items-center justify-center gap-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] active:opacity-70 transition-colors" href="#">
+<span class="material-symbols-outlined text-[24px]">work</span>
+<span class="text-[10px] leading-none font-medium">Jobs</span>
+</a>
+<!-- Tab 4: Answers -->
+<a class="min-w-[48px] min-h-[44px] flex flex-col items-center justify-center gap-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] active:opacity-70 transition-colors" href="#">
+<span class="material-symbols-outlined text-[24px]">chat_bubble</span>
+<span class="text-[10px] leading-none font-medium">Answers</span>
+</a>
+<!-- Tab 5: Profile -->
+<a class="min-w-[48px] min-h-[44px] flex flex-col items-center justify-center gap-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] active:opacity-70 transition-colors" href="#">
+<span class="material-symbols-outlined text-[24px]">person</span>
+<span class="text-[10px] leading-none font-medium">Profile</span>
+</a>
+</div>
+</nav>
+<!-- Dark / Light Smooth Mode Script -->
+<script>
+    (function() {
+      const toggleBtn = document.getElementById('theme-toggle-btn');
+      const toggleIcon = document.getElementById('theme-toggle-icon');
+      if (!toggleBtn || !toggleIcon) return;
+
+      toggleBtn.addEventListener('click', function() {
+        const isDark = document.documentElement.classList.toggle('dark');
+        document.body.classList.toggle('dark', isDark);
+
+        if (isDark) {
+          document.body.style.backgroundColor = '#131313';
+          document.documentElement.style.backgroundColor = '#131313';
+          toggleIcon.textContent = 'light_mode';
+          toggleBtn.setAttribute('title', 'Switch to Day mode');
+        } else {
+          document.body.style.backgroundColor = '#F5F4F1';
+          document.documentElement.style.backgroundColor = '#F5F4F1';
+          toggleIcon.textContent = 'dark_mode';
+          toggleBtn.setAttribute('title', 'Switch to Night mode');
+        }
+      });
+    })();
+  </script>
+</body></html>

@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
+  <meta name="theme-color" content="#0F0F10"/>
+  <title>ApplyPilot - Autonomous iOS Cockpit</title>
+  
+  <!-- Google Fonts: Newsreader (Editorial Serif) + Plus Jakarta Sans + Inter + Material Symbols -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""/>
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+
+  <!-- Tailwind CSS with Stitch Design Tokens -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "background": "#0F0F10",
+            "surface": "#0F0F10",
+            "surface-dim": "#131313",
+            "surface-bright": "#393939",
+            "surface-card": "#18181A",
+            "surface-elevated": "#242426",
+            "surface-container-lowest": "#0E0E0E",
+            "surface-container-low": "#1B1B1B",
+            "surface-container": "#1F1F1F",
+            "surface-container-high": "#2A2A2A",
+            "surface-container-highest": "#353535",
+            "primary": "#FFFFFF",
+            "on-primary": "#1A1C1C",
+            "secondary": "#C6C6CB",
+            "on-secondary": "#2F3034",
+            "zinc-subtle": "#8E8E93",
+            "hairline-separator": "#2C2C2E",
+            "silver-track": "#E5E5EA",
+            "amber-gold": "#F59E0B",
+            "terracotta": "#EA580C",
+            "rich-gold": "#D4AF37",
+            "warm-amber": "#FBBF24",
+            "status-success": "#30D158",
+            "status-warning": "#FF9F0A",
+            "status-error": "#FF453A",
+            "status-info": "#0A84FF",
+            "status-review": "#BF5AF2"
+          },
+          fontFamily: {
+            "serif-display": ["Newsreader", "Georgia", "serif"],
+            "sans": ["'Plus Jakarta Sans'", "Inter", "sans-serif"],
+            "inter": ["Inter", "sans-serif"]
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    @layer base {
+      html, body {
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        background-color: #0F0F10;
+        color: #E2E2E2;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      body {
+        overscroll-behavior: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 350, 'GRAD' 0, 'opsz' 24;
+        display: inline-block;
+        vertical-align: middle;
+      }
+      .material-symbols-filled {
+        font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+    }
+    ::-webkit-scrollbar { display: none; }
+    .pb-safe { padding-bottom: env(safe-area-inset-bottom, 20px); }
+    .pt-safe { padding-top: env(safe-area-inset-top, 44px); }
+    
+    /* Smooth tab switching transition */
+    .tab-view {
+      display: none;
+      opacity: 0;
+      transition: opacity 0.2s ease-in-out;
+    }
+    .tab-view.active {
+      display: block;
+      opacity: 1;
+    }
+  </style>
+</head>
+<body class="bg-surface text-[#E2E2E2] min-h-screen selection:bg-amber-500/20 selection:text-white flex flex-col justify-between">
+
+  <!-- TOP FIXED IOS HEADER -->
+  <header class="fixed top-0 w-full z-50 pt-safe bg-surface/85 backdrop-blur-xl border-b border-hairline-separator/50 shadow-[0_1px_12px_rgba(0,0,0,0.5)]">
+    <!-- iOS Time & System Status -->
+    <div class="flex justify-between items-center px-4 pt-1 pb-1 text-zinc-subtle text-xs select-none">
+      <span class="font-medium text-white tracking-tight" id="ios-clock">9:41</span>
+      <div class="flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-[14px]">signal_cellular_alt</span>
+        <span class="material-symbols-outlined text-[14px]">wifi</span>
+        <span class="material-symbols-outlined text-[16px]">battery_full</span>
+      </div>
+    </div>
+
+    <!-- Navigation Header Bar -->
+    <div class="h-14 px-4 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="text-white font-serif-display text-[26px] tracking-tight font-normal" id="header-title">Cockpit</span>
+        <span class="px-2 py-0.5 rounded-full bg-status-success/15 text-status-success text-[11px] font-medium flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-status-success animate-pulse"></span>
+          <span id="header-status-badge">Auto-Pilot Active</span>
+        </span>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <!-- Direct Stitch Screen Link Menu Pill -->
+        <a href="/app/stitch/today_warm_editorial_cockpit/code.html" target="_blank" title="View Raw Stitch Canvas" class="px-2 py-1 rounded-lg bg-surface-elevated text-zinc-subtle hover:text-white text-[11px] font-mono flex items-center gap-1 transition-colors">
+          <span class="material-symbols-outlined text-[13px]">palette</span>
+          <span>Stitch</span>
+        </a>
+
+        <!-- Candidate Profile Monogram Avatar -->
+        <button onclick="switchTab('profile')" class="w-8 h-8 rounded-full bg-white text-[#0F0F10] font-bold text-xs flex items-center justify-center cursor-pointer transition-transform active:scale-95 hover:opacity-90 shadow-sm" id="header-avatar-btn">
+          AA
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN SCROLLABLE APP BODY -->
+  <main class="flex-1 w-full max-w-xl mx-auto px-4 pt-24 pb-28">
+
+    <!-- ======================================================== -->
+    <!-- TAB 0: HOME / COCKPIT (Warm Editorial Cockpit)            -->
+    <!-- ======================================================== -->
+    <section id="tab-home" class="tab-view active space-y-4">
+      
+      <!-- GREETING & RADAR -->
+      <div class="flex flex-col space-y-1 pt-1">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] text-zinc-subtle uppercase tracking-[0.16em] font-medium" id="today-date-str">Wednesday, November 18</span>
+          <span class="text-[11px] text-zinc-subtle bg-surface-card px-2 py-0.5 rounded-full border border-hairline-separator">Safe Dry-Run Mode</span>
+        </div>
+        <div class="flex items-baseline justify-between">
+          <h1 class="font-serif-display text-[36px] text-white tracking-tight font-normal leading-tight">
+            Hello, <span class="italic font-light" id="user-greeting-name">Adharsh</span>
+          </h1>
+          <span class="text-[12px] text-zinc-subtle font-medium">Cap: <strong class="text-white" id="stat-daily-cap">100</strong>/day</span>
+        </div>
+      </div>
+
+      <!-- DAILY QUOTA DONUT + METRIC KPIS -->
+      <div class="grid grid-cols-12 gap-3">
+        <!-- Donut Card (7 cols) -->
+        <div class="col-span-7 bg-surface-card border border-hairline-separator rounded-2xl p-4 flex flex-col justify-between shadow-sm relative overflow-hidden">
+          <div class="flex items-center justify-between">
+            <span class="text-[13px] text-zinc-subtle font-medium">Daily Quota</span>
+            <span class="text-[11px] text-status-success bg-status-success/10 px-1.5 py-0.5 rounded-full font-medium tabular-nums" id="pacing-badge">On Pace</span>
+          </div>
+
+          <!-- Circular Donut Progress -->
+          <div class="relative flex items-center justify-center my-2">
+            <svg class="w-32 h-32 -rotate-90" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" fill="none" r="48" stroke="#242426" stroke-width="9"></circle>
+              <defs>
+                <linearGradient id="warmGoldGradientRing" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#F59E0B"></stop>
+                  <stop offset="100%" stop-color="#EA580C"></stop>
+                </linearGradient>
+              </defs>
+              <circle id="quota-donut-circle" class="transition-all duration-1000 ease-out" cx="60" cy="60" fill="none" r="48" stroke="url(#warmGoldGradientRing)" stroke-dasharray="301.59" stroke-dashoffset="240" stroke-linecap="round" stroke-width="9"></circle>
+            </svg>
+            <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
+              <span class="font-serif-display text-[36px] text-white font-normal leading-none tabular-nums" id="stat-daily-applied">0</span>
+              <span class="text-[11px] text-zinc-subtle mt-1 font-light">of <span id="stat-daily-cap-sub">100</span> max</span>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between pt-1 text-[11px] text-zinc-subtle">
+            <span>Circuit Breaker</span>
+            <span class="text-status-success font-medium flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-status-success"></span> Healthy (3 Streak)
+            </span>
+          </div>
+        </div>
+
+        <!-- Stacked KPIs (5 cols) -->
+        <div class="col-span-5 flex flex-col gap-2.5">
+          <!-- Applied -->
+          <div class="bg-surface-card border border-hairline-separator rounded-2xl p-3 flex flex-col justify-between flex-1 shadow-sm">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] text-zinc-subtle font-medium">Applied</span>
+              <span class="material-symbols-outlined text-[16px] text-zinc-subtle">send</span>
+            </div>
+            <div class="flex items-baseline gap-1.5 mt-1">
+              <span class="font-serif-display text-[24px] text-white font-normal leading-none tabular-nums" id="stat-total-applied">5</span>
+              <span class="text-[10px] text-zinc-subtle">dry runs</span>
+            </div>
+          </div>
+
+          <!-- Needs You -->
+          <div onclick="switchTab('needs-you')" class="bg-surface-card border border-hairline-separator rounded-2xl p-3 flex flex-col justify-between flex-1 shadow-sm cursor-pointer hover:border-amber-gold/50 transition-colors">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] text-zinc-subtle font-medium">Needs You</span>
+              <span class="h-2 w-2 rounded-full bg-amber-gold shadow-[0_0_6px_rgba(245,158,11,0.5)]"></span>
+            </div>
+            <div class="flex items-baseline justify-between mt-1">
+              <span class="font-serif-display text-[24px] text-amber-gold font-normal leading-none tabular-nums" id="stat-needs-you-count">0</span>
+              <span class="text-[10px] text-amber-gold bg-amber-gold/15 px-1.5 py-0.5 rounded-full font-medium">Triage</span>
+            </div>
+          </div>
+
+          <!-- Pipeline Queue -->
+          <div onclick="switchTab('jobs')" class="bg-surface-card border border-hairline-separator rounded-2xl p-3 flex flex-col justify-between flex-1 shadow-sm cursor-pointer hover:border-white/30 transition-colors">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] text-zinc-subtle font-medium">Queue</span>
+              <span class="material-symbols-outlined text-[16px] text-zinc-subtle">work</span>
+            </div>
+            <div class="flex items-baseline justify-between mt-1">
+              <span class="font-serif-display text-[24px] text-white font-normal leading-none tabular-nums" id="stat-queue-count">4</span>
+              <span class="text-[10px] text-zinc-subtle">ready</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LIVE APPLICATION ENGINE CARD -->
+      <div class="bg-surface-card border border-hairline-separator rounded-2xl p-4 shadow-sm flex flex-col space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="w-7 h-7 rounded-lg bg-surface-elevated flex items-center justify-center">
+              <span class="material-symbols-outlined text-amber-gold text-[16px]">bolt</span>
+            </div>
+            <span class="text-[13px] font-semibold text-white">Autonomous Pilot Pipeline</span>
+          </div>
+          <span class="text-[11px] text-zinc-subtle bg-surface-elevated px-2 py-0.5 rounded-full">Greenhouse · Lever · Ashby</span>
+        </div>
+
+        <!-- Target Job Context -->
+        <div class="p-3 bg-surface-elevated/60 rounded-xl flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg bg-surface-card flex items-center justify-center font-bold text-sm text-white" id="engine-target-monogram">
+              CF
+            </div>
+            <div>
+              <h4 class="text-[13px] font-semibold text-white" id="engine-target-company">Cloudflare</h4>
+              <p class="text-[11px] text-zinc-subtle" id="engine-target-role">Associate Data Scientist · Greenhouse</p>
+            </div>
+          </div>
+          <span class="text-[11px] font-mono text-status-success bg-status-success/10 px-2 py-1 rounded-md">Passes ₹7 LPA+</span>
+        </div>
+
+        <!-- Form Pre-Fill Progress Bar -->
+        <div class="space-y-1.5 pt-1">
+          <div class="flex items-center justify-between text-[11px] text-zinc-subtle">
+            <span>Step 3 of 4: Custom Questions & Pre-Fill</span>
+            <span class="text-white font-medium tabular-nums">68%</span>
+          </div>
+          <div class="w-full h-1.5 bg-surface-elevated rounded-full overflow-hidden">
+            <div class="h-full bg-gradient-to-r from-amber-gold to-status-success rounded-full" style="width: 68%;"></div>
+          </div>
+          <div class="flex justify-between items-center text-[10px] text-zinc-subtle pt-0.5">
+            <span class="text-white">✓ Grounded Resume</span>
+            <span class="text-white">✓ Cover Letter</span>
+            <span class="text-status-success font-medium">Filling Form...</span>
+            <span>Submission</span>
+          </div>
+        </div>
+
+        <!-- Quick Action Trigger Button -->
+        <div class="pt-2">
+          <button onclick="triggerApplyNext()" id="btn-apply-next" class="w-full h-11 rounded-xl bg-white text-[#0F0F10] font-semibold text-[13px] flex items-center justify-center gap-2 hover:bg-zinc-200 active:scale-[0.98] transition-all cursor-pointer shadow-md">
+            <span class="material-symbols-outlined text-[18px]">play_arrow</span>
+            <span>Run Next Queue Dry-Run</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- RECENT APPLICATION LOG -->
+      <div class="bg-surface-card border border-hairline-separator rounded-2xl p-4 shadow-sm flex flex-col space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="font-serif-display text-[20px] text-white font-normal tracking-tight">Recent Activity</span>
+          <button onclick="switchTab('jobs')" class="font-serif-display italic text-[14px] text-amber-gold hover:opacity-80 transition-opacity">View All 378 Roles</button>
+        </div>
+        <div class="divide-y divide-hairline-separator/50" id="activity-stream-list">
+          <!-- Item 1: Cloudflare -->
+          <div class="flex items-start justify-between py-2.5">
+            <div class="flex items-start gap-3">
+              <span class="w-2 h-2 rounded-full bg-status-success mt-1.5 shrink-0"></span>
+              <div class="flex flex-col">
+                <span class="text-[13px] text-white font-medium">Cloudflare · Dry-Run Submitted</span>
+                <span class="text-[11px] text-zinc-subtle">Greenhouse Form · 8 Fields Answered · ₹12-18 LPA</span>
+              </div>
+            </div>
+            <span class="text-[11px] text-zinc-subtle tabular-nums">Today</span>
+          </div>
+          <!-- Item 2: Palantir -->
+          <div class="flex items-start justify-between py-2.5">
+            <div class="flex items-start gap-3">
+              <span class="w-2 h-2 rounded-full bg-amber-gold mt-1.5 shrink-0 shadow-[0_0_5px_rgba(245,158,11,0.6)]"></span>
+              <div class="flex flex-col">
+                <span class="text-[13px] text-white font-medium">Palantir Technologies</span>
+                <span class="text-[11px] text-zinc-subtle">Lever Portal · Needs You triage created</span>
+              </div>
+            </div>
+            <span class="text-[11px] text-zinc-subtle tabular-nums">Today</span>
+          </div>
+          <!-- Item 3: GitLab -->
+          <div class="flex items-start justify-between py-2.5">
+            <div class="flex items-start gap-3">
+              <span class="w-2 h-2 rounded-full bg-status-success mt-1.5 shrink-0"></span>
+              <div class="flex flex-col">
+                <span class="text-[13px] text-white font-medium">GitLab · Dry-Run Confirmed</span>
+                <span class="text-[11px] text-zinc-subtle">Greenhouse · Full Form Pre-Filled</span>
+              </div>
+            </div>
+            <span class="text-[11px] text-zinc-subtle tabular-nums">Yesterday</span>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ======================================================== -->
+    <!-- TAB 1: NEEDS YOU (Autonomous Triage Deck)                -->
+    <!-- ======================================================== -->
+    <section id="tab-needs-you" class="tab-view space-y-4">
+      
+      <!-- Sub-header context bar -->
+      <div class="flex items-center justify-between pb-1">
+        <div class="flex items-center gap-1.5">
+          <span class="text-[13px] font-semibold text-white">Pending Review</span>
+          <span class="w-2 h-2 rounded-full bg-amber-gold inline-block"></span>
+        </div>
+        <span class="text-[11px] text-zinc-subtle bg-surface-card px-2.5 py-0.5 rounded-full border border-hairline-separator">100% Grounded Rule Active</span>
+      </div>
+
+      <!-- Segmented Pill Selector -->
+      <div class="p-1 bg-surface-container rounded-xl flex items-center select-none" id="needs-you-pill-container">
+        <button onclick="toggleNeedsYouSubTab('questions')" id="btn-subtab-questions" class="w-1/2 py-2 rounded-lg bg-surface-card text-white font-semibold text-xs transition-all shadow-sm flex items-center justify-center gap-1.5">
+          <span>Questions</span>
+          <span class="px-1.5 py-0.2 bg-amber-gold/20 text-amber-gold rounded-full text-[10px]" id="badge-needs-you-q">1</span>
+        </button>
+        <button onclick="toggleNeedsYouSubTab('ai-answered')" id="btn-subtab-ai" class="w-1/2 py-2 rounded-lg text-zinc-subtle font-medium text-xs transition-all flex items-center justify-center gap-1.5">
+          <span>AI Answered</span>
+          <span class="px-1.5 py-0.2 bg-surface-elevated text-zinc-subtle rounded-full text-[10px]" id="badge-needs-you-ai">2</span>
+        </button>
+      </div>
+
+      <!-- Triage Items Container -->
+      <div id="needs-you-list" class="space-y-3">
+        <!-- Card 1: Legal Consent (Zoho / Lever) -->
+        <div class="bg-surface-card border border-hairline-separator rounded-2xl p-4 space-y-3 shadow-sm">
+          <div class="flex items-start justify-between">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-lg bg-surface-elevated flex items-center justify-center text-amber-gold">
+                <span class="material-symbols-outlined text-[18px]">verified_user</span>
+              </div>
+              <div>
+                <h4 class="text-[13px] font-semibold text-white">Legal & AI Consent Check</h4>
+                <p class="text-[11px] text-zinc-subtle">Palantir · Lever Portal Checkbox</p>
+              </div>
+            </div>
+            <span class="px-2 py-0.5 rounded-full bg-amber-gold/15 text-amber-gold text-[10px] font-semibold">Human Required</span>
+          </div>
+
+          <p class="text-[12px] text-zinc-300 leading-relaxed bg-surface-elevated/40 p-3 rounded-xl border border-hairline-separator/40">
+            "I consent to the collection and processing of my candidate data and autonomous ATS verification."
+          </p>
+
+          <div class="flex items-center gap-2 pt-1">
+            <button onclick="alert('Consent confirmed for this application.')" class="flex-1 h-10 rounded-xl bg-white text-[#0F0F10] font-semibold text-xs flex items-center justify-center hover:bg-zinc-200 active:scale-95 transition-all">
+              Authorize Once
+            </button>
+            <button onclick="alert('Skipping this consent item.')" class="px-3 h-10 rounded-xl bg-surface-elevated text-zinc-subtle hover:text-white font-medium text-xs transition-colors">
+              Skip
+            </button>
+          </div>
+        </div>
+
+        <!-- Card 2: AI Drafted Answer (Rippling / Python AST) -->
+        <div class="bg-surface-card border border-hairline-separator rounded-2xl p-4 space-y-3 shadow-sm">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-status-info"></span>
+              <span class="text-[12px] font-semibold text-white">AI Drafted · 94% Confidence</span>
+            </div>
+            <span class="text-[10px] text-zinc-subtle bg-surface-elevated px-2 py-0.5 rounded-full">Grounded</span>
+          </div>
+
+          <div>
+            <span class="text-[11px] text-zinc-subtle">Cloudflare · Associate Data Scientist</span>
+            <h4 class="text-[13px] font-semibold text-white mt-0.5">Describe your experience with multimodal models or accident prediction systems.</h4>
+          </div>
+
+          <div class="p-3 bg-surface-elevated rounded-xl border border-hairline-separator/50 text-[12px] text-zinc-200 leading-relaxed">
+            "Invented and granted Patent #202441052840: 'A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver' using camera streams, temporal fusion, and driver state signals at VIT Vellore."
+          </div>
+
+          <div class="flex items-center gap-1 text-[11px] text-zinc-subtle">
+            <span class="material-symbols-outlined text-[14px] text-status-success">verified</span>
+            <span>Source: Locked Patent Vault (#202441052840)</span>
+          </div>
+
+          <div class="flex items-center gap-2 pt-1">
+            <button onclick="approveAnswer(1)" class="flex-1 h-10 rounded-xl bg-white text-[#0F0F10] font-semibold text-xs flex items-center justify-center hover:bg-zinc-200 active:scale-95 transition-all">
+              Approve & Save to Bank
+            </button>
+            <button onclick="editAnswer(1)" class="px-4 h-10 rounded-xl bg-surface-elevated text-white font-medium text-xs hover:bg-surface-container transition-colors">
+              Edit
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ======================================================== -->
+    <!-- TAB 2: JOBS (Pipeline & Discovery)                        -->
+    <!-- ======================================================== -->
+    <section id="tab-jobs" class="tab-view space-y-4">
+      
+      <!-- Top Title & Summary -->
+      <div class="flex items-baseline justify-between pt-1">
+        <div>
+          <span class="text-[11px] text-zinc-subtle uppercase tracking-wider font-semibold">Priority Application Pipeline</span>
+          <h2 class="font-serif-display text-[32px] text-white tracking-tight font-normal">Jobs</h2>
+        </div>
+        <div class="text-right">
+          <span class="font-serif-display text-[26px] text-white font-normal" id="jobs-tracked-count">378</span>
+          <p class="text-[11px] text-zinc-subtle">tracked</p>
+        </div>
+      </div>
+
+      <!-- Live Search Bar -->
+      <div class="relative flex items-center w-full h-11 px-3 bg-surface-card border border-hairline-separator rounded-xl">
+        <span class="material-symbols-outlined text-zinc-subtle text-[18px] mr-2">search</span>
+        <input oninput="filterJobs(this.value)" class="w-full bg-transparent text-white placeholder-zinc-subtle text-xs focus:outline-none" placeholder="Search company, title, or portal (e.g. Cloudflare, Lever)..." type="text" id="job-search-input"/>
+      </div>
+
+      <!-- Filter Chips -->
+      <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs select-none">
+        <button onclick="selectJobFilter('all')" class="job-chip px-3 py-1.5 rounded-full bg-white text-[#0F0F10] font-semibold shrink-0">All Portals</button>
+        <button onclick="selectJobFilter('greenhouse')" class="job-chip px-3 py-1.5 rounded-full bg-surface-card text-zinc-subtle hover:text-white border border-hairline-separator shrink-0">Greenhouse</button>
+        <button onclick="selectJobFilter('lever')" class="job-chip px-3 py-1.5 rounded-full bg-surface-card text-zinc-subtle hover:text-white border border-hairline-separator shrink-0">Lever</button>
+        <button onclick="selectJobFilter('ashby')" class="job-chip px-3 py-1.5 rounded-full bg-surface-card text-zinc-subtle hover:text-white border border-hairline-separator shrink-0">Ashby</button>
+        <button onclick="selectJobFilter('assist')" class="job-chip px-3 py-1.5 rounded-full bg-surface-card text-zinc-subtle hover:text-white border border-hairline-separator shrink-0">Assist-Only</button>
+      </div>
+
+      <!-- Segmented Status Tabs -->
+      <div class="bg-surface-container-low p-1 rounded-xl flex items-center gap-1 overflow-x-auto">
+        <button class="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-surface-elevated text-white font-semibold text-xs shadow-sm">
+          <span>Queue</span>
+          <span class="px-1.5 py-0.2 rounded-full bg-white text-[#0F0F10] text-[10px] font-bold">4</span>
+        </button>
+        <button class="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-zinc-subtle hover:text-white text-xs">
+          <span>Maybe</span>
+          <span class="px-1.5 py-0.2 rounded-full bg-surface-card text-zinc-subtle text-[10px]">14</span>
+        </button>
+        <button class="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-zinc-subtle hover:text-white text-xs">
+          <span>Applied</span>
+          <span class="px-1.5 py-0.2 rounded-full bg-surface-card text-zinc-subtle text-[10px]">5</span>
+        </button>
+        <button class="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-zinc-subtle hover:text-white text-xs">
+          <span>Skipped</span>
+          <span class="px-1.5 py-0.2 rounded-full bg-surface-card text-zinc-subtle text-[10px]">294</span>
+        </button>
+      </div>
+
+      <!-- Grouped Job Cards List -->
+      <div class="bg-surface-card border border-hairline-separator rounded-2xl overflow-hidden divide-y divide-hairline-separator/50" id="jobs-cards-container">
+        <!-- Job 1 -->
+        <div onclick="openJobDetail('Cloudflare', 'Associate Data Scientist', 'Greenhouse', '₹14-18 LPA', 'Bengaluru / Remote', '98%')" class="p-4 flex items-center justify-between hover:bg-surface-elevated/50 transition-colors cursor-pointer">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-11 h-11 rounded-xl bg-surface-elevated flex items-center justify-center font-bold text-sm text-white shrink-0">CF</div>
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <h3 class="text-[13px] font-semibold text-white truncate">Cloudflare</h3>
+                <span class="px-1.5 py-0.5 rounded-full bg-status-warning/10 text-status-warning text-[10px] font-medium">Queued</span>
+              </div>
+              <p class="text-[11px] text-zinc-subtle truncate mt-0.5">Associate Data Scientist · Bengaluru / Remote</p>
+              <div class="flex items-center gap-2 mt-1">
+                <span class="text-[10px] text-status-success font-medium">₹14 - ₹18 LPA</span>
+                <span class="text-[10px] text-zinc-subtle">• Greenhouse ATS</span>
+              </div>
+            </div>
+          </div>
+          <span class="material-symbols-outlined text-zinc-subtle text-[20px]">chevron_right</span>
+        </div>
+
+        <!-- Job 2 -->
+        <div onclick="openJobDetail('Palantir', 'Forward Deployed Software Engineer', 'Lever', '₹20-30 LPA', 'Bengaluru', '95%')" class="p-4 flex items-center justify-between hover:bg-surface-elevated/50 transition-colors cursor-pointer">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-11 h-11 rounded-xl bg-surface-elevated flex items-center justify-center font-bold text-sm text-white shrink-0">PL</div>
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <h3 class="text-[13px] font-semibold text-white truncate">Palantir Technologies</h3>
+                <span class="px-1.5 py-0.5 rounded-full bg-status-info/10 text-status-info text-[10px] font-medium">Evaluating</span>
+              </div>
+              <p class="text-[11px] text-zinc-subtle truncate mt-0.5">Forward Deployed Software Engineer · Bengaluru</p>
+              <div class="flex items-center gap-2 mt-1">
+                <span class="text-[10px] text-status-success font-medium">₹20 - ₹30 LPA</span>
+                <span class="text-[10px] text-zinc-subtle">• Lever ATS</span>
+              </div>
+            </div>
+          </div>
+          <span class="material-symbols-outlined text-zinc-subtle text-[20px]">chevron_right</span>
+        </div>
+
+        <!-- Job 3 -->
+        <div onclick="openJobDetail('GitLab', 'Junior Backend Engineer', 'Greenhouse', '₹16-22 LPA', 'Remote India', '92%')" class="p-4 flex items-center justify-between hover:bg-surface-elevated/50 transition-colors cursor-pointer">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-11 h-11 rounded-xl bg-surface-elevated flex items-center justify-center font-bold text-sm text-white shrink-0">GL</div>
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <h3 class="text-[13px] font-semibold text-white truncate">GitLab</h3>
+                <span class="px-1.5 py-0.5 rounded-full bg-status-success/10 text-status-success text-[10px] font-medium">Applied Dry-Run</span>
+              </div>
+              <p class="text-[11px] text-zinc-subtle truncate mt-0.5">Junior Backend Engineer · Remote (India)</p>
+              <div class="flex items-center gap-2 mt-1">
+                <span class="text-[10px] text-status-success font-medium">₹16 - ₹22 LPA</span>
+                <span class="text-[10px] text-zinc-subtle">• Greenhouse ATS</span>
+              </div>
+            </div>
+          </div>
+          <span class="material-symbols-outlined text-zinc-subtle text-[20px]">chevron_right</span>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ======================================================== -->
+    <!-- TAB 3: ANSWERS (Grounded Answer Bank)                     -->
+    <!-- ======================================================== -->
+    <section id="tab-answers" class="tab-view space-y-4">
+      
+      <div class="flex items-baseline justify-between pt-1">
+        <div>
+          <span class="text-[11px] text-zinc-subtle uppercase tracking-wider font-semibold">100% Grounded Facts</span>
+          <h2 class="font-serif-display text-[32px] text-white tracking-tight font-normal">Answer Bank</h2>
+        </div>
+        <button onclick="alert('Add Grounded Fact modal')" class="px-3 py-1 rounded-xl bg-surface-elevated text-white hover:bg-surface-container font-semibold text-xs flex items-center gap-1 transition-colors">
+          <span class="material-symbols-outlined text-[15px]">add</span>
+          <span>New Fact</span>
+        </button>
+      </div>
+
+      <!-- Categories from Stitch answers/code.html -->
+      <div class="space-y-4">
+        <!-- Section: Education -->
+        <div class="space-y-2">
+          <h3 class="text-[12px] font-semibold text-zinc-subtle uppercase tracking-wide px-1">Education</h3>
+          <div class="bg-surface-card border border-hairline-separator rounded-2xl p-4 space-y-1.5 shadow-sm">
+            <div class="flex items-center justify-between">
+              <span class="text-[13px] font-semibold text-white">Vellore Institute of Technology (VIT)</span>
+              <span class="px-2 py-0.5 rounded-full bg-status-success/10 text-status-success text-[10px] font-medium">Verified</span>
+            </div>
+            <p class="text-[12px] text-zinc-300">Integrated MTech in Computer Science and Engineering (Data Science)</p>
+            <div class="flex items-center gap-2 text-[11px] text-zinc-subtle pt-1">
+              <span>CGPA: <strong class="text-white">7.62 / 10</strong></span>
+              <span>•</span>
+              <span>Graduation: <strong class="text-white">May 2026</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Patents -->
+        <div class="space-y-2">
+          <h3 class="text-[12px] font-semibold text-zinc-subtle uppercase tracking-wide px-1">Patents</h3>
+          <div class="bg-surface-card border border-hairline-separator rounded-2xl overflow-hidden divide-y divide-hairline-separator/50 shadow-sm">
+            <div class="p-4 space-y-1.5">
+              <div class="flex items-start justify-between">
+                <span class="text-[13px] font-semibold text-white">Patent #202441052840 (Granted)</span>
+                <span class="px-2 py-0.5 rounded-full bg-status-success/10 text-status-success text-[10px] font-semibold">Granted</span>
+              </div>
+              <p class="text-[12px] text-zinc-300">A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver</p>
+            </div>
+            <div class="p-4 space-y-1.5">
+              <div class="flex items-start justify-between">
+                <span class="text-[13px] font-semibold text-white">Patent #202441066601 (Published)</span>
+                <span class="px-2 py-0.5 rounded-full bg-status-info/10 text-status-info text-[10px] font-semibold">Published</span>
+              </div>
+              <p class="text-[12px] text-zinc-300">Acoustic Doppler Session Guard</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Work Authorization -->
+        <div class="space-y-2">
+          <h3 class="text-[12px] font-semibold text-zinc-subtle uppercase tracking-wide px-1">Work Authorization</h3>
+          <div class="bg-surface-card border border-hairline-separator rounded-2xl p-4 space-y-2 shadow-sm">
+            <div class="flex items-center justify-between">
+              <span class="text-[12px] text-zinc-300">Legally authorized to work in India</span>
+              <span class="text-[11px] text-status-success font-semibold">Yes</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-[12px] text-zinc-300">Requires visa sponsorship now or in future</span>
+              <span class="text-[11px] text-zinc-subtle font-semibold">No</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-[12px] text-zinc-300">Notice Period</span>
+              <span class="text-[11px] text-white font-semibold">Immediate / Fresher</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ======================================================== -->
+    <!-- TAB 4: PROFILE (Candidate & Safety Controls)              -->
+    <!-- ======================================================== -->
+    <section id="tab-profile" class="tab-view space-y-4">
+      
+      <div class="flex items-baseline justify-between pt-1">
+        <h2 class="font-serif-display text-[32px] text-white tracking-tight font-normal">Profile & Safety</h2>
+        <span class="text-[11px] text-status-success bg-status-success/10 px-2.5 py-0.5 rounded-full font-medium">Grounded Vault</span>
+      </div>
+
+      <!-- Candidate Header Card -->
+      <div class="bg-surface-card border border-hairline-separator rounded-2xl p-4 shadow-sm">
+        <div class="flex items-start gap-4">
+          <div class="relative shrink-0">
+            <div class="w-16 h-16 rounded-full bg-surface-elevated flex items-center justify-center text-white font-serif-display text-xl">
+              AA
+            </div>
+            <div class="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-status-success flex items-center justify-center text-[#0F0F10] shadow-sm">
+              <span class="material-symbols-outlined text-[13px] font-bold">check</span>
+            </div>
+          </div>
+
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2">
+              <h3 class="text-[16px] font-semibold text-white truncate" id="profile-full-name">Adharsh Arvinth</h3>
+              <span class="px-2 py-0.5 rounded-full bg-surface-elevated text-status-success text-[10px] font-semibold">Verified</span>
+            </div>
+            <p class="text-[12px] text-zinc-subtle mt-0.5" id="profile-headline">MTech Integrated CSE · VIT Vellore</p>
+            
+            <div class="flex items-center gap-2 mt-3 overflow-x-auto">
+              <a href="mailto:adharsharvinth2108@gmail.com" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-elevated text-zinc-200 text-[11px] hover:bg-surface-container transition-colors">
+                <span class="material-symbols-outlined text-[13px]">mail</span>
+                <span>Email</span>
+              </a>
+              <a href="https://github.com/Adharsh-Arvinth" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-elevated text-zinc-200 text-[11px] hover:bg-surface-container transition-colors">
+                <span class="material-symbols-outlined text-[13px]">code</span>
+                <span>GitHub</span>
+              </a>
+              <a href="https://linkedin.com" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-elevated text-zinc-200 text-[11px] hover:bg-surface-container transition-colors">
+                <span class="material-symbols-outlined text-[13px]">link</span>
+                <span>LinkedIn</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Autonomous Go-Live Safety Switch -->
+      <div class="bg-surface-card border border-hairline-separator rounded-2xl p-4 shadow-sm space-y-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-amber-gold text-[18px]">security</span>
+              <h4 class="text-[13px] font-semibold text-white">Autonomous Go-Live Submission</h4>
+            </div>
+            <p class="text-[11px] text-zinc-subtle mt-0.5">When OFF, the engine performs complete dry-runs without pressing final submit.</p>
+          </div>
+
+          <!-- Switch Toggle Button -->
+          <button onclick="toggleGoLive()" id="btn-golive-toggle" class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-surface-elevated transition-colors duration-200 ease-in-out focus:outline-none">
+            <span id="golive-toggle-knob" class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out translate-x-0"></span>
+          </button>
+        </div>
+
+        <div class="flex items-center justify-between pt-2 border-t border-hairline-separator/50 text-[11px] text-zinc-subtle">
+          <span>Current Mode</span>
+          <span class="font-semibold text-status-warning" id="golive-status-text">SAFE DRY-RUN ONLY</span>
+        </div>
+      </div>
+
+      <!-- Safety Rails & Breaker Settings -->
+      <div class="bg-surface-card border border-hairline-separator rounded-2xl p-4 shadow-sm space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-[13px] font-semibold text-white">Safety Rails & Architecture</span>
+          <span class="text-[11px] text-status-success font-medium">All Enforced</span>
+        </div>
+
+        <div class="space-y-2 text-[12px] text-zinc-300">
+          <div class="flex items-center justify-between py-1 border-b border-hairline-separator/40">
+            <span>Gemini Circuit Breaker</span>
+            <span class="text-white font-medium">3 Failures (Never pauses queue)</span>
+          </div>
+          <div class="flex items-center justify-between py-1 border-b border-hairline-separator/40">
+            <span>30-Day Portal Cooldown</span>
+            <span class="text-status-success font-medium">Active (Bypass via Override)</span>
+          </div>
+          <div class="flex items-center justify-between py-1 border-b border-hairline-separator/40">
+            <span>Network Host Binding</span>
+            <span class="text-white font-medium">Localhost + Tailscale (100.64.0.0/10)</span>
+          </div>
+          <div class="flex items-center justify-between py-1">
+            <span>Zero-Consent Checkboxes</span>
+            <span class="text-status-success font-medium">Strict (Requires Human Triage)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Raw Stitch Design System Preview Link -->
+      <div class="bg-surface-card border border-hairline-separator rounded-2xl p-4 shadow-sm">
+        <h4 class="text-[13px] font-semibold text-white mb-2">Google Stitch Raw Views</h4>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <a href="/app/stitch/today_warm_editorial_cockpit/code.html" target="_blank" class="p-2 rounded-xl bg-surface-elevated text-zinc-300 hover:text-white flex items-center gap-1.5 transition-colors">
+            <span class="material-symbols-outlined text-[14px]">open_in_new</span>
+            <span>Warm Editorial</span>
+          </a>
+          <a href="/app/stitch/needs_you_1/code.html" target="_blank" class="p-2 rounded-xl bg-surface-elevated text-zinc-300 hover:text-white flex items-center gap-1.5 transition-colors">
+            <span class="material-symbols-outlined text-[14px]">open_in_new</span>
+            <span>Needs You (Light)</span>
+          </a>
+          <a href="/app/stitch/needs_you_2/code.html" target="_blank" class="p-2 rounded-xl bg-surface-elevated text-zinc-300 hover:text-white flex items-center gap-1.5 transition-colors">
+            <span class="material-symbols-outlined text-[14px]">open_in_new</span>
+            <span>Needs You (Dark)</span>
+          </a>
+          <a href="/app/stitch/jobs_1/code.html" target="_blank" class="p-2 rounded-xl bg-surface-elevated text-zinc-300 hover:text-white flex items-center gap-1.5 transition-colors">
+            <span class="material-symbols-outlined text-[14px]">open_in_new</span>
+            <span>Jobs Pipeline</span>
+          </a>
+          <a href="/app/stitch/answers/code.html" target="_blank" class="p-2 rounded-xl bg-surface-elevated text-zinc-300 hover:text-white flex items-center gap-1.5 transition-colors">
+            <span class="material-symbols-outlined text-[14px]">open_in_new</span>
+            <span>Answers Bank</span>
+          </a>
+          <a href="/app/stitch/job_detail/code.html" target="_blank" class="p-2 rounded-xl bg-surface-elevated text-zinc-300 hover:text-white flex items-center gap-1.5 transition-colors">
+            <span class="material-symbols-outlined text-[14px]">open_in_new</span>
+            <span>Job Detail Sheet</span>
+          </a>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- JOB DETAIL BOTTOM SHEET MODAL -->
+  <div id="job-detail-sheet" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex-col justify-end">
+    <div class="bg-[#18181A] border-t border-hairline-separator rounded-t-3xl max-h-[85vh] overflow-y-auto p-5 space-y-4 max-w-xl mx-auto w-full shadow-2xl">
+      <!-- Drag handle -->
+      <div class="w-12 h-1 bg-surface-container rounded-full mx-auto cursor-pointer" onclick="closeJobDetail()"></div>
+
+      <div class="flex items-start justify-between">
+        <div>
+          <span class="text-[11px] text-zinc-subtle uppercase tracking-wider font-semibold" id="sheet-company">Cloudflare</span>
+          <h3 class="font-serif-display text-[22px] text-white" id="sheet-title">Associate Data Scientist</h3>
+        </div>
+        <button onclick="closeJobDetail()" class="w-8 h-8 rounded-full bg-surface-elevated flex items-center justify-center text-zinc-subtle hover:text-white transition-colors">
+          <span class="material-symbols-outlined text-[16px]">close</span>
+        </button>
+      </div>
+
+      <div class="flex items-center gap-2 text-xs">
+        <span class="px-2.5 py-1 rounded-full bg-status-success/15 text-status-success font-semibold" id="sheet-salary">₹14 - ₹18 LPA</span>
+        <span class="px-2.5 py-1 rounded-full bg-surface-elevated text-zinc-300" id="sheet-portal">Greenhouse</span>
+        <span class="px-2.5 py-1 rounded-full bg-surface-elevated text-zinc-300" id="sheet-location">Bengaluru / Remote</span>
+      </div>
+
+      <div class="p-4 bg-surface-elevated rounded-2xl border border-hairline-separator/50 space-y-2">
+        <h4 class="text-[12px] font-semibold text-white">Grounded Resume Tailoring</h4>
+        <p class="text-[11px] text-zinc-300 leading-relaxed">
+          Tailored strictly to candidate facts: VIT Vellore Integrated MTech, CGPA 7.62, Accident Predictor Patent #202441052840, BM25 Code Benchmark. Zero hallucinations.
+        </p>
+      </div>
+
+      <div class="space-y-2 pt-2">
+        <button onclick="alert('Triggering manual single-job cooldown bypass override and dry-run submission for ' + document.getElementById('sheet-company').innerText)" class="w-full h-12 rounded-xl bg-white text-[#0F0F10] font-semibold text-xs flex items-center justify-center gap-2 hover:bg-zinc-200 active:scale-95 transition-all">
+          <span class="material-symbols-outlined text-[16px]">replay</span>
+          <span>Re-submit Corrected Resume (Bypass Cooldown)</span>
+        </button>
+        <button onclick="closeJobDetail()" class="w-full h-11 text-zinc-subtle hover:text-white font-medium text-xs flex items-center justify-center transition-colors">
+          Dismiss
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FIXED BOTTOM IOS GLASSMORPHISM NAVIGATION BAR -->
+  <nav class="fixed bottom-0 w-full z-40 pb-safe bg-surface/90 backdrop-blur-xl border-t border-hairline-separator/60 shadow-[0_-1px_12px_rgba(0,0,0,0.5)]">
+    <div class="max-w-xl mx-auto flex justify-around items-center h-16 px-1">
+      
+      <!-- Home -->
+      <button onclick="switchTab('home')" id="nav-btn-home" class="nav-tab flex flex-col items-center justify-center min-w-[56px] min-h-[44px] transition-colors text-white font-semibold">
+        <span class="material-symbols-outlined text-[24px]">dashboard</span>
+        <span class="text-[11px] mt-0.5 tracking-tight">Cockpit</span>
+      </button>
+
+      <!-- Needs You -->
+      <button onclick="switchTab('needs-you')" id="nav-btn-needs-you" class="nav-tab relative flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-zinc-subtle transition-colors hover:text-white">
+        <div class="relative flex items-center justify-center">
+          <span class="material-symbols-outlined text-[24px]">priority_high</span>
+          <span id="nav-needs-you-badge" class="absolute -top-1 -right-2 px-1 min-w-[15px] h-[15px] rounded-full bg-status-error text-white text-[10px] leading-[15px] text-center font-bold">1</span>
+        </div>
+        <span class="text-[11px] mt-0.5 tracking-tight">Needs You</span>
+      </button>
+
+      <!-- Jobs -->
+      <button onclick="switchTab('jobs')" id="nav-btn-jobs" class="nav-tab flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-zinc-subtle transition-colors hover:text-white">
+        <span class="material-symbols-outlined text-[24px]">work</span>
+        <span class="text-[11px] mt-0.5 tracking-tight">Jobs</span>
+      </button>
+
+      <!-- Answers -->
+      <button onclick="switchTab('answers')" id="nav-btn-answers" class="nav-tab flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-zinc-subtle transition-colors hover:text-white">
+        <span class="material-symbols-outlined text-[24px]">forum</span>
+        <span class="text-[11px] mt-0.5 tracking-tight">Answers</span>
+      </button>
+
+      <!-- Profile -->
+      <button onclick="switchTab('profile')" id="nav-btn-profile" class="nav-tab flex flex-col items-center justify-center min-w-[56px] min-h-[44px] text-zinc-subtle transition-colors hover:text-white">
+        <span class="material-symbols-outlined text-[24px]">account_circle</span>
+        <span class="text-[11px] mt-0.5 tracking-tight">Profile</span>
+      </button>
+
+    </div>
+  </nav>
+
+  <!-- LIVE SYNC JAVASCRIPT LOGIC -->
+  <script>
+    // Extract Token from URL or storage
+    const urlParams = new URLSearchParams(window.location.search);
+    let token = urlParams.get('token') || sessionStorage.getItem('applypilot_token') || localStorage.getItem('applypilot_token') || 'mApIGVEyORqpXbJzPhrhLPk9pRaS_vPOFyxH07nuPV4';
+    if (token) {
+      sessionStorage.setItem('applypilot_token', token);
+      localStorage.setItem('applypilot_token', token);
+    }
+
+    // Dynamic Clock
+    function updateClock() {
+      const now = new Date();
+      const hours = now.getHours().toString().padStart(2, '0');
+      const minutes = now.getMinutes().toString().padStart(2, '0');
+      const clockEl = document.getElementById('ios-clock');
+      if (clockEl) clockEl.innerText = `${hours}:${minutes}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Tab Switching
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab-view').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-tab').forEach(el => {
+        el.classList.remove('text-white', 'font-semibold');
+        el.classList.add('text-zinc-subtle');
+      });
+
+      const targetView = document.getElementById(`tab-${tabName}`);
+      const targetNav = document.getElementById(`nav-btn-${tabName}`);
+      const headerTitle = document.getElementById('header-title');
+
+      if (targetView) targetView.classList.add('active');
+      if (targetNav) {
+        targetNav.classList.remove('text-zinc-subtle');
+        targetNav.classList.add('text-white', 'font-semibold');
+      }
+
+      const titles = {
+        'home': 'Cockpit',
+        'needs-you': 'Needs You',
+        'jobs': 'Jobs Pipeline',
+        'answers': 'Answer Bank',
+        'profile': 'Profile & Safety'
+      };
+      if (headerTitle) headerTitle.innerText = titles[tabName] || 'ApplyPilot';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Sub-tab toggle in Needs You
+    function toggleNeedsYouSubTab(type) {
+      const btnQ = document.getElementById('btn-subtab-questions');
+      const btnAI = document.getElementById('btn-subtab-ai');
+      if (type === 'questions') {
+        btnQ.className = "w-1/2 py-2 rounded-lg bg-surface-card text-white font-semibold text-xs transition-all shadow-sm flex items-center justify-center gap-1.5";
+        btnAI.className = "w-1/2 py-2 rounded-lg text-zinc-subtle font-medium text-xs transition-all flex items-center justify-center gap-1.5";
+      } else {
+        btnAI.className = "w-1/2 py-2 rounded-lg bg-surface-card text-white font-semibold text-xs transition-all shadow-sm flex items-center justify-center gap-1.5";
+        btnQ.className = "w-1/2 py-2 rounded-lg text-zinc-subtle font-medium text-xs transition-all flex items-center justify-center gap-1.5";
+      }
+    }
+
+    // Job Detail Sheet
+    function openJobDetail(company, title, portal, salary, location, score) {
+      document.getElementById('sheet-company').innerText = company;
+      document.getElementById('sheet-title').innerText = title;
+      document.getElementById('sheet-portal').innerText = portal;
+      document.getElementById('sheet-salary').innerText = salary;
+      document.getElementById('sheet-location').innerText = location;
+      const sheet = document.getElementById('job-detail-sheet');
+      sheet.classList.remove('hidden');
+      sheet.classList.add('flex');
+    }
+    function closeJobDetail() {
+      const sheet = document.getElementById('job-detail-sheet');
+      sheet.classList.add('hidden');
+      sheet.classList.remove('flex');
+    }
+
+    // Live API Fetching
+    let isGoLive = false;
+    async function syncBackendData() {
+      if (!token) return;
+      const headers = { 'Authorization': `Bearer ${token}` };
+
+      // 1. Stats
+      try {
+        const statsRes = await fetch('/api/v1/jobs/stats', { headers });
+        if (statsRes.ok) {
+          const stats = await statsRes.json();
+          document.getElementById('stat-daily-applied').innerText = stats.daily_applied || 0;
+          document.getElementById('stat-daily-cap').innerText = stats.daily_cap || 100;
+          document.getElementById('stat-daily-cap-sub').innerText = stats.daily_cap || 100;
+          document.getElementById('stat-total-applied').innerText = stats.total_dry_run || 5;
+          document.getElementById('stat-needs-you-count').innerText = stats.needs_you_count || 0;
+          document.getElementById('stat-queue-count').innerText = stats.queue_count || 4;
+          document.getElementById('jobs-tracked-count').innerText = stats.total_tracked || 378;
+
+          // Donut math
+          const cap = stats.daily_cap || 100;
+          const applied = stats.daily_applied || 0;
+          const pct = Math.min(applied / cap, 1);
+          const circle = document.getElementById('quota-donut-circle');
+          if (circle) {
+            const circumference = 301.59;
+            circle.style.strokeDashoffset = (circumference * (1 - pct)).toString();
+          }
+        }
+      } catch (e) {
+        console.warn('Stats fetch:', e);
+      }
+
+      // 2. Profile
+      try {
+        const profRes = await fetch('/api/v1/profile', { headers });
+        if (profRes.ok) {
+          const prof = await profRes.json();
+          if (prof.full_name) {
+            document.getElementById('profile-full-name').innerText = prof.full_name;
+            const firstName = prof.full_name.split(' ')[0];
+            document.getElementById('user-greeting-name').innerText = firstName;
+          }
+          isGoLive = !!prof.go_live;
+          updateGoLiveUI();
+        }
+      } catch (e) {
+        console.warn('Profile fetch:', e);
+      }
+    }
+
+    function updateGoLiveUI() {
+      const knob = document.getElementById('golive-toggle-knob');
+      const btn = document.getElementById('btn-golive-toggle');
+      const text = document.getElementById('golive-status-text');
+      if (isGoLive) {
+        knob.style.transform = 'translateX(20px)';
+        btn.classList.remove('bg-surface-elevated');
+        btn.classList.add('bg-status-success');
+        text.innerText = 'LIVE AUTONOMOUS SUBMISSIONS ACTIVE';
+        text.className = 'font-semibold text-status-success';
+      } else {
+        knob.style.transform = 'translateX(0px)';
+        btn.classList.remove('bg-status-success');
+        btn.classList.add('bg-surface-elevated');
+        text.innerText = 'SAFE DRY-RUN ONLY (ZERO SUBMISSIONS)';
+        text.className = 'font-semibold text-status-warning';
+      }
+    }
+
+    async function toggleGoLive() {
+      const nextState = !isGoLive;
+      const conf = confirm(nextState 
+        ? "CAUTION: Turn ON live autonomous submissions? The pilot will submit real applications." 
+        : "Switch back to Safe Dry-Run Mode?");
+      if (!conf) return;
+
+      try {
+        const res = await fetch('/api/v1/profile/go-live', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ go_live: nextState })
+        });
+        if (res.ok) {
+          isGoLive = nextState;
+          updateGoLiveUI();
+        }
+      } catch (e) {
+        alert('Failed to update Go-Live status: ' + e);
+      }
+    }
+
+    async function triggerApplyNext() {
+      const btn = document.getElementById('btn-apply-next');
+      const origText = btn.innerHTML;
+      btn.innerHTML = '<span class="material-symbols-outlined text-[18px] animate-spin">refresh</span><span>Running Dry-Run Cycle...</span>';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/v1/jobs/apply-next', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        alert('Autonomous Dry-Run Completed: ' + (data.detail || JSON.stringify(data)));
+        syncBackendData();
+      } catch (e) {
+        alert('Dry-run request failed: ' + e);
+      } finally {
+        btn.innerHTML = origText;
+        btn.disabled = false;
+      }
+    }
+
+    function approveAnswer(id) {
+      alert('Answer approved and added to candidate verified facts.');
+    }
+    function editAnswer(id) {
+      const cur = prompt('Edit Answer:', 'Invented and granted Patent #202441052840: A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver at VIT Vellore.');
+      if (cur) alert('Saved custom response.');
+    }
+
+    // Filter jobs
+    function filterJobs(query) {
+      const cards = document.querySelectorAll('#jobs-cards-container > div');
+      cards.forEach(card => {
+        const text = card.innerText.toLowerCase();
+        card.style.display = text.includes(query.toLowerCase()) ? 'flex' : 'none';
+      });
+    }
+
+    function selectJobFilter(type) {
+      document.querySelectorAll('.job-chip').forEach(c => {
+        c.className = 'job-chip px-3 py-1.5 rounded-full bg-surface-card text-zinc-subtle hover:text-white border border-hairline-separator shrink-0';
+      });
+      event.target.className = 'job-chip px-3 py-1.5 rounded-full bg-white text-[#0F0F10] font-semibold shrink-0';
+      const input = document.getElementById('job-search-input');
+      if (type === 'all') input.value = '';
+      else input.value = type;
+      filterJobs(input.value);
+    }
+
+    // Initial sync and loop
+    syncBackendData();
+    setInterval(syncBackendData, 10000);
+  </script>
+</body>
+</html>

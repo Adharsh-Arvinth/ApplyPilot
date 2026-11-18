@@ -316,6 +316,40 @@ This log records every architectural adjustment, security lock, test result, and
   - Removed ungrounded fallback choices (`"15 Days"`) in `app/lib/screens/home_screen.dart`.
   - Verified 100% test suite pass rate locally (21/21 targeted and 99/99 full suite).
 
+---
+
+## Section 10: Stitch iOS Master Cockpit Deployment & CI Audit
+
+- [x] **GitHub Actions CI Diagnostic (User Email Screenshot Audit)**:
+  - Audited the GitHub Actions notification email shown in the user screenshot (*"ApplyPilot CI: Some jobs were not successful - Flutter Test Suite Succeeded in 38s, Backend Test Suite Failed in 2m 54s"*).
+  - Queried the GitHub Actions API via authenticating credential helper. Confirmed that the failing run was historical **Run `44139000399`** (commit `0f03541`) from 11/17, caused by missing nullability in unconfirmed profile schemas.
+  - Certified that all subsequent runs pushed to `main` are **100% green**:
+    - **Run `44141658782`** (commit `e817e62`): `success`
+    - **Run `44142572388`** (commit `a4777f8`): `success`
+    - **Run `44272147560`** (commit `a546754`): `success`
+    - **Run `44345741740`** (commit `d218fb1`): `success`
+  - Zero failing CI runs on current `main`.
+
+- [x] **Web Cockpit Stale Build Resolution**:
+  - Identified why the user saw no UI changes at `http://127.0.0.1:8000/app/`: `app/build/` is `.gitignore`d, and the static files being served were from an older Flutter web build timestamped `11/17/2026 8:52 PM`.
+  - Created a permanent, tracked static cockpit directory at `backend/app/static/cockpit/` that is never gitignored or wiped by Flutter clean operations.
+  - Updated `backend/app/main.py` mounting logic to prioritize `backend/app/static/cockpit` over local ephemeral builds.
+
+- [x] **Unified Stitch iOS Master Cockpit Assembly**:
+  - Integrated the complete Google Stitch iOS design system from `stitch_applypilot_ios_design_system` into `backend/app/static/cockpit/index.html` (and `app/build/web/index.html`):
+    - **Cockpit / Home**: Editorial serif header (*Newsreader* font), live dynamic daily quota donut with warm amber-to-terracotta gradient (`#F59E0B` to `#EA580C`), pacing indicator, stacked KPI cards (Applied, Needs You, Queue), live Application In-Progress Engine Card with 4-step progress bar (Step 3: Custom Questions & Pre-fill), and recent activity stream.
+    - **Needs You**: Segmented selector (`Questions` vs `AI Answered`), interactive triage cards with grounded fact citations, inline answer editing, and live `approveAnswer` actions.
+    - **Jobs**: Application pipeline with search bar, ATS source chips (`Greenhouse`, `Lever`, `Ashby`, `Assist-Only`), status tabs (`Queue`, `Maybe`, `Applied`, `Skipped`), and expandable Job Detail bottom sheet modal.
+    - **Answers**: Grounded Answer Bank categorized into Education, Patents, Work Authorization, Links, and Preferences.
+    - **Profile & Safety**: Candidate locked facts vault (Adharsh Arvinth, VIT Vellore MTech, CGPA 7.62, Patents #202441052840 & #202441066601), Autonomous Go-Live toggle switch with confirmation safety rails, and 30-day portal cooldown bypass.
+    - **iOS Navigation**: Glassmorphic bottom tab bar (`backdrop-blur-xl bg-surface/90 border-t border-hairline-separator`) with active haptic states, dynamic time header, and raw Stitch screen links (`/app/stitch/...`).
+  - Added live data polling (`/api/v1/jobs/stats`, `/api/v1/profile`, `/api/v1/jobs`, `/api/v1/needs-you`) using query parameter / session token authentication.
+
+- [x] **Test Verification**:
+  - Executed full backend pytest suite: **99 passed in 167.83s (100% pass rate)**.
+  - Executed targeted security & breakers suite: **7 passed in 5.26s (100% pass rate)**.
+
+
 
 
 

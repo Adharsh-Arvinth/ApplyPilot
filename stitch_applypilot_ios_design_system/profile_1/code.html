@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_tab" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "on-secondary-container": "#b5b4ba", "surface-variant": "#353535", "status-warning": "#FF9F0A", "on-secondary": "#2f3034", "surface-bright": "#393939", "status-success": "#30D158", "surface-container-highest": "#353535", "primary": "#ffffff", "on-tertiary": "#2f3034", "zinc-subtle": "#71717A", "tertiary": "#ffffff", "on-primary-fixed-variant": "#454747", "on-secondary-fixed-variant": "#46464b", "surface-container": "#1f1f1f", "primary-fixed": "#e2e2e2", "tertiary-container": "#e2e2e7", "inverse-surface": "#e2e2e2", "surface-dim": "#131313", "secondary-fixed": "#e3e2e7", "surface-tint": "#c6c6c7", "on-error": "#690005", "status-info": "#0A84FF", "secondary-fixed-dim": "#c6c6cb", "outline": "#8e9192", "on-secondary-fixed": "#1a1b1f", "surface-container-lowest": "#0e0e0e", "surface-container-low": "#1b1b1b", "surface-card": "#1C1C1E", "secondary-container": "#46464b", "secondary": "#c6c6cb", "error-container": "#93000a", "status-error": "#FF453A", "on-primary-fixed": "#1a1c1c", "surface-container-high": "#2a2a2a", "inverse-primary": "#5d5f5f", "primary-container": "#e2e2e2", "on-tertiary-container": "#636469", "on-primary-container": "#636565", "outline-variant": "#444748", "on-surface": "#e2e2e2", "tertiary-fixed-dim": "#c6c6cb", "background": "#131313", "primary-fixed-dim": "#c6c6c7", "on-primary": "#2f3131", "silver-track": "#E5E5EA", "error": "#ffb4ab", "inverse-on-surface": "#303030", "tertiary-fixed": "#e2e2e7", "surface-grouped": "#0B0B0D", "on-error-container": "#ffdad6", "surface": "#131313", "on-background": "#e2e2e2", "hairline-separator": "#38383A", "status-review": "#BF5AF2", "on-tertiary-fixed-variant": "#45474b", "on-surface-variant": "#c4c7c8", "surface-elevated": "#2C2C2E", "on-tertiary-fixed": "#1a1c1f" }, "borderRadius": { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, "spacing": { "space-xs": "0.25rem", "space-md": "1rem", "gutter": "1rem", "space-xl": "1.5rem", "space-lg": "1.25rem", "space-sm": "0.5rem", "margin": "1rem" }, "fontFamily": { "label-md": ["Inter"], "headline-lg": ["Inter"], "headline-xl-mobile": ["Inter"], "body-md": ["Inter"], "caption": ["Inter"], "label-sm": ["Inter"], "headline-md": ["Inter"], "headline-xl": ["Inter"], "body-lg": ["Inter"] }, "fontSize": { "label-md": ["13px", { "lineHeight": "18px", "letterSpacing": "-0.1px", "fontWeight": "400" }], "headline-lg": ["22px", { "lineHeight": "28px", "letterSpacing": "-0.3px", "fontWeight": "600" }], "headline-xl-mobile": ["30px", { "lineHeight": "36px", "letterSpacing": "-0.4px", "fontWeight": "600" }], "body-md": ["15px", { "lineHeight": "20px", "letterSpacing": "-0.2px", "fontWeight": "400" }], "caption": ["11px", { "lineHeight": "14px", "letterSpacing": "0.1px", "fontWeight": "400" }], "label-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0px", "fontWeight": "400" }], "headline-md": ["17px", { "lineHeight": "22px", "letterSpacing": "-0.4px", "fontWeight": "600" }], "headline-xl": ["34px", { "lineHeight": "41px", "letterSpacing": "-0.4px", "fontWeight": "600" }], "body-lg": ["17px", { "lineHeight": "22px", "letterSpacing": "-0.4px", "fontWeight": "400" }] } } } };</script><style>@layer base{html,body{width:100%;margin:0;padding:0;background-color:#131313;color:#e2e2e2;}body{overscroll-behavior-y:none;-webkit-tap-highlight-color:transparent;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}}::-webkit-scrollbar{display:none;}</style><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface text-on-surface min-h-screen flex flex-col font-body-md text-body-md"><header class="fixed top-0 w-full z-50 pt-safe bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.4)]"><div class="h-14 px-margin flex items-center justify-between"><div class="flex items-center gap-space-sm"><div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container-high"><span class="w-2 h-2 rounded-full bg-status-success animate-pulse"></span><span class="font-caption text-caption text-silver-track uppercase font-semibold tracking-wider">Agent Active</span></div></div><div class="flex items-center gap-space-md"><h1 class="font-headline-md text-headline-md text-primary tracking-tight">Profile</h1></div><div class="flex items-center"><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex-1 flex flex-col w-full pt-14 pb-20 bg-surface"><div class="flex flex-col w-full pb-12">
+<div class="px-margin pt-4 pb-2">
+<h2 class="font-headline-xl-mobile text-headline-xl-mobile text-primary tracking-tight">Profile</h2>
+</div>
+<div class="px-margin mb-6">
+<div class="bg-surface-card rounded-[18px] p-space-md shadow-sm">
+<div class="flex items-start gap-space-md">
+<div class="relative shrink-0">
+<div class="w-16 h-16 rounded-full bg-surface-elevated flex items-center justify-center text-primary font-headline-md text-headline-md tracking-wider">
+            AA
+          </div>
+<div class="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-status-success flex items-center justify-center text-surface-grouped shadow-sm">
+<span class="material-symbols-outlined text-[13px] font-bold" style="font-variation-settings: 'FILL' 1;">check</span>
+</div>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center gap-2">
+<h3 class="font-headline-md text-headline-md text-primary truncate">Adharsh Arvinth</h3>
+<span class="px-2 py-0.5 rounded-full bg-surface-elevated text-status-success font-caption text-caption uppercase tracking-wider font-medium shrink-0">
+              Verified
+            </span>
+</div>
+<p class="font-body-md text-body-md text-zinc-subtle mt-0.5 truncate">
+            MTech Integrated CSE · VIT Vellore
+          </p>
+<div class="flex items-center gap-2 mt-3 overflow-x-auto pb-0.5">
+<a class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-elevated text-silver-track font-caption text-caption hover:bg-surface-variant transition-colors shrink-0" href="mailto:adharsharvinth2108@gmail.com">
+<span class="material-symbols-outlined text-[14px] text-zinc-subtle">mail</span>
+<span>Email</span>
+</a>
+<a class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-elevated text-silver-track font-caption text-caption hover:bg-surface-variant transition-colors shrink-0" href="https://github.com" target="_blank">
+<span class="material-symbols-outlined text-[14px] text-zinc-subtle">code</span>
+<span>GitHub</span>
+</a>
+<a class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-elevated text-silver-track font-caption text-caption hover:bg-surface-variant transition-colors shrink-0" href="https://linkedin.com" target="_blank">
+<span class="material-symbols-outlined text-[14px] text-zinc-subtle">link</span>
+<span>LinkedIn</span>
+</a>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="px-margin mb-6">
+<div class="flex items-center gap-1.5 px-1 pb-2">
+<span class="material-symbols-outlined text-zinc-subtle text-[16px]">lock</span>
+<span class="font-caption text-caption uppercase tracking-wider text-zinc-subtle font-semibold">Facts the AI can use</span>
+</div>
+<div class="bg-surface-card rounded-[18px] overflow-hidden">
+<div class="p-space-md bg-surface-card">
+<div class="flex items-center justify-between mb-1">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-zinc-subtle font-medium">Education</span>
+<span class="font-caption text-caption text-zinc-subtle">Primary</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface leading-snug">
+          MTech Integrated CSE (Data Science), Vellore Institute of Technology
+        </p>
+<div class="mt-1 flex items-center gap-2">
+<span class="px-2 py-0.5 rounded-md bg-surface-elevated text-silver-track font-caption text-caption">CGPA 7.62 / 10</span>
+</div>
+</div>
+<div class="h-[1px] bg-hairline-separator ml-4"></div>
+<div class="p-space-md bg-surface-card">
+<div class="flex items-center justify-between mb-1">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-zinc-subtle font-medium">Patent</span>
+<span class="font-caption text-caption text-status-success font-medium">Granted</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface leading-snug">
+          A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver
+        </p>
+</div>
+<div class="h-[1px] bg-hairline-separator ml-4"></div>
+<div class="p-space-md bg-surface-card">
+<div class="flex items-center justify-between mb-1">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-zinc-subtle font-medium">Patent</span>
+<span class="font-caption text-caption text-zinc-subtle font-medium">Published</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface leading-snug">
+          Acoustic Doppler Session Guard
+        </p>
+</div>
+<div class="h-[1px] bg-hairline-separator ml-4"></div>
+<div class="p-space-md bg-surface-card">
+<div class="flex items-center justify-between mb-1">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-zinc-subtle font-medium">Project</span>
+<span class="font-caption text-caption text-status-info font-medium">Evaluation</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface leading-snug">
+          Agentic Code Intelligence, 25.59% NDCG@10 (embeddings + BM25 + AST; 8,765 Python programs)
+        </p>
+</div>
+<div class="h-[1px] bg-hairline-separator ml-4"></div>
+<div class="p-space-md bg-surface-card">
+<div class="flex items-center justify-between mb-1">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-zinc-subtle font-medium">Certifications</span>
+<span class="font-caption text-caption text-zinc-subtle">2 Records</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface leading-snug">
+          AWS Cloud Solutions Architect; Generative AI for Data Analysts
+        </p>
+</div>
+</div>
+<div class="flex items-center gap-1.5 px-2 pt-2 text-zinc-subtle">
+<span class="material-symbols-outlined text-[14px]">info</span>
+<span class="font-caption text-caption">Read-only ground truth. Used strictly for compiling tailored resumes and cover responses.</span>
+</div>
+</div>
+<div class="px-margin mb-6">
+<div class="flex items-center justify-between px-1 pb-2">
+<span class="font-caption text-caption uppercase tracking-wider text-zinc-subtle font-semibold">Skills</span>
+<span class="font-caption text-caption text-zinc-subtle">20 Verified</span>
+</div>
+<div class="bg-surface-card rounded-[18px] p-space-md">
+<div class="flex flex-wrap gap-2">
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">Python</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">SQL</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">Java</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">JavaScript</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">HTML/CSS</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">NumPy</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">Pandas</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">Scikit-learn</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">Matplotlib</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">Seaborn</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">OpenCV</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">MediaPipe</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">Tableau</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">ELK Stack</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">Kibana</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">Jupyter</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">Git</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">GitHub</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">AWS</span>
+<span class="px-3 py-1.5 rounded-full bg-surface-elevated text-silver-track font-label-md text-label-md">Linux</span>
+</div>
+</div>
+</div>
+<div class="px-margin mb-6">
+<div class="flex items-center justify-between px-1 pb-2">
+<span class="font-caption text-caption uppercase tracking-wider text-zinc-subtle font-semibold">Application Preferences</span>
+</div>
+<div class="bg-surface-card rounded-[18px] overflow-hidden">
+<button class="w-full text-left p-space-md flex items-center justify-between hover:bg-surface-elevated transition-colors" type="button">
+<span class="font-body-md text-body-md text-on-surface">Graduation Date</span>
+<div class="flex items-center gap-2">
+<span class="font-body-md text-body-md text-zinc-subtle">Select graduation date</span>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-status-warning/15 text-status-warning">Required</span>
+<span class="material-symbols-outlined text-zinc-subtle text-[18px]">chevron_right</span>
+</div>
+</button>
+<div class="h-[1px] bg-hairline-separator ml-4"></div>
+<button class="w-full text-left p-space-md flex items-center justify-between hover:bg-surface-elevated transition-colors" type="button">
+<span class="font-body-md text-body-md text-on-surface">Notice Period</span>
+<div class="flex items-center gap-2">
+<span class="font-body-md text-body-md text-zinc-subtle">Select notice period</span>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-status-warning/15 text-status-warning">Required</span>
+<span class="material-symbols-outlined text-zinc-subtle text-[18px]">chevron_right</span>
+</div>
+</button>
+<div class="h-[1px] bg-hairline-separator ml-4"></div>
+<button class="w-full text-left p-space-md flex items-center justify-between hover:bg-surface-elevated transition-colors" type="button">
+<span class="font-body-md text-body-md text-on-surface">Work Authorization</span>
+<div class="flex items-center gap-2">
+<span class="font-body-md text-body-md text-zinc-subtle">Select status</span>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-status-warning/15 text-status-warning">Required</span>
+<span class="material-symbols-outlined text-zinc-subtle text-[18px]">chevron_right</span>
+</div>
+</button>
+<div class="h-[1px] bg-hairline-separator ml-4"></div>
+<button class="w-full text-left p-space-md flex items-center justify-between hover:bg-surface-elevated transition-colors" type="button">
+<span class="font-body-md text-body-md text-on-surface">Relocation</span>
+<div class="flex items-center gap-2">
+<span class="font-body-md text-body-md text-zinc-subtle">Select preference</span>
+<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-status-warning/15 text-status-warning">Required</span>
+<span class="material-symbols-outlined text-zinc-subtle text-[18px]">chevron_right</span>
+</div>
+</button>
+<div class="h-[1px] bg-hairline-separator ml-4"></div>
+<button class="w-full text-left p-space-md flex items-center justify-between hover:bg-surface-elevated transition-colors" type="button">
+<span class="font-body-md text-body-md text-on-surface">Minimum Pay</span>
+<div class="flex items-center gap-2">
+<span class="font-body-md text-body-md text-primary font-medium">₹7,00,000</span>
+<span class="material-symbols-outlined text-zinc-subtle text-[18px]">chevron_right</span>
+</div>
+</button>
+<div class="h-[1px] bg-hairline-separator ml-4"></div>
+<button class="w-full text-left p-space-md flex items-center justify-between hover:bg-surface-elevated transition-colors" type="button">
+<span class="font-body-md text-body-md text-on-surface">Daily Cap</span>
+<div class="flex items-center gap-2">
+<span class="font-body-md text-body-md text-primary font-medium">100 / day</span>
+<span class="material-symbols-outlined text-zinc-subtle text-[18px]">chevron_right</span>
+</div>
+</button>
+</div>
+<div class="px-2 pt-2 text-zinc-subtle font-caption text-caption">
+      Tapping a row opens a picker sheet. Complete required items to unblock full queue automation.
+    </div>
+</div>
+<div class="px-margin mb-8">
+<div class="flex items-center justify-between px-1 pb-2">
+<span class="font-caption text-caption uppercase tracking-wider text-zinc-subtle font-semibold">Safety</span>
+</div>
+<div class="bg-surface-card rounded-[18px] p-space-md">
+<div class="flex items-center justify-between">
+<div>
+<span class="font-body-md text-body-md text-primary font-medium block">Live Auto-Apply</span>
+<span class="font-caption text-caption text-zinc-subtle mt-0.5 block">Off = dry run only. Applications staged for manual review.</span>
+</div>
+<button aria-label="Toggle Live Auto-Apply" class="w-12 h-7 rounded-full bg-surface-elevated p-0.5 flex items-center transition-colors relative cursor-pointer" id="toggle-safety" type="button">
+<div class="w-6 h-6 rounded-full bg-primary shadow-sm transform transition-transform" id="toggle-thumb"></div>
+</button>
+</div>
+</div>
+</div>
+<div class="fixed inset-0 z-50 bg-surface-dim/80 backdrop-blur-md hidden items-center justify-center p-space-md" id="safety-modal-backdrop">
+<div class="bg-surface-elevated w-full max-w-sm rounded-[22px] p-space-xl shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+<div class="w-12 h-12 rounded-full bg-status-error/15 flex items-center justify-center text-status-error mb-4 mx-auto">
+<span class="material-symbols-outlined text-[28px]">warning</span>
+</div>
+<h3 class="font-headline-md text-headline-md text-primary text-center tracking-tight mb-2">
+        Enable Live Autonomous Applying?
+      </h3>
+<div class="space-y-2.5 my-4 text-left">
+<div class="flex items-start gap-2.5">
+<span class="material-symbols-outlined text-zinc-subtle text-[18px] shrink-0 mt-0.5">send</span>
+<p class="font-label-md text-label-md text-on-surface-variant leading-snug">
+            Real submissions will be dispatched to Greenhouse, Lever &amp; Ashby portals on your behalf.
+          </p>
+</div>
+<div class="flex items-start gap-2.5">
+<span class="material-symbols-outlined text-zinc-subtle text-[18px] shrink-0 mt-0.5">verified_user</span>
+<p class="font-label-md text-label-md text-on-surface-variant leading-snug">
+            Grounded resumes compiled solely with your locked single-source facts.
+          </p>
+</div>
+<div class="flex items-start gap-2.5">
+<span class="material-symbols-outlined text-zinc-subtle text-[18px] shrink-0 mt-0.5">speed</span>
+<p class="font-label-md text-label-md text-on-surface-variant leading-snug">
+            Rate limited to 100 applications/day with 180s human pacing intervals.
+          </p>
+</div>
+</div>
+<div class="flex flex-col gap-2 pt-2">
+<button class="w-full h-11 rounded-xl bg-status-error text-primary font-headline-md text-headline-md font-semibold hover:opacity-90 active:scale-[0.98] transition-all" id="btn-turn-on" type="button">
+          Turn On
+        </button>
+<button class="w-full h-11 rounded-xl bg-surface-card text-silver-track font-headline-md text-headline-md font-normal hover:bg-surface-variant active:scale-[0.98] transition-all" id="btn-cancel" type="button">
+          Cancel
+        </button>
+</div>
+</div>
+</div>
+</div>
+<script>
+  (function() {
+    const toggle = document.getElementById('toggle-safety');
+    const thumb = document.getElementById('toggle-thumb');
+    const modal = document.getElementById('safety-modal-backdrop');
+    const btnCancel = document.getElementById('btn-cancel');
+    const btnTurnOn = document.getElementById('btn-turn-on');
+
+    let isLiveActive = false;
+
+    function openModal() {
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeModal() {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function renderToggle() {
+      if (isLiveActive) {
+        toggle.classList.remove('bg-surface-elevated');
+        toggle.classList.add('bg-status-success');
+        thumb.classList.add('translate-x-5');
+      } else {
+        toggle.classList.remove('bg-status-success');
+        toggle.classList.add('bg-surface-elevated');
+        thumb.classList.remove('translate-x-5');
+      }
+    }
+
+    toggle.addEventListener('click', () => {
+      if (!isLiveActive) {
+        openModal();
+      } else {
+        isLiveActive = false;
+        renderToggle();
+      }
+    });
+
+    btnCancel.addEventListener('click', () => {
+      closeModal();
+    });
+
+    btnTurnOn.addEventListener('click', () => {
+      isLiveActive = true;
+      renderToggle();
+      closeModal();
+    });
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        closeModal();
+      }
+    });
+  })();
+</script></main><nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface/85 backdrop-blur-xl shadow-[0_-1px_12px_rgba(0,0,0,0.5)]" data-active-classes="text-primary font-semibold"><div class="h-16 px-space-xs flex items-center justify-around"><a class="flex flex-col items-center justify-center w-14 h-11 text-zinc-subtle hover:text-on-surface transition-colors" data-path="home" href="#"><span class="material-symbols-outlined text-[24px]">home</span><span class="font-caption text-caption mt-0.5">Home</span></a><a class="flex flex-col items-center justify-center w-14 h-11 text-zinc-subtle hover:text-on-surface relative transition-colors" data-path="needs-you" href="#"><div class="relative"><span class="material-symbols-outlined text-[24px]">notifications</span><span class="absolute -top-1 -right-2 px-1 min-w-[16px] h-4 rounded-full bg-status-error text-primary font-caption text-[10px] font-semibold flex items-center justify-center leading-none">3</span></div><span class="font-caption text-caption mt-0.5">Needs You</span></a><a class="flex flex-col items-center justify-center w-14 h-11 text-zinc-subtle hover:text-on-surface transition-colors" data-path="jobs" href="#"><span class="material-symbols-outlined text-[24px]">work</span><span class="font-caption text-caption mt-0.5">Jobs</span></a><a class="flex flex-col items-center justify-center w-14 h-11 text-zinc-subtle hover:text-on-surface transition-colors" data-path="answers" href="#"><span class="material-symbols-outlined text-[24px]">chat</span><span class="font-caption text-caption mt-0.5">Answers</span></a><a aria-current="page" class="flex flex-col items-center justify-center w-14 h-11 transition-colors text-primary font-semibold" data-path="profile" href="#"><span class="material-symbols-outlined text-[24px]">account_circle</span><span class="font-caption text-caption mt-0.5">Profile</span></a></div></nav></body></html>

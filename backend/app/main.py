@@ -175,9 +175,12 @@ app.add_middleware(
 # Mount static asset folders for screenshots and resumes
 app.mount("/output", StaticFiles(directory=str(settings.OUTPUT_DIR)), name="output")
 
-# Mount Flutter Web Application Cockpit
+# Mount Web Application Cockpit (Google Stitch iOS Cockpit or Flutter build)
+cockpit_dir = Path(__file__).resolve().parent / "static" / "cockpit"
 flutter_web_dir = Path(__file__).resolve().parent.parent.parent / "app" / "build" / "web"
-if flutter_web_dir.exists():
+web_dir = cockpit_dir if cockpit_dir.exists() else flutter_web_dir
+
+if web_dir.exists():
     @app.get("/app")
     def redirect_app_no_slash(request: Request):
         token = request.query_params.get("token")
@@ -185,7 +188,7 @@ if flutter_web_dir.exists():
             return RedirectResponse(url=f"/app/?token={token}")
         return RedirectResponse(url="/app/")
 
-    app.mount("/app", StaticFiles(directory=str(flutter_web_dir), html=True), name="app")
+    app.mount("/app", StaticFiles(directory=str(web_dir), html=True), name="app")
 else:
     @app.get("/app")
     @app.get("/app/")
@@ -205,7 +208,7 @@ app.include_router(firebase_router, prefix="/api/v1")
 
 @app.get("/")
 def root(request: Request):
-    if flutter_web_dir.exists():
+    if web_dir.exists():
         token = request.query_params.get("token")
         if token:
             return RedirectResponse(url=f"/app/?token={token}")

@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_tab" name="shell-type"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script><script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "on-primary-fixed": "#1a1c1c",
+          "inverse-primary": "#5d5f5f",
+          "outline-variant": "#444748",
+          "on-surface-variant": "#c4c7c8",
+          "primary-fixed-dim": "#c6c6c7",
+          "tertiary-fixed-dim": "#c6c6cb",
+          "zinc-subtle": "#71717A",
+          "surface-container-highest": "#353535",
+          "secondary-fixed": "#e3e2e7",
+          "surface-elevated": "#2C2C2E",
+          "status-error": "#FF453A",
+          "surface-container-low": "#1b1b1b",
+          "on-secondary": "#2f3034",
+          "primary-fixed": "#e2e2e2",
+          "tertiary-container": "#e2e2e7",
+          "status-warning": "#FF9F0A",
+          "tertiary-fixed": "#e2e2e7",
+          "hairline-separator": "#38383A",
+          "secondary-container": "#46464b",
+          "background": "#131313",
+          "on-secondary-fixed-variant": "#46464b",
+          "on-secondary-container": "#b5b4ba",
+          "on-error": "#690005",
+          "on-primary-fixed-variant": "#454747",
+          "surface-container": "#1f1f1f",
+          "secondary-fixed-dim": "#c6c6cb",
+          "silver-track": "#E5E5EA",
+          "on-surface": "#e2e2e2",
+          "surface-container-high": "#2a2a2a",
+          "on-tertiary-fixed-variant": "#45474b",
+          "on-tertiary": "#2f3034",
+          "tertiary": "#ffffff",
+          "surface": "#131313",
+          "surface-tint": "#c6c6c7",
+          "surface-dim": "#131313",
+          "inverse-on-surface": "#303030",
+          "on-secondary-fixed": "#1a1b1f",
+          "error-container": "#93000a",
+          "error": "#ffb4ab",
+          "surface-variant": "#353535",
+          "on-background": "#e2e2e2",
+          "outline": "#8e9192",
+          "status-info": "#0A84FF",
+          "surface-bright": "#393939",
+          "surface-grouped": "#0B0B0D",
+          "surface-container-lowest": "#0e0e0e",
+          "on-tertiary-fixed": "#1a1c1f",
+          "surface-card": "#1C1C1E",
+          "status-success": "#30D158",
+          "on-primary-container": "#636565",
+          "secondary": "#c6c6cb",
+          "inverse-surface": "#e2e2e2",
+          "status-review": "#BF5AF2",
+          "on-error-container": "#ffdad6",
+          "primary": "#ffffff",
+          "on-primary": "#2f3131",
+          "primary-container": "#e2e2e2",
+          "on-tertiary-container": "#636469"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.25rem",
+          "lg": "0.5rem",
+          "xl": "0.75rem",
+          "full": "9999px"
+        },
+        "spacing": {
+          "gutter": "1rem",
+          "space-xl": "1.5rem",
+          "space-md": "1rem",
+          "margin": "1rem",
+          "space-sm": "0.5rem",
+          "space-xs": "0.25rem",
+          "space-lg": "1.25rem"
+        },
+        "fontFamily": {
+          "label-md": ["Inter"],
+          "body-lg": ["Inter"],
+          "headline-xl-mobile": ["Inter"],
+          "body-md": ["Inter"],
+          "headline-xl": ["Inter"],
+          "caption": ["Inter"],
+          "label-sm": ["Inter"],
+          "headline-md": ["Inter"],
+          "headline-lg": ["Inter"]
+        },
+        "fontSize": {
+          "label-md": ["13px", { lineHeight: "18px", letterSpacing: "-0.1px", fontWeight: "400" }],
+          "body-lg": ["17px", { lineHeight: "22px", letterSpacing: "-0.4px", fontWeight: "400" }],
+          "headline-xl-mobile": ["30px", { lineHeight: "36px", letterSpacing: "-0.4px", fontWeight: "600" }],
+          "body-md": ["15px", { lineHeight: "20px", letterSpacing: "-0.2px", fontWeight: "400" }],
+          "headline-xl": ["34px", { lineHeight: "41px", letterSpacing: "-0.4px", fontWeight: "600" }],
+          "caption": ["11px", { lineHeight: "14px", letterSpacing: "0.1px", fontWeight: "400" }],
+          "label-sm": ["12px", { lineHeight: "16px", letterSpacing: "0px", fontWeight: "400" }],
+          "headline-md": ["17px", { lineHeight: "22px", letterSpacing: "-0.4px", fontWeight: "600" }],
+          "headline-lg": ["22px", { lineHeight: "28px", letterSpacing: "-0.3px", fontWeight: "600" }]
+        }
+      }
+    }
+  };
+</script><style>@layer base{html,body{width:100%;margin:0;padding:0;background-color:#131313;color:#e2e2e2;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,20px);}.pt-safe{padding-top:env(safe-area-inset-top,44px);}.material-symbols-outlined{font-variation-settings:'FILL' 0,'wght' 300,'GRAD' 0,'opsz' 24;display:inline-block;vertical-align:middle;}.material-symbols-outlined.fill-icon{font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24;}}::-webkit-scrollbar{display:none;}</style><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head><body class="bg-surface font-body-md text-on-surface antialiased selection:bg-surface-elevated selection:text-white"><header class="fixed top-0 w-full z-50 bg-surface/85 backdrop-blur-xl pt-safe"><div class="h-11 px-6 flex items-center justify-between text-on-surface font-headline-md"><span class="text-[15px] font-semibold tracking-tight">9:41</span><div class="w-28 h-7 bg-surface-container-lowest rounded-full mx-auto flex items-center justify-center"><div class="w-2.5 h-2.5 rounded-full bg-surface-container-high mr-2"></div><div class="w-2.5 h-2.5 rounded-full bg-surface-container-high"></div></div><div class="flex items-center space-x-1.5 text-on-surface"><span class="material-symbols-outlined text-[16px]">signal_cellular_alt</span><span class="material-symbols-outlined text-[16px]">wifi</span><span class="material-symbols-outlined text-[20px]">battery_full</span></div></div><div class="h-14 px-margin flex items-center justify-between"><h1 class="font-headline-lg text-headline-lg font-semibold tracking-tight text-on-surface">Home</h1><div class="flex items-center gap-space-sm"><div class="w-8 h-8 rounded-full bg-surface-elevated border border-hairline-separator flex items-center justify-center text-white"><span class="material-symbols-outlined text-[18px]">person</span></div></div></div></header><main class="flex flex-col relative w-full min-h-screen bg-surface px-margin pt-25 pb-24"><div class="flex flex-col w-full text-on-surface select-none pb-12">
+<!-- Title & Pending Indicator Area -->
+<div class="flex flex-col mb-4">
+<div class="flex items-center justify-between mb-1">
+<div class="flex items-center gap-1.5">
+<span class="inline-flex w-2 h-2 rounded-full bg-white animate-pulse"></span>
+<span class="font-label-md text-label-md text-on-surface font-medium">3 pending interventions</span>
+</div>
+<button class="flex items-center gap-1 text-outline hover:text-on-surface transition-colors py-1 px-2 rounded-lg bg-surface-container text-label-sm font-label-sm border border-hairline-separator" id="toggle-empty-state-btn">
+<span class="material-symbols-outlined text-[15px]">arrow_back_ios_new</span>
+<span id="empty-state-toggle-label">Preview Empty</span>
+</button>
+</div>
+<div class="flex items-baseline justify-between">
+<h2 class="font-headline-xl-mobile text-headline-xl-mobile tracking-tight text-on-surface font-semibold">Needs You</h2>
+<span class="font-label-sm text-label-sm px-2.5 py-0.5 rounded-full bg-white/10 text-white font-medium border border-white/15">Autonomous Mode Active</span>
+</div>
+</div>
+<!-- iOS Inset Segmented Control -->
+<div class="p-1 bg-surface-container-lowest rounded-xl flex items-center mb-5 border border-hairline-separator">
+<button class="flex-1 py-1.5 px-3 rounded-lg font-headline-md text-label-md font-semibold text-center transition-all bg-surface-elevated text-white shadow-sm border border-hairline-separator/60" id="tab-questions">
+      Questions <span class="ml-1 px-1.5 py-0.2 rounded-full bg-white text-black font-bold text-[11px]">3</span>
+</button>
+<button class="flex-1 py-1.5 px-3 rounded-lg font-headline-md text-label-md text-on-surface-variant text-center transition-all hover:text-on-surface" id="tab-ai-answered">
+      AI Answered <span class="ml-1 px-1.5 py-0.2 rounded-full bg-surface-variant text-on-surface-variant font-bold text-[11px]">4</span>
+</button>
+</div>
+<!-- MAIN VIEW CONTAINER -->
+<div class="relative w-full" id="content-container">
+<!-- VIEW 1: QUESTIONS CAROUSEL VIEW -->
+<div class="flex flex-col w-full transition-opacity duration-200" id="view-questions">
+<!-- Counter & Progress indicator -->
+<div class="flex items-center justify-between mb-3 px-1">
+<div class="flex items-center gap-2">
+<span class="font-body-md text-body-md text-on-surface-variant font-medium" id="carousel-counter-label">Question 1 of 3</span>
+<span class="text-outline-variant font-body-md">•</span>
+<span class="text-white font-label-sm text-label-sm bg-surface-elevated border border-hairline-separator px-2.5 py-0.5 rounded-full font-medium" id="carousel-company-pill">Zoho</span>
+</div>
+<div class="flex items-center gap-1.5" id="pagination-dots">
+<span class="w-2 h-2 rounded-full bg-white transition-all duration-300" data-dot="1"></span>
+<span class="w-2 h-2 rounded-full bg-surface-container-highest transition-all duration-300" data-dot="2"></span>
+<span class="w-2 h-2 rounded-full bg-surface-container-highest transition-all duration-300" data-dot="3"></span>
+</div>
+</div>
+<!-- Card Stack Canvas -->
+<div class="relative w-full min-h-[460px]">
+<!-- CARD 1: Single Choice (Active) -->
+<div class="absolute inset-0 w-full transition-all duration-300 transform translate-y-0 opacity-100 z-30" id="card-1">
+<div class="flex flex-col bg-surface-card border border-hairline-separator rounded-2xl p-5 shadow-2xl">
+<!-- Company / Context Row -->
+<div class="flex items-center justify-between mb-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-surface-container-high border border-hairline-separator flex items-center justify-center font-bold text-white text-headline-md shadow-inner">
+                  Z
+                </div>
+<div>
+<div class="font-headline-md text-headline-md text-on-surface">Zoho</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Data Analyst · Chennai</div>
+</div>
+</div>
+<div class="w-7 h-7 rounded-full bg-surface-container flex items-center justify-center text-outline">
+<span class="material-symbols-outlined text-[17px]">verified</span>
+</div>
+</div>
+<!-- Question prompt -->
+<h3 class="font-headline-lg text-headline-lg text-white mb-5 leading-snug">
+              Are you legally authorized to work in India?
+            </h3>
+<!-- Options Group -->
+<div class="flex flex-col gap-2.5 mb-5" id="card1-options">
+<button class="opt-btn flex items-center justify-between p-3.5 rounded-xl bg-surface-elevated border border-white/40 text-white transition-all text-left shadow-sm" data-opt="yes">
+<span class="font-headline-md text-body-md text-white font-medium">Yes, immediately</span>
+<span class="material-symbols-outlined text-white text-[20px] opt-check">check_circle</span>
+</button>
+<button class="opt-btn flex items-center justify-between p-3.5 rounded-xl bg-surface-container border border-hairline-separator/50 text-on-surface-variant hover:text-on-surface transition-all text-left" data-opt="no">
+<span class="font-body-md text-body-md">No, require sponsorship</span>
+<span class="material-symbols-outlined text-outline text-[20px] opt-check hidden">radio_button_unchecked</span>
+</button>
+<button class="opt-btn flex items-center justify-between p-3.5 rounded-xl bg-surface-container border border-hairline-separator/50 text-on-surface-variant hover:text-on-surface transition-all text-left" data-opt="discuss">
+<span class="font-body-md text-body-md">Prefer to discuss in interview</span>
+<span class="material-symbols-outlined text-outline text-[20px] opt-check hidden">radio_button_unchecked</span>
+</button>
+</div>
+<!-- Auto-fill memory switch -->
+<div class="flex items-center justify-between p-3 bg-surface-container-lowest border border-hairline-separator/60 rounded-xl mb-5">
+<div class="flex flex-col pr-2">
+<span class="font-headline-md text-label-md text-on-surface">Remember for future apps</span>
+<span class="font-label-sm text-label-sm text-zinc-subtle">ApplyPilot will auto-answer similar fields</span>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" id="toggle-remember-1" type="checkbox"/>
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-surface peer-checked:bg-silver-track after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-[#131313] after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+</label>
+</div>
+<!-- Primary Action -->
+<button class="w-full py-3.5 px-4 rounded-full bg-white hover:bg-neutral-200 text-black font-headline-md text-body-md font-bold flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.99]" onclick="advanceCard(1)">
+<span>Save &amp; Continue</span>
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- CARD 2: Legal Confirmation / Attestation -->
+<div class="absolute inset-0 w-full transition-all duration-300 transform translate-y-3 scale-[0.97] opacity-60 pointer-events-none z-20" id="card-2">
+<div class="flex flex-col bg-surface-card border border-hairline-separator rounded-2xl p-5 shadow-xl">
+<!-- Header with tag -->
+<div class="flex items-center justify-between mb-3">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-surface-elevated border border-hairline-separator text-white flex items-center justify-center font-bold text-headline-md">
+<span class="material-symbols-outlined text-[22px]">policy</span>
+</div>
+<div>
+<div class="font-headline-md text-headline-md text-on-surface">Fintech Global</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Senior Engineer · London</div>
+</div>
+</div>
+<span class="font-label-sm text-[11px] px-2.5 py-1 rounded-full bg-white/10 border border-white/15 text-white font-semibold flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px]">lock</span>
+                Requires Sign-off
+              </span>
+</div>
+<h3 class="font-headline-lg text-headline-lg text-white mb-3 leading-snug">
+              Background Verification Consent
+            </h3>
+<!-- Scrollable terms inset -->
+<div class="bg-surface-container-lowest border border-hairline-separator/60 rounded-xl p-3.5 h-36 overflow-y-auto mb-4 text-on-surface-variant font-label-md text-label-md leading-relaxed">
+<p class="mb-2">By submitting this disclosure, you authorize ApplyPilot and our hiring client to initiate pre-employment credit, identity, and standard regulatory compliance screening through accredited background inquiry agencies.</p>
+<p class="text-zinc-subtle">No automated inquiry will be conducted without your explicit signature or when local regulatory disclosures dictate manual scheduling.</p>
+</div>
+<!-- Agreement Checkbox -->
+<label class="flex items-center gap-3 p-3 bg-surface-container border border-hairline-separator/50 rounded-xl mb-4 cursor-pointer">
+<input class="w-5 h-5 rounded bg-surface-container-high border-hairline-separator text-white focus:ring-0 focus:ring-offset-0 cursor-pointer" id="consent-check" type="checkbox"/>
+<span class="font-body-md text-label-md text-on-surface">I acknowledge and agree to terms</span>
+</label>
+<!-- Action buttons -->
+<div class="flex gap-2">
+<button class="w-1/3 py-3 px-3 rounded-full bg-surface-elevated border border-hairline-separator text-on-surface-variant font-headline-md text-label-md" onclick="rewindCard(2)">
+                Previous
+              </button>
+<button class="w-2/3 py-3 px-4 rounded-full bg-white hover:bg-neutral-200 text-black font-headline-md text-body-md font-bold transition-all" id="consent-confirm-btn" onclick="advanceCard(2)">
+                Confirm &amp; Submit
+              </button>
+</div>
+</div>
+</div>
+<!-- CARD 3: 2FA Verification Code Prompt -->
+<div class="absolute inset-0 w-full transition-all duration-300 transform translate-y-6 scale-[0.94] opacity-20 pointer-events-none z-10" id="card-3">
+<div class="flex flex-col bg-surface-card border border-hairline-separator rounded-2xl p-5 shadow-xl">
+<!-- Header -->
+<div class="flex items-center justify-between mb-3">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-surface-elevated border border-hairline-separator text-white flex items-center justify-center font-bold text-headline-md">
+<span class="material-symbols-outlined text-[20px]">encrypted</span>
+</div>
+<div>
+<div class="font-headline-md text-headline-md text-on-surface">Greenhouse Portal</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Auth Challenge · Stripe Application</div>
+</div>
+</div>
+<span class="font-label-sm text-[11px] px-2 py-0.5 rounded-full bg-white/10 border border-white/15 text-white font-semibold">2FA Needed</span>
+</div>
+<h3 class="font-headline-lg text-headline-lg text-white mb-1">
+              Enter Verification PIN
+            </h3>
+<p class="font-body-md text-label-md text-on-surface-variant mb-5">Greenhouse sent a single-use 6-digit code to your inbox to authenticate submission.</p>
+<!-- 6 PIN inputs -->
+<div class="flex justify-between gap-1.5 mb-5" id="pin-container">
+<input class="pin-box w-11 h-13 text-center bg-surface-container border border-hairline-separator rounded-xl font-headline-lg text-headline-lg text-white font-bold focus:outline-none focus:border-white transition-colors" maxlength="1" type="text" value="7"/>
+<input class="pin-box w-11 h-13 text-center bg-surface-container border border-hairline-separator rounded-xl font-headline-lg text-headline-lg text-white font-bold focus:outline-none focus:border-white transition-colors" maxlength="1" type="text" value="4"/>
+<input class="pin-box w-11 h-13 text-center bg-surface-container border border-hairline-separator rounded-xl font-headline-lg text-headline-lg text-white font-bold focus:outline-none focus:border-white transition-colors" maxlength="1" type="text" value="9"/>
+<input class="pin-box w-11 h-13 text-center bg-surface-container-lowest border border-hairline-separator/50 rounded-xl font-headline-lg text-headline-lg text-on-surface font-bold focus:outline-none focus:border-white transition-colors" maxlength="1" placeholder="•" type="text"/>
+<input class="pin-box w-11 h-13 text-center bg-surface-container-lowest border border-hairline-separator/50 rounded-xl font-headline-lg text-headline-lg text-on-surface font-bold focus:outline-none focus:border-white transition-colors" maxlength="1" placeholder="•" type="text"/>
+<input class="pin-box w-11 h-13 text-center bg-surface-container-lowest border border-hairline-separator/50 rounded-xl font-headline-lg text-headline-lg text-on-surface font-bold focus:outline-none focus:border-white transition-colors" maxlength="1" placeholder="•" type="text"/>
+</div>
+<!-- Auto-detect inbox status -->
+<div class="flex items-center justify-between p-3 rounded-xl bg-surface-container-lowest border border-hairline-separator/60 mb-5">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-white text-[18px] animate-spin">sync</span>
+<span class="font-label-sm text-label-sm text-on-surface">Listening to mail webhook...</span>
+</div>
+<span class="font-label-sm text-label-sm text-zinc-subtle font-mono">0:24</span>
+</div>
+<!-- Buttons -->
+<div class="flex gap-2">
+<button class="w-1/3 py-3 px-3 rounded-full bg-surface-elevated border border-hairline-separator text-on-surface-variant font-headline-md text-label-md" onclick="rewindCard(3)">
+                Previous
+              </button>
+<button class="w-2/3 py-3.5 px-4 rounded-full bg-white hover:bg-neutral-200 text-black font-headline-md text-body-md font-bold flex items-center justify-center gap-1.5 transition-all" onclick="completeQueue()">
+<span>Verify &amp; Finish</span>
+<span class="material-symbols-outlined text-[18px]">check</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Tactile peek hint when at Card 1 -->
+<div class="mt-4 flex items-center justify-center gap-2 text-zinc-subtle py-2 cursor-pointer hover:text-white transition-colors" id="peek-indicator" onclick="advanceCard(1)">
+<span class="font-label-sm text-label-sm">Next up: Fintech Global Consent</span>
+<span class="material-symbols-outlined text-[16px]">expand_more</span>
+</div>
+</div>
+<!-- VIEW 2: AI ANSWERED (INSET GROUPED LIST) -->
+<div class="hidden flex-col w-full transition-opacity duration-200" id="view-ai-answered">
+<!-- Sub-banner explaining autonomous review -->
+<div class="flex items-center justify-between p-3 bg-surface-container-lowest border border-hairline-separator/60 rounded-xl mb-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-white text-[20px]">smart_toy</span>
+<div class="flex flex-col">
+<span class="font-headline-md text-label-md text-on-surface">4 Drafts Ready for Review</span>
+<span class="font-label-sm text-label-sm text-zinc-subtle">Generated using your portfolio knowledge graph</span>
+</div>
+</div>
+<button class="px-3 py-1 rounded-full bg-white text-black hover:bg-neutral-200 transition-colors font-label-sm text-label-sm font-semibold" onclick="approveAll()">
+          Approve All
+        </button>
+</div>
+<!-- Grouped AI Answers List -->
+<div class="flex flex-col gap-3">
+<!-- Item 1 -->
+<div class="flex flex-col bg-surface-card border border-hairline-separator rounded-2xl p-4 cursor-pointer hover:bg-surface-elevated transition-colors shadow-md" onclick="openActionSheet('Distributed SQL Experience', 'Designed and deployed CockroachDB clusters across 3 AWS regions with 99.99% uptime, implementing automatic geo-partitioning.', 'Projects &amp; GitHub sync (Fintech cluster repo)', '94%')">
+<div class="flex items-center justify-between mb-2">
+<span class="font-label-sm text-label-sm text-zinc-subtle font-medium">Databricks · Senior SRE</span>
+<span class="px-2 py-0.5 rounded-full bg-white/10 border border-white/15 text-white text-[11px] font-semibold flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-white"></span> 94% Match
+            </span>
+</div>
+<h4 class="font-headline-md text-body-lg text-on-surface mb-2 font-medium">
+            What is your experience with distributed SQL databases?
+          </h4>
+<div class="p-3 bg-surface-container-lowest border border-hairline-separator/50 rounded-xl mb-3 text-on-surface-variant font-body-md text-label-md italic">
+            “Designed and deployed CockroachDB clusters across 3 AWS regions with 99.99% uptime, implementing automatic geo-partitioning.”
+          </div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1 text-zinc-subtle font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">history_edu</span>
+<span>Source: Stripe &amp; Fintech repo</span>
+</div>
+<div class="flex gap-1.5" onclick="event.stopPropagation()">
+<button class="w-8 h-8 rounded-full bg-surface-container border border-hairline-separator flex items-center justify-center text-outline hover:text-white transition-colors" onclick="quickReject(this)">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+<button class="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center hover:bg-neutral-200 transition-colors" onclick="quickApprove(this)">
+<span class="material-symbols-outlined text-[18px]">check</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="flex flex-col bg-surface-card border border-hairline-separator rounded-2xl p-4 cursor-pointer hover:bg-surface-elevated transition-colors shadow-md" onclick="openActionSheet('Expected Salary Range', '$165,000 - $185,000 base + equity package according to San Francisco index.', 'Profile Target Compensations', '98%')">
+<div class="flex items-center justify-between mb-2">
+<span class="font-label-sm text-label-sm text-zinc-subtle font-medium">Retool · Fullstack Engineer</span>
+<span class="px-2 py-0.5 rounded-full bg-white/10 border border-white/15 text-white text-[11px] font-semibold flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-white"></span> 98% Match
+            </span>
+</div>
+<h4 class="font-headline-md text-body-lg text-on-surface mb-2 font-medium">
+            Expected salary range (USD)?
+          </h4>
+<div class="p-3 bg-surface-container-lowest border border-hairline-separator/50 rounded-xl mb-3 text-on-surface-variant font-body-md text-label-md italic">
+            “$165,000 - $185,000 base + equity package according to San Francisco index.”
+          </div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1 text-zinc-subtle font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">tune</span>
+<span>Source: Profile preferences</span>
+</div>
+<div class="flex gap-1.5" onclick="event.stopPropagation()">
+<button class="w-8 h-8 rounded-full bg-surface-container border border-hairline-separator flex items-center justify-center text-outline hover:text-white transition-colors" onclick="quickReject(this)">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+<button class="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center hover:bg-neutral-200 transition-colors" onclick="quickApprove(this)">
+<span class="material-symbols-outlined text-[18px]">check</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Item 3 -->
+<div class="flex flex-col bg-surface-card border border-hairline-separator rounded-2xl p-4 cursor-pointer hover:bg-surface-elevated transition-colors shadow-md" onclick="openActionSheet('React &amp; TypeScript Tenure', '5+ years leading web architecture, micro-frontends with Vite, Module Federation, and strict TypeScript types.', 'Work History &amp; Resume bullet 3', '99%')">
+<div class="flex items-center justify-between mb-2">
+<span class="font-label-sm text-label-sm text-zinc-subtle font-medium">Linear · Lead UI</span>
+<span class="px-2 py-0.5 rounded-full bg-white/10 border border-white/15 text-white text-[11px] font-semibold flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-white"></span> 99% Match
+            </span>
+</div>
+<h4 class="font-headline-md text-body-lg text-on-surface mb-2 font-medium">
+            Years of experience with React &amp; TypeScript?
+          </h4>
+<div class="p-3 bg-surface-container-lowest border border-hairline-separator/50 rounded-xl mb-3 text-on-surface-variant font-body-md text-label-md italic">
+            “5+ years leading web architecture, micro-frontends with Vite, Module Federation, and strict TypeScript types.”
+          </div>
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-1 text-zinc-subtle font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]">badge</span>
+<span>Source: Work History</span>
+</div>
+<div class="flex gap-1.5" onclick="event.stopPropagation()">
+<button class="w-8 h-8 rounded-full bg-surface-container border border-hairline-separator flex items-center justify-center text-outline hover:text-white transition-colors" onclick="quickReject(this)">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+<button class="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center hover:bg-neutral-200 transition-colors" onclick="quickApprove(this)">
+<span class="material-symbols-outlined text-[18px]">check</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- VIEW 3: EMPTY STATE (Hidden by default, activated via button) -->
+<div class="hidden flex-col items-center justify-center text-center p-8 bg-surface-card border border-hairline-separator rounded-2xl min-h-[380px] shadow-sm" id="view-empty-state">
+<div class="w-16 h-16 rounded-full bg-white/10 text-white flex items-center justify-center mb-4 border border-white/15">
+<span class="material-symbols-outlined text-[32px]">done_all</span>
+</div>
+<h3 class="font-headline-lg text-headline-lg text-white font-semibold mb-1">
+        All caught up
+      </h3>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-xs mb-6">
+        No manual answers or verification codes needed right now. ApplyPilot is cruising smoothly in background autopilot.
+      </p>
+<div class="flex items-center gap-2 p-3 bg-surface-container-lowest border border-hairline-separator/60 rounded-xl text-left max-w-xs w-full">
+<span class="material-symbols-outlined text-white text-[20px]">radar</span>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-medium">Scanning 24 applications</span>
+<span class="font-label-sm text-label-sm text-zinc-subtle">Next check in 4 minutes</span>
+</div>
+</div>
+<button class="mt-6 text-white font-headline-md text-label-md underline underline-offset-4" onclick="toggleEmptyState(false)">
+        Return to active queue
+      </button>
+</div>
+</div>
+<!-- iOS BOTTOM SHEET MODAL (Contextual AI Inspector) -->
+<div class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden transition-opacity duration-300 opacity-0 flex flex-col justify-end" id="ios-bottom-sheet-backdrop">
+<div class="w-full bg-surface-card border-t border-hairline-separator rounded-t-[28px] p-5 pb-8 shadow-2xl transition-transform duration-300 transform translate-y-full" id="ios-bottom-sheet">
+<!-- Apple grabber bar -->
+<div class="w-10 h-1.5 bg-zinc-subtle/50 rounded-full mx-auto mb-4"></div>
+<!-- Modal Header -->
+<div class="flex items-center justify-between mb-4">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-white"></span>
+<span class="font-label-sm text-label-sm text-white font-semibold" id="sheet-match-badge">94% Confidence</span>
+</div>
+<button class="w-7 h-7 rounded-full bg-surface-elevated border border-hairline-separator flex items-center justify-center text-on-surface-variant hover:text-white" onclick="closeActionSheet()">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+<!-- Modal Question & Proposed Content -->
+<h3 class="font-headline-lg text-headline-lg text-white mb-3 font-semibold" id="sheet-question-title">
+        Review Generated Answer
+      </h3>
+<div class="p-3.5 bg-surface-container-lowest border border-hairline-separator rounded-xl mb-3 text-on-surface font-body-md text-body-md" id="sheet-answer-text">
+        Generated response preview will appear here.
+      </div>
+<div class="flex items-center gap-1 text-zinc-subtle font-label-sm text-label-sm mb-6" id="sheet-source-text">
+<span class="material-symbols-outlined text-[15px]">source</span>
+<span>Based on uploaded data</span>
+</div>
+<!-- Action Stack -->
+<div class="flex flex-col gap-2.5">
+<button class="w-full py-3.5 rounded-full bg-white hover:bg-neutral-200 text-black font-headline-md text-body-md font-bold flex items-center justify-center gap-2" onclick="executeSheetAction('approved')">
+<span class="material-symbols-outlined text-[20px]">check</span>
+<span>Approve &amp; Save</span>
+</button>
+<button class="w-full py-3 rounded-full bg-surface-elevated border border-hairline-separator text-white font-headline-md text-body-md" onclick="executeSheetAction('edited')">
+          Edit Answer
+        </button>
+<button class="w-full py-2.5 text-zinc-subtle hover:text-white font-headline-md text-label-md" onclick="executeSheetAction('rejected')">
+          Reject AI Suggestion
+        </button>
+</div>
+</div>
+</div>
+<!-- Toast notification banner -->
+<div class="fixed top-20 left-4 right-4 z-50 hidden bg-surface-elevated border border-hairline-separator rounded-xl p-3 shadow-2xl flex items-center gap-3 transition-transform duration-200" id="toast-banner">
+<div class="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-[18px]" id="toast-icon">check</span>
+</div>
+<div class="flex flex-col flex-1 min-w-0">
+<span class="font-headline-md text-label-md text-white font-semibold" id="toast-title">Intervention Saved</span>
+<span class="font-label-sm text-label-sm text-zinc-subtle truncate" id="toast-desc">Answer dispatched to active portal.</span>
+</div>
+</div>
+</div>
+<script>
+  // State management
+  let currentCardIndex = 1;
+  let inEmptyState = false;
+
+  // Segmented control tabs
+  const tabQuestions = document.getElementById('tab-questions');
+  const tabAiAnswered = document.getElementById('tab-ai-answered');
+  const viewQuestions = document.getElementById('view-questions');
+  const viewAiAnswered = document.getElementById('view-ai-answered');
+  const viewEmptyState = document.getElementById('view-empty-state');
+  const toggleEmptyStateBtn = document.getElementById('toggle-empty-state-btn');
+  const toggleEmptyLabel = document.getElementById('empty-state-toggle-label');
+
+  tabQuestions.addEventListener('click', () => switchTab('questions'));
+  tabAiAnswered.addEventListener('click', () => switchTab('ai-answered'));
+  toggleEmptyStateBtn.addEventListener('click', () => toggleEmptyState(!inEmptyState));
+
+  function switchTab(target) {
+    if (inEmptyState) toggleEmptyState(false);
+    
+    if (target === 'questions') {
+      tabQuestions.className = "flex-1 py-1.5 px-3 rounded-lg font-headline-md text-label-md font-semibold text-center transition-all bg-surface-elevated text-white shadow-sm border border-hairline-separator/60";
+      tabAiAnswered.className = "flex-1 py-1.5 px-3 rounded-lg font-headline-md text-label-md text-on-surface-variant text-center transition-all hover:text-on-surface";
+      viewQuestions.classList.remove('hidden');
+      viewAiAnswered.classList.add('hidden');
+    } else {
+      tabAiAnswered.className = "flex-1 py-1.5 px-3 rounded-lg font-headline-md text-label-md font-semibold text-center transition-all bg-surface-elevated text-white shadow-sm border border-hairline-separator/60";
+      tabQuestions.className = "flex-1 py-1.5 px-3 rounded-lg font-headline-md text-label-md text-on-surface-variant text-center transition-all hover:text-on-surface";
+      viewAiAnswered.classList.remove('hidden');
+      viewQuestions.classList.add('hidden');
+    }
+  }
+
+  // Card Switcher / Carousel Engine
+  function advanceCard(fromIndex) {
+    if (fromIndex === 1) {
+      applyCardState(2);
+    } else if (fromIndex === 2) {
+      applyCardState(3);
+    }
+  }
+
+  function rewindCard(fromIndex) {
+    if (fromIndex === 2) {
+      applyCardState(1);
+    } else if (fromIndex === 3) {
+      applyCardState(2);
+    }
+  }
+
+  function applyCardState(targetIndex) {
+    currentCardIndex = targetIndex;
+    const c1 = document.getElementById('card-1');
+    const c2 = document.getElementById('card-2');
+    const c3 = document.getElementById('card-3');
+    const counter = document.getElementById('carousel-counter-label');
+    const companyPill = document.getElementById('carousel-company-pill');
+    const peek = document.getElementById('peek-indicator');
+
+    // Update dots
+    document.querySelectorAll('[data-dot]').forEach(d => {
+      const dotNum = parseInt(d.getAttribute('data-dot'));
+      if (dotNum === targetIndex) {
+        d.className = "w-2 h-2 rounded-full bg-white transition-all duration-300";
+      } else {
+        d.className = "w-2 h-2 rounded-full bg-surface-container-highest transition-all duration-300";
+      }
+    });
+
+    counter.textContent = `Question ${targetIndex} of 3`;
+
+    if (targetIndex === 1) {
+      companyPill.textContent = "Zoho";
+      companyPill.className = "text-white font-label-sm text-label-sm bg-surface-elevated border border-hairline-separator px-2.5 py-0.5 rounded-full font-medium";
+      peek.classList.remove('hidden');
+
+      c1.className = "absolute inset-0 w-full transition-all duration-300 transform translate-y-0 opacity-100 z-30 pointer-events-auto";
+      c2.className = "absolute inset-0 w-full transition-all duration-300 transform translate-y-3 scale-[0.97] opacity-60 pointer-events-none z-20";
+      c3.className = "absolute inset-0 w-full transition-all duration-300 transform translate-y-6 scale-[0.94] opacity-20 pointer-events-none z-10";
+    } else if (targetIndex === 2) {
+      companyPill.textContent = "Fintech Global";
+      companyPill.className = "text-white font-label-sm text-label-sm bg-surface-elevated border border-hairline-separator px-2.5 py-0.5 rounded-full font-medium";
+      peek.classList.add('hidden');
+
+      c1.className = "absolute inset-0 w-full transition-all duration-300 transform -translate-y-8 opacity-0 pointer-events-none z-10";
+      c2.className = "absolute inset-0 w-full transition-all duration-300 transform translate-y-0 opacity-100 z-30 pointer-events-auto";
+      c3.className = "absolute inset-0 w-full transition-all duration-300 transform translate-y-3 scale-[0.97] opacity-60 pointer-events-none z-20";
+    } else if (targetIndex === 3) {
+      companyPill.textContent = "Greenhouse Auth";
+      companyPill.className = "text-white font-label-sm text-label-sm bg-surface-elevated border border-hairline-separator px-2.5 py-0.5 rounded-full font-medium";
+      peek.classList.add('hidden');
+
+      c1.className = "absolute inset-0 w-full transition-all duration-300 transform -translate-y-12 opacity-0 pointer-events-none z-10";
+      c2.className = "absolute inset-0 w-full transition-all duration-300 transform -translate-y-8 opacity-0 pointer-events-none z-20";
+      c3.className = "absolute inset-0 w-full transition-all duration-300 transform translate-y-0 opacity-100 z-30 pointer-events-auto";
+    }
+  }
+
+  function completeQueue() {
+    showToast("Auth code verified", "Greenhouse application successfully sent.");
+    setTimeout(() => {
+      toggleEmptyState(true);
+    }, 900);
+  }
+
+  // Option pill selection micro-interaction
+  document.querySelectorAll('#card1-options .opt-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#card1-options .opt-btn').forEach(b => {
+        b.className = "opt-btn flex items-center justify-between p-3.5 rounded-xl bg-surface-container border border-hairline-separator/50 text-on-surface-variant hover:text-on-surface transition-all text-left";
+        const icon = b.querySelector('.opt-check');
+        icon.textContent = "radio_button_unchecked";
+        icon.className = "material-symbols-outlined text-outline text-[20px] opt-check hidden";
+      });
+      btn.className = "opt-btn flex items-center justify-between p-3.5 rounded-xl bg-surface-elevated border border-white/40 text-white transition-all text-left shadow-sm";
+      const activeIcon = btn.querySelector('.opt-check');
+      activeIcon.textContent = "check_circle";
+      activeIcon.className = "material-symbols-outlined text-white text-[20px] opt-check";
+    });
+  });
+
+  // Empty State Toggle
+  function toggleEmptyState(state) {
+    inEmptyState = state;
+    if (inEmptyState) {
+      viewQuestions.classList.add('hidden');
+      viewAiAnswered.classList.add('hidden');
+      viewEmptyState.classList.remove('hidden');
+      viewEmptyState.classList.add('flex');
+      toggleEmptyLabel.textContent = "Show Queue";
+    } else {
+      viewEmptyState.classList.add('hidden');
+      viewEmptyState.classList.remove('flex');
+      toggleEmptyLabel.textContent = "Preview Empty";
+      switchTab('questions');
+    }
+  }
+
+  // Quick Inline Actions on AI list
+  function quickApprove(btn) {
+    const card = btn.closest('.flex-col');
+    card.style.opacity = '0.4';
+    showToast("Draft Approved", "Answer sent to application queue.");
+    setTimeout(() => card.remove(), 400);
+  }
+
+  function quickReject(btn) {
+    const card = btn.closest('.flex-col');
+    card.style.opacity = '0.3';
+    showToast("Draft Rejected", "Flagged for manual authoring.");
+    setTimeout(() => card.remove(), 400);
+  }
+
+  function approveAll() {
+    showToast("All 4 Drafts Approved", "Autonomous background job submitted.");
+    document.querySelectorAll('#view-ai-answered .shadow-md').forEach(el => el.remove());
+  }
+
+  // iOS Bottom Sheet Modal Engine
+  const sheetBackdrop = document.getElementById('ios-bottom-sheet-backdrop');
+  const sheetModal = document.getElementById('ios-bottom-sheet');
+  const sheetTitle = document.getElementById('sheet-question-title');
+  const sheetAnswer = document.getElementById('sheet-answer-text');
+  const sheetSource = document.getElementById('sheet-source-text');
+  const sheetBadge = document.getElementById('sheet-match-badge');
+
+  function openActionSheet(q, a, source, match) {
+    sheetTitle.textContent = q;
+    sheetAnswer.innerHTML = `&ldquo;${a}&rdquo;`;
+    sheetSource.innerHTML = `<span class="material-symbols-outlined text-[15px]">source</span><span>${source}</span>`;
+    sheetBadge.textContent = `${match} Confidence`;
+
+    sheetBackdrop.classList.remove('hidden');
+    setTimeout(() => {
+      sheetBackdrop.classList.remove('opacity-0');
+      sheetBackdrop.classList.add('opacity-100');
+      sheetModal.classList.remove('translate-y-full');
+      sheetModal.classList.add('translate-y-0');
+    }, 10);
+  }
+
+  function closeActionSheet() {
+    sheetBackdrop.classList.remove('opacity-100');
+    sheetBackdrop.classList.add('opacity-0');
+    sheetModal.classList.remove('translate-y-0');
+    sheetModal.classList.add('translate-y-full');
+    setTimeout(() => {
+      sheetBackdrop.classList.add('hidden');
+    }, 300);
+  }
+
+  function executeSheetAction(action) {
+    closeActionSheet();
+    if (action === 'approved') showToast("Response Approved", "Synchronized to application.");
+    if (action === 'edited') showToast("Editor Opened", "Opening rich markdown answer composer.");
+    if (action === 'rejected') showToast("Response Dismissed", "Removed from queue.");
+  }
+
+  // Toast System
+  function showToast(title, desc) {
+    const toast = document.getElementById('toast-banner');
+    document.getElementById('toast-title').textContent = title;
+    document.getElementById('toast-desc').textContent = desc;
+    toast.classList.remove('hidden');
+    setTimeout(() => {
+      toast.classList.add('hidden');
+    }, 2800);
+  }
+
+  // Auto PIN input jumping
+  const pinInputs = document.querySelectorAll('.pin-box');
+  pinInputs.forEach((input, idx) => {
+    input.addEventListener('keyup', (e) => {
+      if (input.value.length === 1 && idx < pinInputs.length - 1) {
+        pinInputs[idx + 1].focus();
+      }
+    });
+  });
+</script></main><nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface/85 backdrop-blur-xl border-t border-hairline-separator shadow-[0_1px_8px_rgba(0,0,0,0.4)]"><div class="h-16 px-space-xs flex items-center justify-around"><a class="flex flex-col items-center justify-center w-16 h-12 text-[#8E8E93] hover:text-white transition-colors" data-path="home" href="#"><span class="material-symbols-outlined text-[24px]">home</span><span class="font-label-sm text-label-sm mt-0.5">Home</span></a><a class="flex flex-col items-center justify-center w-16 h-12 text-white font-semibold transition-colors" data-path="needs-you" href="#"><span class="material-symbols-outlined text-[24px] fill-icon">notification_important</span><span class="font-label-sm text-label-sm mt-0.5">Needs You</span></a><a class="flex flex-col items-center justify-center w-16 h-12 text-[#8E8E93] hover:text-white transition-colors" data-path="jobs" href="#"><span class="material-symbols-outlined text-[24px]">work</span><span class="font-label-sm text-label-sm mt-0.5">Jobs</span></a><a class="flex flex-col items-center justify-center w-16 h-12 text-[#8E8E93] hover:text-white transition-colors" data-path="answers" href="#"><span class="material-symbols-outlined text-[24px]">forum</span><span class="font-label-sm text-label-sm mt-0.5">Answers</span></a><a class="flex flex-col items-center justify-center w-16 h-12 text-[#8E8E93] hover:text-white transition-colors" data-path="profile" href="#"><span class="material-symbols-outlined text-[24px]">person</span><span class="font-label-sm text-label-sm mt-0.5">Profile</span></a></div></nav></body></html>
