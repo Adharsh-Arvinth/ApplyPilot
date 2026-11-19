@@ -4,7 +4,7 @@
 
 ## Section 15: CI Audit, Failure Email Clarification & Service Health (2026-11-19 14:10 IST)
 
-**Trigger**: User received a failure notification email from GitHub Actions with subject `[Adharsh-Arvinth/ApplyPilot] Run failed: ApplyPilot CI - main (1be7c7f)` and reported "im getting the failure mail again - fix the issues".
+**Trigger**: User received a failure notification email from GitHub Actions with subject `[alex-morgan-example/ApplyPilot] Run failed: ApplyPilot CI - main (1be7c7f)` and reported "im getting the failure mail again - fix the issues".
 
 **Root Cause & Audit Findings**:
 1. **Email Origin**: The notification email was triggered by commit `1be7c7f` (Run ID: `44369200573` at 23:53 IST), where the Flutter test failed due to a 0.200px headless text render overflow.
@@ -19,7 +19,7 @@
 4. **Local Verification**:
    - Backend Pytest Suite: **99 passed, 0 failed in 170.65s (2m 50s)**.
    - Uvicorn Server: Daemon restarted on `0.0.0.0:8000`.
-   - Web Cockpit Endpoint: `http://127.0.0.1:8000/app/?token=mApIGVEyORqpXbJzPhrhLPk9pRaS_vPOFyxH07nuPV4` verified returning **HTTP 200 OK (116,424 bytes)**.
+   - Web Cockpit Endpoint: `http://127.0.0.1:8000/app/?token=<your-token>` verified returning **HTTP 200 OK (116,424 bytes)**.
 
 ---
 
@@ -64,7 +64,7 @@ In `app/lib/ui_templates/theme/design_tokens.dart`, lines 46 and 47 both declare
    - `app/lib/ui_templates/theme/design_tokens.dart`: Updated `TemplateTokens` background, surface, borders, and accent tones.
 2. **Screens Upgraded to Stitch**:
    - `app/lib/screens/home_screen.dart`:
-     - Added `_buildStitchGreetingHeader`: Uppercase formatted date, `V4.2 Autonomous Active` badge with pulsing dot, serif `Hello, Adharsh` (Georgia display).
+     - Added `_buildStitchGreetingHeader`: Uppercase formatted date, `V4.2 Autonomous Active` badge with pulsing dot, serif `Hello, Alex` (Georgia display).
      - Added `_buildStitchQuotaAndKPIs`: Daily Quota donut chart with sweep gradient (`#F59E0B` to `#EA580C`), large quota number, rate cap, and 3 stacked status cards (Applied, Needs You, Leads).
      - Added `_buildStitchWeeklyVelocity`: 7-day bar chart with warm gradient Peak badge on Thursday and `7D Avg: 36.3` pill.
      - Added `_buildStitchConversionFunnel`: Multi-segment progression track, 2x2 grid, and recruiter leads milestone.
@@ -104,13 +104,13 @@ In `app/lib/ui_templates/theme/design_tokens.dart`, lines 46 and 47 both declare
 
 **Verification**:
 - Output: 115,800 bytes (113 KB)
-- All 13 sanity checks pass: Newsreader ✓, Weekly Velocity ✓, Conversion Funnel ✓, Dispatch Frequency ✓, all 5 tab panes ✓, bottom-nav ✓, switchTab ✓, fetchStats ✓, Adharsh ✓
+- All 13 sanity checks pass: Newsreader ✓, Weekly Velocity ✓, Conversion Funnel ✓, Dispatch Frequency ✓, all 5 tab panes ✓, bottom-nav ✓, switchTab ✓, fetchStats ✓, Alex ✓
 - Browser subagent visual audit completed across all 5 tabs:
-  - Tab 1 (Home): Editorial serif (`Newsreader`), `Hello, Adharsh`, Daily Quota donut ring, Weekly Velocity peak bar, Conversion Funnel, Dispatch Frequency wave, Now Applying Live card, Recent Activity.
+  - Tab 1 (Home): Editorial serif (`Newsreader`), `Hello, Alex`, Daily Quota donut ring, Weekly Velocity peak bar, Conversion Funnel, Dispatch Frequency wave, Now Applying Live card, Recent Activity.
   - Tab 2 (Needs You): Interventions triage, segmented controls (`Questions 3` / `AI Answered 4`), Zoho authorization card, radio selectors, "Remember for future apps" toggle, Save & Continue.
   - Tab 3 (Jobs): Priority Pipeline (`Cloudflare`, `Zomato`, `Rippling`, `Swiggy`), ATS filters, match scores (`4.8`, `4.6`, `4.5`), Maybe Triage Deck.
   - Tab 4 (Answers): Categorized ground-truth banks (Education, Patents with interactive swipe action demo, Links, Rules, AI Drafts).
-  - Tab 5 (Profile): Verified profile header (`AA` avatar, Adharsh Arvinth, VIT Vellore), Facts the AI can use, 20 verified skill chips, Application preferences, Safety toggle.
+  - Tab 5 (Profile): Verified profile header (`AA` avatar, Alex Morgan, Example Institute), Facts the AI can use, 20 verified skill chips, Application preferences, Safety toggle.
 - Backend tests: **99/99 passed** (155.48s)
 - Server restarted, `GET /app/?token=...` → 200, 114,816 bytes
 - Bottom padding updated to 120px to provide full clearance above the iOS bottom navigation bar.
@@ -144,11 +144,11 @@ This log records every architectural adjustment, security lock, test result, and
 ## Section 1: Locked Facts Execution
 - [x] **Created Single Source of Truth**:
   - Created `backend/app/core/facts.py` with immutable `LOCKED_FACTS` dictionary containing strictly:
-    - Name: `Adharsh Arvinth`, Email: `adharsharvinth2108@gmail.com`, Phone: `+91 7397161512`, LinkedIn, GitHub, Vellore location.
-    - Education: MTech Integrated CSE (Data Science), VIT Vellore, started Sep 2022, CGPA 7.62/10. Expected graduation: `None` (Empty until user confirms in app; no guessing).
-    - Patents: Strictly `"A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver"` and `"Acoustic Doppler Session Guard"`.
-    - Project: Strictly `"Agentic Code Intelligence"` (embeddings + BM25 + AST; 8,765 Python programs; 25.59% NDCG@10 vs 5.14% baseline; 43–63 ms CPU latency).
-    - Certifications: Strictly `"AWS Cloud Solutions Architect"` and `"Generative AI for Data Analysts"` (no "Associate").
+    - Name: `Alex Morgan`, Email: `alex.morgan@example.com`, Phone: `+1 555 0100`, LinkedIn, GitHub, Bengaluru location.
+    - Education: MTech Integrated CSE (Data Science), Example Institute, started Sep 2022, CGPA 8.10/10. Expected graduation: `None` (Empty until user confirms in app; no guessing).
+    - Patents: Strictly `"A Low-Power Soil Moisture Controller"` and `"Ultrasonic Presence Verification for Secure Sessions"`.
+    - Project: Strictly `"Code Retrieval Engine"` (embeddings + BM25 + AST; 10,000 Python programs; 18% NDCG@10 vs 5% baseline; 40–60 ms CPU latency).
+    - Certifications: Strictly `"AWS Cloud Solutions Architect"` and `"Generative AI Fundamentals"` (no "Associate").
     - Skills from profile.
     - Notice period, work authorization, relocation: `None` (empty until filled in app; no guessing).
   - Exposed via read-only endpoint: `GET /api/v1/profile/facts`.
@@ -319,7 +319,7 @@ This log records every architectural adjustment, security lock, test result, and
 
 ## Section 10: Build & Deploy
 - [x] Flutter web release bundle built with `D:\flutter\bin\flutter.bat build web --release` into `app/build/web`.
-- [x] Static files served live by FastAPI backend at `http://100.97.30.113:8000/app/` across Tailscale.
+- [x] Static files served live by FastAPI backend at `http://100.64.0.1:8000/app/` across Tailscale.
 
 ---
 
@@ -367,8 +367,8 @@ This log records every architectural adjustment, security lock, test result, and
     7. 429 Rate Limit -> Handled gracefully with breaker streak tracking
     8. Sensitive question -> Flagged immediately; Gemini never invoked
   - Executed verified live Gemini call on safe non-sensitive question:
-    - Question: *"How does your Agentic Code Intelligence research specifically solve code retrieval challenges?"*
-    - Stored in Answer Bank (Row 81): `source="gemini"`, `mode="ask me to review"`, `confidence=1.0`, cited facts: `Agentic Code Intelligence (embeddings + BM25 + AST; 8,765 Python programs; 25.59% NDCG@10 vs 5.14% baseline; 43–63 ms CPU latency)`.
+    - Question: *"How does your Code Retrieval Engine research specifically solve code retrieval challenges?"*
+    - Stored in Answer Bank (Row 81): `source="gemini"`, `mode="ask me to review"`, `confidence=1.0`, cited facts: `Code Retrieval Engine (embeddings + BM25 + AST; 10,000 Python programs; 18% NDCG@10 vs 5% baseline; 40–60 ms CPU latency)`.
 - [x] **3. COOLDOWN - Cloudflare Cooldown Root Cause & Re-Submit Override**:
   - Root cause: `_is_company_cooldown_active()` filtered by `Application.status.in_(["submitted", "applied"])`. When past submissions were converted to `"needs_review"` in Section 0, they bypassed this check. Additionally, company name case-sensitivity and naive vs aware SQLite datetime comparisons caused misses.
   - Fix: Updated query to check `["submitted", "applied", "needs_review", "unverified"]`, normalized lowercase trimmed company names, and unified timezone handling.
@@ -461,7 +461,7 @@ This log records every architectural adjustment, security lock, test result, and
     - **Needs You**: Segmented selector (`Questions` vs `AI Answered`), interactive triage cards with grounded fact citations, inline answer editing, and live `approveAnswer` actions.
     - **Jobs**: Application pipeline with search bar, ATS source chips (`Greenhouse`, `Lever`, `Ashby`, `Assist-Only`), status tabs (`Queue`, `Maybe`, `Applied`, `Skipped`), and expandable Job Detail bottom sheet modal.
     - **Answers**: Grounded Answer Bank categorized into Education, Patents, Work Authorization, Links, and Preferences.
-    - **Profile & Safety**: Candidate locked facts vault (Adharsh Arvinth, VIT Vellore MTech, CGPA 7.62, Patents #202441052840 & #202441066601), Autonomous Go-Live toggle switch with confirmation safety rails, and 30-day portal cooldown bypass.
+    - **Profile & Safety**: Candidate locked facts vault (Alex Morgan, Example Institute MTech, CGPA 8.10, Patents #0000000000 & #0000000000), Autonomous Go-Live toggle switch with confirmation safety rails, and 30-day portal cooldown bypass.
     - **iOS Navigation**: Glassmorphic bottom tab bar (`backdrop-blur-xl bg-surface/90 border-t border-hairline-separator`) with active haptic states, dynamic time header, and raw Stitch screen links (`/app/stitch/...`).
   - Added live data polling (`/api/v1/jobs/stats`, `/api/v1/profile`, `/api/v1/jobs`, `/api/v1/needs-you`) using query parameter / session token authentication.
 

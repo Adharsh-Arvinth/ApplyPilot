@@ -1,0 +1,145 @@
+"""Autopilot settings, email-proof classification/matching, single-resume replace, cover letters."""
+from types import SimpleNamespace
+
+import pytest
+from fastapi.testclient import TestClient
+
+from backend.app.core.config import settings
+from backend.app.main import app
+from backend.app.services import email_proof
+from backend.app.services.gemini_service import GeminiService
+
+client = TestClient(app)
+AUTH = {"Authorization": f"Bearer {settings.APPLYPILOT_TOKEN}"}
+
+
+# ── Email proof ──
+@pytest.mark.parametrize("subject,body,kind", [
+    ("Thank you for applying to Acme", "We have received your application for Data Scientist.", "confirmation"),
+    ("Your application to Acme", "Thanks for your interest in Acme!", "confirmation"),
+    ("Interview invitation – Acme", "We'd like to schedule an interview with you next week.", "interview"),
+    ("Update on your application", "Unfortunately, we will not be moving forward at this time.", "rejection"),
+    ("Weekly newsletter", "Top stories this week", None),
+])
+def test_classify_employer_emails(subject, body, kind):
+    assert email_proof.classify(subject, body) == kind
+
+
+def test_match_job_prefers_company_in_sender_or_subject():
+    jobs = [SimpleNamespace(id=1, company="Ramp", title="Data Engineer"),
+            SimpleNamespace(id=2, company="Cloudflare", title="AI Engineer"),
+            SimpleNamespace(id=3, company="Elastic", title="ML Engineer")]
+    hit = email_proof.match_job(jobs, "Cloudflare Recruiting <no-reply@greenhouse.io>", "Thank you for applying", "")
+    assert hit.id == 2
+    assert email_proof.match_job(jobs, "news@example.com", "Hello", "nothing relevant") is None
+
+
+def test_proof_status_and_sync_without_connection():
+    res = client.get("/api/v1/proofs/status", headers=AUTH)
+    assert res.status_code == 200
+    assert "connected" in res.json() and "counts" in res.json()
+    assert client.post("/api/v1/proofs/sync", headers=AUTH).status_code == 200
+    assert client.get("/api/v1/proofs", headers=AUTH).status_code == 200
+
+
+def test_proof_connection_rejects_bad_input():
+    res = client.put("/api/v1/proofs/connection", headers=AUTH, json={"address": "not-an-email", "app_password": "x"})
+    assert res.status_code == 400
+
+
+# ── Autopilot ──
+def test_autopilot_overview_and_settings_are_clamped():
+    res = client.get("/api/v1/autopilot", headers=AUTH)
+    assert res.status_code == 200
+    assert {"config", "state", "status", "apply_gap_minutes"} <= set(res.json())
+    res = client.put("/api/v1/autopilot", headers=AUTH, json={"discovery_hours": 999, "proof_sync_minutes": 1, "enabled": True})
+    cfg = res.json()["config"]
+    assert cfg["discovery_hours"] == 48 and cfg["proof_sync_minutes"] == 5 and cfg["enabled"] is True
+    client.put("/api/v1/autopilot", headers=AUTH, json={"discovery_hours": 6, "proof_sync_minutes": 20})
+
+
+def test_autopilot_requires_auth():
+    client.cookies.clear()
+    assert client.get("/api/v1/autopilot").status_code == 401
+
+
+# ── Resume: one active file, every upload replaces the last ──
+def test_resume_upload_replaces_previous(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "OUTPUT_DIR", tmp_path)
+    first = client.post("/api/v1/profile/resume", headers=AUTH, files={"file": ("first.txt", b"Python SQL resume v1", "text/plain")})
+    assert first.status_code == 200 and first.json()["filename"] == "first.txt"
+    second = client.post("/api/v1/profile/resume", headers=AUTH, files={"file": ("second.txt", b"Python SQL resume v2 updated", "text/plain")})
+    assert second.status_code == 200
+    files = sorted(p.name for p in (tmp_path / "resumes").glob("master_resume.*"))
+    assert files == ["master_resume.txt"]
+    assert (tmp_path / "resumes" / "master_resume.txt").read_bytes() == b"Python SQL resume v2 updated"
+    current = client.get("/api/v1/profile/resume", headers=AUTH).json()
+    assert current["uploaded"] and current["filename"] == "second.txt"
+
+
+def test_resume_upload_rejects_unsupported_type(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "OUTPUT_DIR", tmp_path)
+    res = client.post("/api/v1/profile/resume", headers=AUTH, files={"file": ("photo.png", b"\x89PNG", "image/png")})
+    assert res.status_code == 400
+
+
+# ── Cover letter ──
+def test_cover_letter_falls_back_to_grounded_template(monkeypatch):
+    monkeypatch.setattr(GeminiService, "get_client", classmethod(lambda cls: None))
+    from backend.app.core.database import SessionLocal
+    from backend.app.models import Job
+    db = SessionLocal()
+    try:
+        job = db.query(Job).first()
+        if job is None:
+            pytest.skip("no jobs seeded")
+        job_id, company = job.id, job.company
+    finally:
+        db.close()
+    res = client.post("/api/v1/ai/cover-letter", headers=AUTH, json={"job_id": job_id})
+    assert res.status_code == 200
+    body = res.json()
+    assert body["source"] == "template" and company in body["cover_letter"]
+
+
+# ── Autopilot picks the best role on a site that allows automation ──
+def test_autopilot_skips_assist_only_sites(monkeypatch):
+    import asyncio
+    import datetime
+    from backend.app.core.app_settings import set_setting
+    from backend.app.core.database import SessionLocal
+    from backend.app.models import Job, Profile
+    from backend.app.services.apply_engine import AutoApplyEngine
+    from backend.app.services.autopilot import Autopilot
+
+    db = SessionLocal()
+    try:
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        set_setting(db, "autopilot_state", {"last_discovery_at": now, "last_proof_sync_at": now})
+        profile = db.query(Profile).first()
+        saved = (profile.is_paused, profile.active_hours_start, profile.active_hours_end)
+        profile.is_paused, profile.active_hours_start, profile.active_hours_end = False, 0, 24
+        assist = Job(source="indeed", company="AssistCo", title="ML Engineer", url="https://example.com/a", status="queued", score=4.99)
+        auto = Job(source="greenhouse", company="AutoCo", title="ML Engineer", url="https://example.com/b", status="queued", score=4.98)
+        db.add_all([assist, auto]); db.commit()
+        picked = []
+
+        async def fake_apply(db_, job, profile_, **kw):
+            picked.append(job.source)
+            job.status = "dry_run"
+            db_.commit()
+            return {"status": "dry_run"}
+
+        monkeypatch.setattr(AutoApplyEngine, "process_job_application", staticmethod(fake_apply))
+        monkeypatch.setattr(AutoApplyEngine, "is_circuit_broken", classmethod(lambda cls: False))
+        res = asyncio.run(Autopilot.run_cycle(force=True))
+        assert picked == ["greenhouse"], res
+        db.refresh(assist)
+        assert assist.status == "queued"  # left for the user to apply themselves
+    finally:
+        for j in db.query(Job).filter(Job.company.in_(["AssistCo", "AutoCo"])).all():
+            db.delete(j)
+        profile = db.query(Profile).first()
+        profile.is_paused, profile.active_hours_start, profile.active_hours_end = saved
+        db.commit()
+        db.close()

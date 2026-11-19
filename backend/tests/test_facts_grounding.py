@@ -12,30 +12,26 @@ def test_locked_facts_immutability():
 
 def test_grounded_valid_resume_text_passes():
     """Valid text with verified claims must pass without error."""
-    valid_text = """
-    Adharsh Arvinth
-    Vellore Institute of Technology (VIT Vellore)
-    Degree: MTech Integrated CSE (Data Science)
-    Academic Standing: CGPA 7.62/10
-    Patents:
-    - A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver
-    - Acoustic Doppler Session Guard
-    Projects:
-    - Agentic Code Intelligence: hybrid code retrieval across 8,765 Python programs 
-      using embeddings, BM25, and AST; achieved 25.59% NDCG@10 vs 5.14% baseline at 43–63 ms CPU latency.
-    Certifications:
-    - AWS Cloud Solutions Architect
-    - Generative AI for Data Analysts
-    """
+    e = LOCKED_FACTS["education"]
+    project = LOCKED_FACTS["projects"][0]
+    valid_text = "\n".join([
+        LOCKED_FACTS["personal"]["name"],
+        f"{e['institution_full']} ({e['institution']})",
+        f"Degree: {e['degree']}",
+        f"Academic Standing: CGPA {e['cgpa']}",
+        "Patents:", *[f"- {t}" for t in LOCKED_FACTS["patents"]],
+        "Projects:", f"- {project['name']}: {project['description']}",
+        "Certifications:", *[f"- {c}" for c in LOCKED_FACTS["certifications"]],
+    ])
     # Should not raise
     assert_resume_grounded(valid_text, profile_graduation_date=None)
 
 def test_fake_patent_rejected():
     """Injecting a fake or unapproved patent must be rejected."""
-    fake_text = """
+    fake_text = f"""
     Patents:
     - Adaptive Context Caching with Speculative Token Pruning for Edge LLMs
-    - A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver
+    - {LOCKED_FACTS["patents"][0]}
     """
     with pytest.raises(UngroundedFactError) as exc_info:
         assert_resume_grounded(fake_text)
@@ -61,7 +57,7 @@ def test_fake_employer_rejected():
 
 def test_unconfirmed_graduation_date_rejected():
     """Asserting graduation date when unconfirmed in profile must be rejected."""
-    fake_text = "VIT Vellore, Expected: May 2027"
+    fake_text = f"{LOCKED_FACTS['education']['institution']}, Expected: May 2027"
     with pytest.raises(UngroundedFactError) as exc_info:
         assert_resume_grounded(fake_text, profile_graduation_date=None)
     assert "Graduation date" in str(exc_info.value)

@@ -242,3 +242,24 @@ def interview_prep(
 
     result = GeminiService.generate_interview_prep(job_dict)
     return result
+
+
+class CoverLetterRequest(BaseModel):
+    job_id: int
+
+
+@router.post("/cover-letter")
+def cover_letter(
+    req: CoverLetterRequest,
+    db: Session = Depends(get_db),
+    token: str = Depends(verify_token)
+):
+    """Generate a short cover letter for a job, grounded in the verified candidate facts."""
+    job = db.query(Job).filter(Job.id == req.job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    profile = db.query(Profile).first()
+    return GeminiService.generate_cover_letter(
+        {"title": job.title, "company": job.company, "location": job.location, "notes": job.score_reason or ""},
+        {"full_name": profile.full_name} if profile else None,
+    )

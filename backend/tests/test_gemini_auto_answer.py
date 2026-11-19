@@ -156,9 +156,9 @@ def test_grounded_questions_answered_correctly():
             "field_type": "text",
             "mock": {
                 "can_answer": True,
-                "answer": "Vellore Institute of Technology (VIT Vellore)",
+                "answer": f"{LOCKED_FACTS['education']['institution_full']} ({LOCKED_FACTS['education']['institution']})",
                 "confidence": 0.98,
-                "facts_used": ["VIT Vellore", "Integrated MTech CSE (Data Science)"],
+                "facts_used": [LOCKED_FACTS["education"]["institution"], LOCKED_FACTS["education"]["degree"]],
                 "reason_if_not": ""
             }
         },
@@ -168,9 +168,9 @@ def test_grounded_questions_answered_correctly():
             "field_type": "text",
             "mock": {
                 "can_answer": True,
-                "answer": "7.62/10",
+                "answer": LOCKED_FACTS["education"]["cgpa"],
                 "confidence": 0.99,
-                "facts_used": ["CGPA 7.62/10"],
+                "facts_used": [f"CGPA {LOCKED_FACTS['education']['cgpa']}"],
                 "reason_if_not": ""
             }
         },
@@ -180,21 +180,21 @@ def test_grounded_questions_answered_correctly():
             "field_type": "text",
             "mock": {
                 "can_answer": True,
-                "answer": "A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver",
+                "answer": LOCKED_FACTS["patents"][0],
                 "confidence": 0.99,
-                "facts_used": ["A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver"],
+                "facts_used": [LOCKED_FACTS["patents"][0]],
                 "reason_if_not": ""
             }
         },
         # Benchmark Project Metric
         {
-            "question": "What retrieval metric did your Agentic Code Intelligence search benchmark achieve?",
+            "question": f"What retrieval metric did your {LOCKED_FACTS['projects'][0]['name']} search benchmark achieve?",
             "field_type": "text",
             "mock": {
                 "can_answer": True,
-                "answer": "25.59% NDCG@10 vs 5.14% baseline across 8,765 Python programs with 43–63 ms CPU latency.",
+                "answer": LOCKED_FACTS["projects"][0]["metrics"],
                 "confidence": 0.96,
-                "facts_used": ["Agentic Code Intelligence", "25.59% NDCG@10 vs 5.14% baseline", "8,765 Python programs"],
+                "facts_used": [LOCKED_FACTS["projects"][0]["name"], LOCKED_FACTS["projects"][0]["metrics"]],
                 "reason_if_not": ""
             }
         },
@@ -276,7 +276,7 @@ def test_grounding_violation_rejected_by_validation():
         "can_answer": True,
         "answer": "My model achieved 99.9% accuracy on the test benchmark dataset.",
         "confidence": 0.92,
-        "facts_used": ["Agentic Code Intelligence"],
+        "facts_used": [LOCKED_FACTS["projects"][0]["name"]],
         "reason_if_not": ""
     }
     with patch.object(GeminiService, "_call_model", return_value=json.dumps(inflated_metric_mock)):

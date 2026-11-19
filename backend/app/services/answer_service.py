@@ -1,5 +1,6 @@
 import re
 import json
+from backend.app.core.facts import LOCKED_FACTS
 import logging
 from pathlib import Path
 from typing import Optional, Tuple, List, Dict, Any
@@ -10,93 +11,56 @@ from backend.app.core.config import settings
 logger = logging.getLogger(__name__)
 
 def seed_candidate_records(db: Session) -> int:
-    """Seed verified structured candidate records (University vs School, Published Patents vs Benchmarks)."""
+    """Seed verified structured candidate records from the facts file (never hard-coded here)."""
     if db.query(CandidateRecord).count() > 0:
         return 0
-
-    records = [
-        # Education - University vs School
-        CandidateRecord(
-            category="education",
-            subcategory="university",
-            title="Integrated MTech Computer Science and Engineering (Data Science)",
-            description="Vellore Institute of Technology (VIT Vellore) • CGPA: 7.62/10",
-            source_evidence="Official Academic Record / Transcript",
-            verification_status="verified",
-            is_verified=True
-        ),
-        CandidateRecord(
-            category="education",
-            subcategory="school",
-            title="Higher Secondary Certificate (12th Grade CBSE)",
-            description="Mathematics, Physics, Chemistry, Computer Science stream",
-            source_evidence="CBSE Board Examination Certificate",
-            verification_status="verified",
-            is_verified=True
-        ),
-        # Patents - Published Patents (NOT benchmarks or applications!)
-        CandidateRecord(
-            category="patents",
-            subcategory="published_patent",
-            title="Proactive Multimodal Fusion-Based Accident Predictor for a Driver",
-            description="Multimodal Driver Stress & Crash Risk Detection using OpenCV, MediaPipe facial landmarks, voice-stress acoustics (MFCC, pitch, amplitude), Random Forest + LSTM neural classifiers, and real-time GenAI safety incident summaries.",
-            source_evidence="Indian Patent Office Publication #202441058291",
-            verification_status="verified",
-            is_verified=True
-        ),
-        CandidateRecord(
-            category="patents",
-            subcategory="published_patent",
-            title="Acoustic Doppler Session Guard",
-            description="High-frequency ultrasonic Doppler shift proximity verification and dual-band spectral veto for zero-trust terminal sessions. Automatically locks workstations in 10.5 seconds upon operator departure.",
-            source_evidence="Indian Patent Office Publication #202441069123",
-            verification_status="verified",
-            is_verified=True
-        ),
-        # Projects - System Benchmarks (NOT patents!)
-        CandidateRecord(
-            category="projects",
-            subcategory="system_benchmark",
-            title="Agentic Code Intelligence & Neural Code Search",
-            description="Hybrid code retrieval engine indexing 8,765 Python programs. Combines dense sentence-transformers embeddings, sparse BM25 ranking, and AST lexical syntax graph parsing. Evaluated on MTEB AppsRetrieval dataset, achieving 25.59% NDCG@10 vs a 5.14% baseline with 43–63 ms CPU latency.",
-            source_evidence="Benchmarked on MTEB AppsRetrieval benchmark suite (8,765 Python programs)",
-            verification_status="verified",
-            is_verified=True
-        ),
-        # Certifications
-        CandidateRecord(
-            category="certifications",
-            subcategory="cloud_architecture",
-            title="AWS Cloud Solutions Architect",
-            description="Comprehensive knowledge in designing highly available, fault-tolerant, and scalable AWS cloud architectures.",
-            source_evidence="AWS Certification Credential ID: AWS-SAA-2023-VERIFIED",
-            verification_status="verified",
-            is_verified=True
-        ),
-        CandidateRecord(
-            category="certifications",
-            subcategory="ai_analytics",
-            title="Generative AI for Data Analysts",
-            description="Specialized training on LLM embeddings, vector search, RAG pipelines, and automated reporting.",
-            source_evidence="DeepLearning.AI / Coursera Credential",
-            verification_status="verified",
-            is_verified=True
-        ),
-        # Technical Skills
-        CandidateRecord(
-            category="technical_skills",
-            subcategory="software_system",
-            title="AI / ML Systems & Data Science Stack",
-            description="Python, PyTorch, Scikit-Learn, OpenCV, MediaPipe, Pandas, NumPy, FastAPI, SQLite, PostgreSQL, Playwright, Docker, Git",
-            source_evidence="Verified across open-source codebases and patent implementations",
-            verification_status="verified",
-            is_verified=True
-        ),
-    ]
+    rows = LOCKED_FACTS.get("candidate_records") or _default_candidate_records()
+    records = [CandidateRecord(**{k: v for k, v in dict(r).items()}) for r in rows]
     db.add_all(records)
     db.commit()
     logger.info(f"Seeded {len(records)} structured candidate records.")
     return len(records)
+
+
+def _default_candidate_records():
+    """Records derived from the core facts when the facts file has no detailed list."""
+    e = LOCKED_FACTS["education"]
+    out = [{"category": "education", "subcategory": "university", "title": e["degree"],
+            "description": f"{e.get('institution_full') or e['institution']} • CGPA: {e.get('cgpa', '')}",
+            "source_evidence": "Academic record", "verification_status": "verified", "is_verified": True}]
+    out += [{"category": "patents", "subcategory": "published_patent", "title": t, "description": "Published patent",
+             "source_evidence": "Patent publication", "verification_status": "verified", "is_verified": True} for t in LOCKED_FACTS.get("patents", ())]
+    out += [{"category": "projects", "subcategory": "system_benchmark", "title": p["name"], "description": p.get("description", ""),
+             "source_evidence": "Project benchmark", "verification_status": "verified", "is_verified": True} for p in LOCKED_FACTS.get("projects", ())]
+    out += [{"category": "certifications", "subcategory": "certificate", "title": c, "description": "",
+             "source_evidence": "Certification", "verification_status": "verified", "is_verified": True} for c in LOCKED_FACTS.get("certifications", ())]
+    return out
+
+
+def _institution(long: bool = False) -> str:
+    e = LOCKED_FACTS["education"]
+    full = e.get("institution_full") or e["institution"]
+    return f"{full} ({e['institution']})" if long and e["institution"] != full else full
+
+
+def format_inr(amount) -> str:
+    """Indian digit grouping: 700000 -> 7,00,000; 1250000 -> 12,50,000."""
+    digits = str(int(amount or 0))
+    if len(digits) <= 3:
+        return digits
+    head, tail = digits[:-3], digits[-3:]
+    groups = []
+    while len(head) > 2:
+        groups.insert(0, head[-2:])
+        head = head[:-2]
+    return ",".join(([head] if head else []) + groups) + "," + tail
+
+
+def _answer(key: str):
+    """Personal answers (pronouns, city, username…) live in the facts file under "answers"."""
+    value = (LOCKED_FACTS.get("answers") or {}).get(key)
+    return (value, "always_use") if value else None
+
 
 SYNONYM_MAP = {
     # Degree & Education
@@ -207,7 +171,7 @@ def clean_and_deduplicate_answer_bank(db: Session):
     inst = db.query(AnswerBank).filter(AnswerBank.question_key == "institution").first()
     if inst:
         inst.question_text = "University / Institution"
-        inst.answer = "Vellore Institute of Technology (VIT Vellore)"
+        inst.answer = _institution(long=True)
         inst.canonical_key = "institution"
 
     db.commit()
@@ -296,8 +260,8 @@ class AnswerService:
                 phone="+91 98765 43210",
                 linkedin="https://linkedin.com/in/candidate",
                 github="https://github.com/candidate",
-                education="MTech Integrated CSE (Data Science), VIT Vellore",
-                cgpa="7.62/10",
+                education=f"{LOCKED_FACTS['education']['degree']}, {_institution()}",
+                cgpa=LOCKED_FACTS["education"].get("cgpa", ""),
                 graduation_date="",
                 min_salary_inr=700000,
                 daily_cap=100,
@@ -329,7 +293,7 @@ class AnswerService:
                 pdf_path="/output/resumes/master_resume.pdf"
             ))
             db.add(ResumeVersion(
-                version_name="Agentic Code Intelligence & Search",
+                version_name="AI Engineering & Search Focus",
                 target_role="AI Engineer / Backend Systems",
                 ats_score=97.0,
                 is_master=False,
@@ -364,37 +328,30 @@ class AnswerService:
             
             # Education
             ("highest degree", profile.education, "text", "always_use", "education", "candidate_profile", True, "Degree Certificate"),
-            ("institution", "Vellore Institute of Technology (VIT Vellore)", "text", "always_use", "education", "candidate_profile", True, "University Record"),
-            ("school", "Vellore Institute of Technology", "text", "always_use", "education", "candidate_profile", True, "University Record"),
-            ("discipline", "Computer Science and Engineering (Data Science)", "text", "always_use", "education", "candidate_profile", True, "Major Program"),
+            ("institution", _institution(long=True), "text", "always_use", "education", "candidate_profile", True, "University Record"),
+            ("school", _institution(), "text", "always_use", "education", "candidate_profile", True, "University Record"),
+            ("discipline", (LOCKED_FACTS.get("answers") or {}).get("discipline", ""), "text", "always_use", "education", "candidate_profile", True, "Major Program"),
             ("degree", profile.education, "text", "always_use", "education", "candidate_profile", True, "Degree Verification"),
             ("cgpa", profile.cgpa, "text", "always_use", "education", "candidate_profile", True, "Official Academic Transcript"),
-            ("start year", "2022", "text", "always_use", "education", "candidate_profile", True, "Matriculation Record"),
+            ("start year", (LOCKED_FACTS["education"].get("start_date") or "").split()[-1:][0] if LOCKED_FACTS["education"].get("start_date") else "", "text", "always_use", "education", "candidate_profile", True, "Matriculation Record"),
 
             # Work Authorization & Preferences (Strictly based on profile, never guessed)
-            ("expected salary", f"₹{profile.min_salary_inr:,} per year minimum, negotiable", "text", "always_use", "preferences", "candidate_profile", True, "Candidate Preference"),
-            ("salary expectation", f"₹{profile.min_salary_inr:,} per year minimum, negotiable", "text", "always_use", "preferences", "candidate_profile", True, "Candidate Preference"),
+            ("expected salary", f"₹{format_inr(profile.min_salary_inr)} per year minimum, negotiable", "text", "always_use", "preferences", "candidate_profile", True, "Candidate Preference"),
+            ("salary expectation", f"₹{format_inr(profile.min_salary_inr)} per year minimum, negotiable", "text", "always_use", "preferences", "candidate_profile", True, "Candidate Preference"),
             ("preferred work mode", profile.preferred_work_mode or "Remote / Hybrid / Onsite", "text", "always_use", "preferences", "candidate_profile", True, "Work Mode Preference"),
             ("how did you hear about this job", "Company career page", "text", "always_use", "general", "candidate_profile", True, "Standard ATS question"),
             ("how did you hear about us", "Company career page", "text", "always_use", "general", "candidate_profile", True, "Standard ATS question"),
             ("gender", "Prefer not to say", "select", "always_use", "demographics", "candidate_profile", True, "Demographic Disclosure Choice"),
             ("gender identity", "Prefer not to say", "select", "always_use", "demographics", "candidate_profile", True, "Demographic Disclosure Choice"),
-            ("pronouns", "He/Him/His", "text", "always_use", "demographics", "candidate_profile", True, "Candidate Preference"),
             ("are you hispanic latino", "No", "select", "always_use", "demographics", "candidate_profile", True, "EEOC disclosure"),
             ("veteran status", "I am not a protected veteran", "select", "always_use", "demographics", "candidate_profile", True, "EEOC disclosure"),
             ("disability status", "I do not have a disability", "select", "always_use", "demographics", "candidate_profile", True, "EEOC disclosure"),
             
             # Technical Proof Points (Strict truth)
-            ("pytorch jax experience", "Yes, trained Random Forest and LSTM neural architectures for multimodal sensor prediction in my published patent project.", "textarea", "always_use", "technical", "verified_patent", True, "Indian Patent Office publication"),
-            ("neural architecture reproduction", "Yes, built and benchmarked a hybrid neural embedding + BM25 + AST code retrieval system on MTEB AppsRetrieval, achieving 25.59% NDCG@10 vs a 5.14% baseline with 43–63ms CPU latency.", "textarea", "always_use", "technical", "benchmark_paper", True, "Benchmarked on MTEB AppsRetrieval dataset"),
-            ("deep learning experience years", "1-2 years through graduate coursework, published patent R&D, and benchmarked research implementations.", "text", "always_use", "technical", "candidate_profile", True, "Academic & Project Timeline"),
-            ("public links", f"GitHub: {profile.github} | 2 Published Patents (A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver & Acoustic Doppler Session Guard)", "text", "always_use", "technical", "verified_patent", True, "Patent Office Registrations"),
-            ("cloud experience", "AWS Cloud Solutions Architect with practical knowledge in scalable cloud architectures, serverless, and distributed pipelines.", "text", "always_use", "technical", "certificate", True, "AWS Certification Credential"),
+            ("public links", f"GitHub: {profile.github} | Published patents: {'; '.join(LOCKED_FACTS['patents'])}", "text", "always_use", "technical", "verified_patent", True, "Patent Office Registrations"),
             
             # Behavioral
-            ("stakeholder disagreement essay", "During development of our multimodal accident predictor patent, a collaborator pushed to add heavy facial mesh layers that threatened our 60ms latency budget. I ran empirical benchmarks demonstrating our Random Forest + LSTM model with voice-stress features achieved equivalent precision at half the compute. Presenting data-backed tradeoffs convinced the team to preserve our low-latency design, successfully securing our patent filing.", "textarea", "always_use", "behavioral", "candidate_experience", True, "Patent Project Case Study"),
-            ("describe a specific situation where you managed conflict", "During development of our multimodal accident predictor patent, a collaborator pushed to add heavy facial mesh layers that threatened our 60ms latency budget. I ran empirical benchmarks demonstrating our Random Forest + LSTM model with voice-stress features achieved equivalent precision at half the compute. Presenting data-backed tradeoffs convinced the team to preserve our low-latency design, successfully securing our patent filing.", "textarea", "always_use", "behavioral", "candidate_experience", True, "Patent Project Case Study"),
-            ("what does the best team wins mean to you", "To me, it means collective ownership over individual ego. In research and engineering, the most resilient solutions emerge when diverse perspectives collaborate openly, challenge ideas with empirical data, and align around shared outcomes.", "textarea", "always_use", "behavioral", "candidate_experience", True, "Engineering Philosophy Statement")
+            *[tuple(x) for x in (LOCKED_FACTS.get("seed_answers") or ())],
         ]
 
         seen_keys = set()
@@ -508,11 +465,11 @@ class AnswerService:
 
         # Education
         if re.search(r'\bschool|college|university|institution\b', clean_key):
-            return "Vellore Institute of Technology", "always_use"
+            return _institution(), "always_use"
         if re.search(r'\bdegree|highest.*education\b', clean_key):
             return profile.education, "always_use"
         if re.search(r'\bdiscipline|major|field of study\b', clean_key):
-            return "Computer Science and Engineering (Data Science)", "always_use"
+            return _answer("discipline")
         if re.search(r'\bcgpa|gpa\b', clean_key):
             return profile.cgpa, "always_use"
         if re.search(r'\bgraduation.*(year|date)\b', clean_key):
@@ -524,7 +481,7 @@ class AnswerService:
         if re.search(r'why.*(join|work for|interested in|apply to)', clean_key):
             return "I am eager to apply my expertise in Machine Learning, Python engineering, and scalable distributed architectures to build high-impact, reliable systems alongside world-class engineering teams.", "always_use"
         if re.search(r'intend\s*to\s*work|work\s*location\s*preference|from\s*where\s*do\s*you', clean_key):
-            return "India (Remote)", "always_use"
+            return _answer("work_location_preference")
         if re.search(r'preferred\s*(first\s*)?name', clean_key):
             return first_name, "always_use"
         if re.search(r'sponsorship|require.*visa|visa.*sponsorship|employment.*visa|immigration.*sponsorship|authorized.*work|work.*authorization|legally.*authorized|unrestricted.*right', clean_key):
@@ -546,7 +503,7 @@ class AnswerService:
         if re.search(r'usd|eur|\$', clean_key) and re.search(r'salary|compensation|ctc', clean_key):
             return None # Must use ₹ with clear range; never bare number in USD
         if re.search(r'salary|expected.*ctc|compensation', clean_key):
-            return "₹7,00,000 per year minimum, negotiable", "always_use"
+            return f"₹{format_inr(profile.min_salary_inr)} per year minimum, negotiable", "always_use"
 
         # Notice & Availability
         if re.search(r'\bnotice.*period\b|start.*date|earliest.*start|preferred start', clean_key):
@@ -560,33 +517,33 @@ class AnswerService:
         if re.search(r'disability', clean_key):
             return "No, I do not have a disability", "always_use"
         if re.search(r'gender', clean_key):
-            return "Male", "always_use"
+            return _answer("gender")
         if re.search(r'pronunciation', clean_key):
-            return "Uh-dharsh Ahr-vinth", "always_use"
+            return _answer("name_pronunciation")
         if re.search(r'\bpronoun(s)?\b', clean_key):
-            return "He/Him/His", "always_use"
+            return _answer("pronouns")
         if re.search(r'how\s*(did|do)\s*you\s*hear|heard\s*about', clean_key):
             return "Company career page / Job Board", "always_use"
         if re.search(r'language\s*skill', clean_key):
             return "Python", "always_use"
         if re.search(r'proudest\s*accomplishment|favorite\s*project.*(llm|ai|ml)|accomplishment.*(llm|ai|ml)', clean_key):
-            return "Architecting and evaluating agentic LLM retrieval pipelines and multimodal perception systems with patented architectures, achieving 25.59% NDCG@10 on MTEB benchmarks.", "always_use"
+            return _answer("proudest_accomplishment")
         if re.search(r'why.*(palantir|spotify|figma|elastic|gitlab|cloudflare)', clean_key):
             return "I am excited by the engineering rigor, distributed infrastructure, and high-impact machine learning challenges tackled here, and I look forward to contributing performant Python and ML systems.", "always_use"
         if re.search(r'adjustment.*interview|accessible.*interview', clean_key):
             return "None required", "always_use"
         if re.search(r'gitlab\s*username', clean_key):
-            return "Adharsh-Arvinth", "always_use"
+            return _answer("gitlab_username")
         if re.search(r'employment\s*agreement|post-employment\s*restriction', clean_key):
             return "No", "always_use"
 
         # Standalone Location fields (Must not shadow complex sentences)
         if clean_key in ["current location", "location", "your location"]:
-            return "Vellore, Tamil Nadu, India", "always_use"
+            return LOCKED_FACTS["personal"].get("location") or None, "always_use"
         if re.search(r'^\s*(what\s+is\s+your\s+)?(location|country)(\s+of\s+residence|\s+of\s+citizenship)?\s*$|(in\s+)?which\s+country\s+do\s+you\s+(reside|work|live|currently\s+work|currently\s+live)', clean_key):
             return "India", "always_use"
         if re.search(r'^\s*(what\s+is\s+your\s+)?city\s*$|current\s+city|which\s+city', clean_key):
-            return "Bengaluru", "always_use"
+            return _answer("current_city")
         if clean_key in ["country", "current country", "citizenship"]:
             return "India", "always_use"
 

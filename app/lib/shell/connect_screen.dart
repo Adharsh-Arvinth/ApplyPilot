@@ -97,7 +97,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
             const SizedBox(height: 6),
             const Padding(
               padding: EdgeInsets.only(left: 4),
-              child: Text('e.g. http://100.97.30.113:8000', style: TextStyle(color: ShellColors.ink3, fontSize: 12)),
+              child: Text('e.g. http://100.64.0.1:8000', style: TextStyle(color: ShellColors.ink3, fontSize: 12)),
             ),
             const SizedBox(height: 16),
             TextField(

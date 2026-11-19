@@ -18,6 +18,7 @@ from backend.app.services.answer_service import AnswerService, normalize_questio
 from backend.app.services.tailoring_service import ResumeTailoringService
 from backend.app.services.fcm_service import PushNotificationService
 from backend.app.services.gemini_service import GeminiService
+from backend.app.core.facts import LOCKED_FACTS
 
 logger = logging.getLogger(__name__)
 
@@ -712,7 +713,7 @@ class AutoApplyEngine:
                 loc_el = await page.query_selector("input[name='location']:not(#candidate-location), #location-input")
                 if loc_el:
                     try:
-                        await loc_el.fill("Vellore, Tamil Nadu, India")
+                        await loc_el.fill(LOCKED_FACTS["personal"].get("location", ""))
                     except Exception:
                         pass
 
@@ -720,7 +721,7 @@ class AutoApplyEngine:
                 org_el = await page.query_selector("input[name='org'], input[name*='company'], input[name*='organization']")
                 if org_el:
                     try:
-                        await org_el.fill("Vellore Institute of Technology")
+                        await org_el.fill(LOCKED_FACTS["education"].get("institution_full") or LOCKED_FACTS["education"]["institution"])
                     except Exception:
                         pass
 
@@ -1111,7 +1112,7 @@ class AutoApplyEngine:
                         elif is_required:
                             lbl_l = label_text.lower()
                             if any(k in lbl_l for k in ["school", "university", "college", "institution", "degree", "result", "grade", "gpa", "rationale", "evidence"]):
-                                fallback_ans = "Vellore Institute of Technology - First Class with Distinction"
+                                fallback_ans = f"{LOCKED_FACTS['education'].get('institution_full') or LOCKED_FACTS['education']['institution']} - CGPA {LOCKED_FACTS['education'].get('cgpa', '')}"
                                 await inp.fill(fallback_ans)
                                 logger.info(f"Filled education fallback for [{label_text[:30]}]: {fallback_ans}")
                             elif any(k in lbl_l for k in ["experience", "linux", "python", "describe", "summary", "project"]):

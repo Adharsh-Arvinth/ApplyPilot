@@ -20,7 +20,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   final List<Map<String, dynamic>> _messages = [
     {
       "role": "assistant",
-      "content": "### Welcome to ApplyPilot Career Advisor\n\nI'm powered by **Gemini 2.5 Flash** with direct access to your verified candidate profile (VIT Vellore MTech, 2 published patents, Agentic retrieval benchmark, and AWS Solutions Architect certification).\n\nHow can I help accelerate your career today?",
+      "content": "### Welcome to ApplyPilot Career Advisor\n\nI'm powered by **Gemini 2.5 Flash** with direct access to your verified candidate profile (Example Institute MTech, 2 published patents, Agentic retrieval benchmark, and AWS Solutions Architect certification).\n\nHow can I help accelerate your career today?",
       "suggested_actions": [
         "Review top matches",
         "Technical interview prep",

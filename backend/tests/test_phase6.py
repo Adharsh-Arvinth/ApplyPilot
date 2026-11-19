@@ -1,3 +1,4 @@
+from backend.app.core.facts import LOCKED_FACTS
 import pytest
 import datetime
 import zipfile
@@ -42,8 +43,8 @@ def test_phase6_assist_mode_draft_and_manual_apply():
         data = res.json()
         assert data["company"] == "Google India"
         assert "copyable_answers" in data
-        assert data["copyable_answers"]["full_name"] in ["Adharsh Arvinth", "Candidate Profile"]
-        assert "2 published patents" in data["copyable_answers"]["patents"]
+        assert data["copyable_answers"]["full_name"]
+        assert LOCKED_FACTS["patents"][0] in data["copyable_answers"]["patents"]
         assert Path(data["resume_path"]).exists()
 
         # 2. Mark as applied manually from phone
@@ -115,7 +116,7 @@ def test_phase6_backup_service():
 
             # Verify answer bank content inside zip
             bank_content = z.read("answer_bank_backup.json").decode("utf-8")
-            assert "Candidate" in bank_content or "Adharsh" in bank_content
-            assert "Vellore Institute of Technology" in bank_content
+            assert "Candidate" in bank_content or LOCKED_FACTS["personal"]["name"].split()[0] in bank_content
+            assert LOCKED_FACTS["education"]["institution_full"] in bank_content
     finally:
         db.close()

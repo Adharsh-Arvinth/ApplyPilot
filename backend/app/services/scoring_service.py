@@ -182,7 +182,7 @@ class ScoringService:
         """Dynamically generate evaluation prompt from live candidate Profile."""
         cand_name = profile.full_name if profile else "Candidate"
         education = profile.education if profile else "Integrated MTech CSE"
-        cgpa = profile.cgpa if profile else "7.62/10"
+        cgpa = profile.cgpa if profile else ""
         proof_points = profile.proof_points_text if profile else "Verified Engineering Background"
         
         return f"""You are an elite technical career advisor.

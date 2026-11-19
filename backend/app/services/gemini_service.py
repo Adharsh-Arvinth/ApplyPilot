@@ -7,30 +7,13 @@ from typing import Dict, Any, List, Optional, Tuple
 from google import genai
 from google.genai import types
 from backend.app.core.config import settings
-from backend.app.core.facts import LOCKED_FACTS, assert_resume_grounded, UngroundedFactError
+from backend.app.core.facts import LOCKED_FACTS, assert_resume_grounded, UngroundedFactError, candidate_summary
 from backend.app.services.answer_service import normalize_question_key
 
 logger = logging.getLogger(__name__)
 
 # Verified candidate ground truth (Strictly bounded truth source - zero fabrication permitted)
-CANDIDATE_FACTS = """
-CANDIDATE PROFILE (VERIFIED TRUTH SOURCE):
-- Full Name: Candidate Profile
-- Email: candidate@applypilot.local
-- Phone: +91 98765 43210
-- Links: GitHub (github.com/candidate), LinkedIn (linkedin.com/in/candidate)
-- Degree: Integrated MTech in Computer Science & Engineering (Specialization: Data Science), Vellore Institute of Technology (VIT Vellore)
-- Education: Started Sep 2022 | CGPA: 7.62/10
-- Target Roles: Data Scientist, ML Engineer, Data Analyst, Analytics Engineer, Python Developer, Backend Developer, AI Engineer
-- Target Locations: Remote, Bengaluru, Chennai, Hyderabad, Pune, Coimbatore, Mumbai, Delhi NCR
-- Published Patents:
-  1. "A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver"
-  2. "Acoustic Doppler Session Guard"
-- Key Benchmarks & Projects:
-  * Agentic Code Intelligence: High-performance code retrieval over 8,765 Python programs (embeddings + BM25 + AST), 25.59% NDCG@10 vs 5.14% baseline, 43-63 ms CPU latency
-- Certifications: AWS Cloud Solutions Architect; Generative AI for Data Analysts
-- Core Technical Skills: Python, FastAPI, PyTorch, LangChain, Transformers, Docker, Kubernetes, AWS, SQL, Vector Databases, Data Engineering, REST APIs, Git
-"""
+CANDIDATE_FACTS = candidate_summary()
 
 class GeminiService:
     PRIMARY_MODEL = getattr(settings, "GEMINI_MODEL", "gemini-3.5-flash-lite")
@@ -558,7 +541,7 @@ Respond ONLY with a JSON object matching this schema:
 
         prompt = f"""
 Candidate:
-Education: {profile_dict.get('education', 'MTech CSE Data Science, VIT Vellore')}
+Education: {profile_dict.get('education', '')}
 Target Roles: {profile_dict.get('target_roles_json', '[]')}
 Locations: {profile_dict.get('locations_json', '[]')}
 Proof Points:
@@ -579,14 +562,14 @@ Respond ONLY with a JSON object matching this schema:
   "recommendation": "Strong Match | Potential Match | Pass",
   "factors": {{
     "skills": {{"score": 92, "reason": "Strong alignment with Python, ML, PyTorch, and Data Science"}},
-    "experience": {{"score": 85, "reason": "Patent research and Agentic benchmark demonstrate deep engineering"}},
-    "education": {{"score": 95, "reason": "VIT Vellore MTech CSE Data Science directly matches academic criteria"}},
+    "experience": {{"score": 85, "reason": "Patent research and benchmarked projects demonstrate deep engineering"}},
+    "education": {{"score": 95, "reason": "The candidate's degree directly matches the academic criteria"}},
     "location": {{"score": 90, "reason": "Location matches candidate target hubs"}},
     "compensation": {{"score": 88, "reason": "Exceeds candidate minimum threshold"}}
   }},
   "strengths": ["Key candidate strength 1", "Key candidate strength 2"],
   "weaknesses": ["Potential gap 1"],
-  "actionable_advice": "Focus interview discussion on acoustic Doppler patent and Agentic retrieval architecture."
+  "actionable_advice": "Lead with the most relevant verified project or patent."
 }}
 """
         response_text = cls._call_model(prompt, system_instruction, json_mode=True)
@@ -608,12 +591,12 @@ Respond ONLY with a JSON object matching this schema:
             "recommendation": "Strong Match",
             "factors": {
                 "skills": {"score": 88, "reason": "Strong Python and Data Science foundation"},
-                "experience": {"score": 80, "reason": "2 published patents and Agentic benchmark"},
-                "education": {"score": 95, "reason": "VIT Vellore Integrated MTech CSE Data Science"},
+                "experience": {"score": 80, "reason": "Verified projects and published research"},
+                "education": {"score": 95, "reason": "Degree matches the role's academic criteria"},
                 "location": {"score": 85, "reason": "Matches target Indian tech hubs / remote"},
                 "compensation": {"score": 80, "reason": "Within acceptable parameters"}
             },
-            "strengths": ["VIT Vellore Data Science Master's degree", "2 published AI/IoT patents"],
+            "strengths": ["Relevant degree", "Verified projects and patents"],
             "weaknesses": ["Fresher / Early-career candidate"],
             "actionable_advice": "Highlight system design and low-latency benchmark performance."
         }
@@ -634,11 +617,7 @@ Company: {job_dict.get('company', '')}
 Location: {job_dict.get('location', '')}
 
 Candidate Verified Background:
-- Degree: Integrated MTech CSE (Data Science), VIT Vellore (Started Sep 2022)
-- Patent 1: A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver
-- Patent 2: Acoustic Doppler Session Guard
-- Benchmark: Agentic Code Intelligence (NDCG@10 25.59%, 43-63ms CPU latency across 8,765 Python programs)
-- Certifications: AWS Cloud Solutions Architect; Generative AI for Data Analysts
+{CANDIDATE_FACTS}
 
 Provide tailored bullet points and ATS keyword analysis.
 Respond ONLY with a JSON object:
@@ -649,14 +628,14 @@ Respond ONLY with a JSON object:
   "bullet_recommendations": [
     {{
       "section": "Projects & Patents",
-      "original": "Built accident predictor using OpenCV and LSTM.",
+      "original": "Built object detection model using OpenCV and LSTM.",
       "tailored": "Architected multimodal accident prediction pipeline using OpenCV, MediaPipe, and LSTM, achieving proactive driver-safety telemetry with GenAI reporting.",
       "reason": "Accentuates multimodal AI and pipeline scalability required by JD."
     }},
     {{
       "section": "System Benchmarks",
       "original": "Built code retrieval search engine.",
-      "tailored": "Engineered low-latency code retrieval engine over 8,765 Python programs using hybrid embeddings, AST analysis, and BM25, attaining 25.59% NDCG@10 at 43-63ms CPU latency.",
+      "tailored": "Rewrite the bullet with the verified metrics from the candidate profile only.",
       "reason": "Demonstrates high-scale retrieval performance and production metrics."
     }}
   ],
@@ -678,13 +657,13 @@ Respond ONLY with a JSON object:
 
         # Deterministic fallback
         return {
-            "tailored_summary": "Integrated MTech Data Science candidate at VIT Vellore with 2 published patents in multimodal AI and acoustic signal processing, AWS Solutions Architect certification, and proven Agentic code retrieval benchmarking.",
+            "tailored_summary": "Early-career data science candidate with verified projects, published research and cloud certification.",
             "matched_keywords": ["Python", "Data Science", "Machine Learning", "FastAPI", "AWS", "SQL"],
             "missing_keywords": ["CI/CD", "Distributed Computing"],
             "bullet_recommendations": [
                 {
                     "section": "Patents & Research",
-                    "original": "Developed accident predictor with OpenCV.",
+                    "original": "Developed object detection model with OpenCV.",
                     "tailored": "Designed and patented proactive multimodal driver-safety system fusing OpenCV, MediaPipe facial vectors, voice-stress acoustics, and LSTM models.",
                     "reason": "Directly targets machine learning & real-time telemetry criteria."
                 }
@@ -720,7 +699,7 @@ Respond ONLY with a JSON object:
   "suggested_answer": "Precise, professional answer suitable for an ATS form",
   "confidence": 0.95,
   "reasoning": "Grounding justification based on candidate profile",
-  "grounding_source": "VIT Vellore MTech CSE / Patents / Candidate Profile"
+  "grounding_source": "Verified candidate profile"
 }}
 """
         response_text = cls._call_model(prompt, system_instruction, json_mode=True)
@@ -737,7 +716,7 @@ Respond ONLY with a JSON object:
 
         # Deterministic fallback
         return {
-            "suggested_answer": "I hold an Integrated MTech in CSE (Data Science) from VIT Vellore with 2 published AI patents and AWS Solutions Architect certification. My core background in Python, machine learning, and scalable systems aligns directly with this role.",
+            "suggested_answer": f"I am completing an {LOCKED_FACTS['education']['degree']} at {LOCKED_FACTS['education']['institution']}. My background in Python, machine learning and scalable systems aligns directly with this role.",
             "confidence": 0.90,
             "reasoning": "Standard professional answer grounded in academic and patent credentials.",
             "grounding_source": "Candidate Profile"
@@ -765,7 +744,7 @@ Respond ONLY with a JSON object:
     {{
       "question": "Technical question likely asked for this role",
       "hint": "What the interviewer is testing for",
-      "model_answer": "How to answer using candidate's patents or Agentic benchmark"
+      "model_answer": "How to answer using the candidate's verified patents or projects"
     }},
     {{
       "question": "Second technical question",
@@ -776,14 +755,14 @@ Respond ONLY with a JSON object:
   "behavioral_questions": [
     {{
       "question": "Behavioral question (e.g. STAR method)",
-      "star_situation": "Candidate situation from VIT/Patent project",
+      "star_situation": "A situation from a verified project or patent",
       "star_task": "The problem solved",
       "star_action": "Technical actions taken",
       "star_result": "Measurable outcome"
     }}
   ],
   "system_architecture_focus": ["Areas like low-latency retrieval, microservices, pipeline monitoring"],
-  "candidate_edge": "The 2 published patents and AWS certification set you apart from standard entry-level candidates."
+  "candidate_edge": "What sets the candidate apart, using verified facts only"
 }}
 """
         response_text = cls._call_model(prompt, system_instruction, json_mode=True)
@@ -808,7 +787,7 @@ Respond ONLY with a JSON object:
                     "model_answer": "Explain combining OpenCV facial metrics with MFCC voice acoustic vectors into LSTM with late fusion."
                 },
                 {
-                    "question": "How do you achieve 43-63ms CPU retrieval across thousands of code documents?",
+                    "question": "How did you keep latency low in your most performance-sensitive project?",
                     "hint": "Evaluating indexing, vector quantization, and AST parsing.",
                     "model_answer": "Discuss hybrid search combining AST tokenization, BM25 keyword weighting, and lightweight dense embeddings."
                 }
@@ -816,15 +795,54 @@ Respond ONLY with a JSON object:
             "behavioral_questions": [
                 {
                     "question": "Describe a challenging technical problem you solved independently.",
-                    "star_situation": "Developing the Acoustic Doppler session guard with dual-band spectral veto.",
-                    "star_task": "Preventing accidental lockouts from ambient acoustic noise.",
-                    "star_action": "Implemented FFT frequency shift thresholding and dual-band filtering in Python.",
-                    "star_result": "Achieved sub-11s auto-lock with zero false-positives under test conditions."
+                    "star_situation": "Building a signal-processing feature that had to work reliably in noisy conditions.",
+                    "star_task": "Avoiding false triggers without missing real events.",
+                    "star_action": "Prototyped, measured and tuned thresholds and filters in Python.",
+                    "star_result": "Reliable behaviour with no false positives under test conditions."
                 }
             ],
             "system_architecture_focus": ["High-throughput feature pipelines", "Low-latency API design", "Vector search"],
-            "candidate_edge": "Dual patent author and AWS Solutions Architect credentials create strong differentiation."
+            "candidate_edge": "Published research and certified cloud skills set you apart."
         }
+
+    @classmethod
+    def generate_cover_letter(cls, job_dict: Dict[str, Any], profile_dict: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Short, specific cover letter grounded only in the verified facts. Falls back to a safe
+        template when Gemini is unavailable or the draft fails the grounding check."""
+        facts = LOCKED_FACTS
+        name = (profile_dict or {}).get("full_name") or facts["personal"]["name"]
+        title, company = job_dict.get("title", "the role"), job_dict.get("company", "your team")
+        projects = facts.get("projects") or ()
+        project = projects[0] if projects else None
+        skills = ", ".join(list(facts.get("skills", ()))[:6])
+        edu = facts.get("education", {})
+
+        def template() -> str:
+            lines = [f"Dear {company} hiring team,", "",
+                     f"I'm applying for the {title} position. I'm completing an {edu.get('degree', 'degree')} at "
+                     f"{edu.get('institution_full') or edu.get('institution', 'my university')}, and I work day to day with {skills}."]
+            if project:
+                lines += ["", f"Most relevant to this role is {project['name']}: {project.get('description', '')}"]
+            if facts.get("patents"):
+                lines += ["", f"I'm also a named inventor on {len(facts['patents'])} published patent(s), including "
+                              f"“{facts['patents'][0]}”."]
+            lines += ["", f"I'd welcome the chance to discuss how I can contribute to {company}.", "", "Best regards,", name]
+            return "\n".join(lines)
+
+        if cls.get_client() is None or cls.is_circuit_breaker_active()[0]:
+            return {"cover_letter": template(), "source": "template"}
+        prompt = (f"Write a concise cover letter (170-230 words, 3 short paragraphs, no placeholders, no headers) for the "
+                  f"{title} role at {company} ({job_dict.get('location', '')}). Job notes: {job_dict.get('notes', '')[:600]}\n"
+                  f"Sign it as {name}. Use ONLY facts from the profile below; never invent employers, metrics, dates or awards.")
+        text = cls._call_model(prompt, system_instruction=f"You are a precise career writer.\n{CANDIDATE_FACTS}")
+        if not text:
+            return {"cover_letter": template(), "source": "template"}
+        try:
+            assert_resume_grounded(text)
+        except UngroundedFactError as e:
+            logger.warning(f"Cover letter draft rejected by grounding check: {e}")
+            return {"cover_letter": template(), "source": "template", "note": "AI draft contained an unverified claim, so a safe template was used."}
+        return {"cover_letter": text.strip(), "source": "gemini"}
 
     @classmethod
     def chat_career_advisor(
@@ -882,7 +900,7 @@ Provide a direct, helpful, and motivating response formatted in markdown. Includ
             }
 
         return {
-            "response": f"### ApplyPilot Career Advisor\n\nYou're making solid progress! With your **VIT Vellore MTech (Data Science)** degree, **2 published patents**, and **AWS Solutions Architect** certification, your profile stands in the top tier for Data Science and Machine Learning roles.\n\n* **Today's Focus:** Review your pending approvals and tailor your patent highlights for your target roles in Bengaluru and Chennai.\n* **Interview Edge:** Frame your answers around your 43ms Agentic code retrieval benchmark and acoustic Doppler security engineering.",
+            "response": f"### ApplyPilot Career Advisor\n\nYou're making solid progress! With your degree, published research and certifications, your profile stands in the top tier for Data Science and Machine Learning roles.\n\n* **Today's Focus:** Review your pending approvals and tailor your patent highlights for your target roles in Bengaluru and Chennai.\n* **Interview Edge:** Frame your answers around your strongest verified project and patent.",
             "suggested_actions": [
                 "Review top matched jobs",
                 "Generate interview prep",

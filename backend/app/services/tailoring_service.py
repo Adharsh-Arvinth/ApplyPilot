@@ -100,6 +100,16 @@ class ResumeTailoringService:
         # 1. Education, 2. Skills, 3. Projects, 4. Patents, 5. Certifications
 
         skills_list = ", ".join(LOCKED_FACTS["skills"])
+        # Sections built from the facts file (no personal details hard-coded here)
+        location_val = LOCKED_FACTS["personal"].get("location", "")
+        projects_html = "".join(
+            f'<div class="item-title"><span>{pr["name"]}</span><span>Benchmarked System</span></div>'
+            f'<div class="item-sub"><span>Technologies: {", ".join(pr.get("technologies", ()))}</span></div>'
+            f'<ul><li>{pr.get("description", "")}</li></ul>'
+            for pr in LOCKED_FACTS.get("projects", ())
+        )
+        patents_html = "".join(f"<li><strong>{t}</strong> &mdash; Published Patent</li>" for t in LOCKED_FACTS.get("patents", ()))
+        certs_html = "".join(f"<li>{c}</li>" for c in LOCKED_FACTS.get("certifications", ()))
 
         html_content = f"""<!DOCTYPE html>
 <html lang="en">
@@ -199,7 +209,7 @@ class ResumeTailoringService:
 <h2>Education</h2>
 <div class="item-title">
   <span>{institution_val}</span>
-  <span>Vellore, Tamil Nadu, India</span>
+  <span>{location_val}</span>
 </div>
 <div class="item-sub">
   <span>{degree_val} (Started {start_date_val}{grad_date_str})</span>
@@ -210,29 +220,13 @@ class ResumeTailoringService:
 <p class="skills-content">{skills_list}</p>
 
 <h2>Projects</h2>
-<div class="item-title">
-  <span>Agentic Code Intelligence</span>
-  <span>Benchmarked System</span>
-</div>
-<div class="item-sub">
-  <span>Technologies: Python, Neural Embeddings, BM25, Abstract Syntax Tree (AST) Parsing</span>
-</div>
-<ul>
-  <li>Engineered a hybrid code retrieval architecture indexing 8,765 Python programs using embeddings, BM25, and AST parsing.</li>
-  <li>Achieved <strong>25.59% NDCG@10</strong> vs 5.14% baseline with <strong>43–63 ms CPU latency</strong>.</li>
-</ul>
+{projects_html}
 
 <h2>Patents</h2>
-<ul>
-  <li><strong>A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver</strong> &mdash; Published Patent</li>
-  <li><strong>Acoustic Doppler Session Guard</strong> &mdash; Published Patent</li>
-</ul>
+<ul>{patents_html}</ul>
 
 <h2>Certifications</h2>
-<ul>
-  <li>AWS Cloud Solutions Architect</li>
-  <li>Generative AI for Data Analysts</li>
-</ul>
+<ul>{certs_html}</ul>
 
 </body>
 </html>"""

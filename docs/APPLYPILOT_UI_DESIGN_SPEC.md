@@ -203,14 +203,14 @@ flowchart TD
 │ 🤖 GEMINI AUTO-ANSWER PROPOSAL (Confidence: 92%)    Company: GitLab   │
 │ Question: "Describe your experience with AST parsing and BM25."      │
 │ ┌──────────────────────────────────────────────────────────────────┐ │
-│ │ Proposed: "In my Agentic Code Intelligence research, I combined  │ │
-│ │ BM25, AST analysis, and code embeddings across 8,765 Python..."  │ │
+│ │ Proposed: "In my Code Retrieval Engine research, I combined  │ │
+│ │ BM25, AST analysis, and code embeddings across 5,000 Python..."  │ │
 │ └──────────────────────────────────────────────────────────────────┘ │
-│ Facts Cited: [Agentic Code Intelligence Research - VIT Vellore]      │
+│ Facts Cited: [Code Retrieval Engine Research - Example Institute]      │
 │                                           [ EDIT ]    [ APPROVE ]    │
 ├──────────────────────────────────────────────────────────────────────┤
 │ 🔐 GREENHOUSE EMAIL OTP CODE                        Company: Cloudflare
-│ Enter 6-digit code sent to adharsharvinth2108@gmail.com              │
+│ Enter 6-digit code sent to alex.morgan@example.com              │
 │ [ 7 ] [ 9 ] [ 8 ] [ 2 ] [ 9 ] [ 4 ]             Auto-sync: 12s...   │
 │                                           [ SUBMIT CODE ]            │
 └──────────────────────────────────────────────────────────────────────┘
@@ -301,18 +301,18 @@ flowchart TD
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│  Adharsh Arvinth                                  [ Verified Profile]│
-│  MTech Integrated CSE (Data Science) • VIT Vellore                   │
-│  [ adharsharvinth2108@gmail.com ]  [ LinkedIn ]  [ GitHub ]          │
+│  Alex Morgan                                  [ Verified Profile]│
+│  MTech Integrated CSE (Data Science) • Example Institute                   │
+│  [ alex.morgan@example.com ]  [ LinkedIn ]  [ GitHub ]          │
 ├──────────────────────────────────────────────────────────────────────┤
 │ 🔒 LOCKED FACTS (Read-Only Single Source of Truth)                   │
-│ • Education: MTech Integrated CSE, VIT Vellore (Started Sep 2022)    │
-│ • CGPA: 7.62 / 10.00                                                 │
+│ • Education: MTech Integrated CSE, Example Institute (Started Sep 2022)    │
+│ • CGPA: 8.10 / 10.00                                                 │
 │ • Patents (2 Registered):                                            │
-│   1. A Proactive Multimodal Fusion-Based Accident Predictor System...│
-│   2. Acoustic Doppler Session Guard                                  │
-│ • Flagship Project: Agentic Code Intelligence                        │
-│   (embeddings + BM25 + AST; 8,765 Python programs; 25.59% NDCG@10)  │
+│   1. A Low-Power Soil Moisture Controller...│
+│   2. Ultrasonic Presence Verification for Secure Sessions                                  │
+│ • Flagship Project: Code Retrieval Engine                        │
+│   (embeddings + BM25 + AST; 10,000 Python programs; 18% NDCG@10)  │
 │ • Certifications: AWS Cloud Solutions Architect, Generative AI...    │
 ├──────────────────────────────────────────────────────────────────────┤
 │ ⚙️ CANDIDATE PREFERENCES (Requires Your Input)                       │
@@ -335,7 +335,7 @@ flowchart TD
 ├──────────────────────────────────────────────────────────────────────┤
 │ NETWORK & ACCESS CONTROL                                             │
 │ Host Interface: Localhost & Tailscale Only (100.64.0.0/10)   [ ACTIVE ]│
-│ Access Token:   mApIGVEyORqpXbJzPhrhLPk...                   [ COPY ] │
+│ Access Token:   <your-token>                   [ COPY ] │
 ├──────────────────────────────────────────────────────────────────────┤
 │ GEMINI AUTO-ANSWER CONFIGURATION                                     │
 │ Enabled:        [ ON ⬤ ]                                             │

@@ -1,5 +1,5 @@
 import secrets
-from fastapi import Cookie, Header, HTTPException, status, Depends
+from fastapi import Cookie, Header, HTTPException, Query, status, Depends
 from cryptography.fernet import Fernet
 from backend.app.core.config import settings
 
@@ -34,17 +34,22 @@ from typing import Optional
 def verify_token(
     authorization: Optional[str] = Header(None),
     applypilot_token: Optional[str] = Cookie(None),
+    query_token: Optional[str] = Query(None, alias="token", include_in_schema=False),
 ) -> bool:
     """
     Validate that incoming requests carry the correct Bearer token.
     Enforces that only the authenticated mobile app can access the PC backend.
     The web cockpit authenticates with the HttpOnly `applypilot_token` cookie the
     middleware sets on login, since page scripts cannot read that cookie back.
+    A ?token= query parameter (already accepted by the middleware) also works, so
+    downloads opened in the phone's browser (e.g. the CSV export) are authorised.
     """
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split("Bearer ", 1)[1].strip()
     elif applypilot_token:
         token = applypilot_token.strip()
+    elif query_token:
+        token = query_token.strip()
     else:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

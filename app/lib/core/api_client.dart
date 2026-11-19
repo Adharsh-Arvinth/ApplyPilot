@@ -13,8 +13,8 @@ class ApiClient {
   factory ApiClient() => _instance;
   ApiClient._internal();
 
-  static const String defaultTailscaleUrl = "http://100.97.30.113:8000";
-  static const String defaultAuthToken = "mApIGVEyORqpXbJzPhrhLPk9pRaS_vPOFyxH07nuPV4";
+  static const String defaultTailscaleUrl = "";  // entered on the connect screen
+  static const String defaultAuthToken = "";
 
   String _baseUrl = defaultTailscaleUrl;
   String _token = defaultAuthToken;

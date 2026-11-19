@@ -24,11 +24,11 @@ This log records every architectural adjustment, security lock, test result, and
 ## Section 1: Locked Facts Execution
 - [x] **Created Single Source of Truth**:
   - Created `backend/app/core/facts.py` with immutable `LOCKED_FACTS` dictionary containing strictly:
-    - Name: `Adharsh Arvinth`, Email: `adharsharvinth2108@gmail.com`, Phone: `+91 7397161512`, LinkedIn, GitHub, Vellore location.
-    - Education: MTech Integrated CSE (Data Science), VIT Vellore, started Sep 2022, CGPA 7.62/10. Expected graduation: `None` (Empty until user confirms in app; no guessing).
-    - Patents: Strictly `"A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver"` and `"Acoustic Doppler Session Guard"`.
-    - Project: Strictly `"Agentic Code Intelligence"` (embeddings + BM25 + AST; 8,765 Python programs; 25.59% NDCG@10 vs 5.14% baseline; 43–63 ms CPU latency).
-    - Certifications: Strictly `"AWS Cloud Solutions Architect"` and `"Generative AI for Data Analysts"` (no "Associate").
+    - Name: `Alex Morgan`, Email: `alex.morgan@example.com`, Phone: `+1 555 0100`, LinkedIn, GitHub, Bengaluru location.
+    - Education: MTech Integrated CSE (Data Science), Example Institute, started Sep 2022, CGPA 8.10/10. Expected graduation: `None` (Empty until user confirms in app; no guessing).
+    - Patents: Strictly `"A Low-Power Soil Moisture Controller"` and `"Ultrasonic Presence Verification for Secure Sessions"`.
+    - Project: Strictly `"Code Retrieval Engine"` (embeddings + BM25 + AST; 10,000 Python programs; 18% NDCG@10 vs 5% baseline; 40–60 ms CPU latency).
+    - Certifications: Strictly `"AWS Cloud Solutions Architect"` and `"Generative AI Fundamentals"` (no "Associate").
     - Skills from profile.
     - Notice period, work authorization, relocation: `None` (empty until filled in app; no guessing).
   - Exposed via read-only endpoint: `GET /api/v1/profile/facts`.
@@ -199,7 +199,7 @@ This log records every architectural adjustment, security lock, test result, and
 
 ## Section 10: Build & Deploy
 - [x] Flutter web release bundle built with `D:\flutter\bin\flutter.bat build web --release` into `app/build/web`.
-- [x] Static files served live by FastAPI backend at `http://100.97.30.113:8000/app/` across Tailscale.
+- [x] Static files served live by FastAPI backend at `http://100.64.0.1:8000/app/` across Tailscale.
 
 ---
 

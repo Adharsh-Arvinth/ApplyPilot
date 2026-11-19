@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     APPLYPILOT_ENCRYPTION_KEY: str = "ECvqzWXsliXT4qtOZoppgQGIJcC2HuLTGEB8w2FBbnI="
     CLAUDE_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
+    # Email proof (optional fallback; the in-app Settings connection takes precedence)
+    GMAIL_ADDRESS: Optional[str] = None
+    GMAIL_APP_PASSWORD: Optional[str] = None
+    # Background autopilot loop (discover → score → apply → check email). Off in tests.
+    AUTOPILOT_ENABLED: bool = True
     GEMINI_MODEL: str = "gemini-3.5-flash-lite"
     GROQ_API_KEY: Optional[str] = None
     OLLAMA_ENABLED: bool = False

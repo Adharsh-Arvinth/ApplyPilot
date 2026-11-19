@@ -70,13 +70,13 @@ def test_gemini_calculate_compatibility():
         "factors": {
             "skills": {"score": 95, "reason": "Python and ML match"},
             "experience": {"score": 88, "reason": "Patents match"},
-            "education": {"score": 98, "reason": "VIT Vellore MTech"},
+            "education": {"score": 98, "reason": "Example Institute MTech"},
             "location": {"score": 90, "reason": "Bengaluru match"},
             "compensation": {"score": 90, "reason": "Within range"}
         },
-        "strengths": ["VIT Vellore MTech", "2 published patents"],
+        "strengths": ["Example Institute MTech", "2 published patents"],
         "weaknesses": [],
-        "actionable_advice": "Highlight acoustic Doppler patent."
+        "actionable_advice": "Highlight the most relevant patent."
     })
     with patch.object(GeminiService, "_call_model", return_value=mock_response):
         job = {
@@ -88,8 +88,8 @@ def test_gemini_calculate_compatibility():
             "salary_raw": "15-20 LPA"
         }
         profile = {
-            "education": "Integrated MTech CSE (Data Science), VIT Vellore",
-            "proof_points_text": "2 published patents in multimodal AI; Agentic Code retrieval benchmark",
+            "education": "Integrated MTech CSE (Data Science), Example Institute",
+            "proof_points_text": "2 published patents in multimodal AI; code retrieval benchmark",
             "target_roles_json": '["ML Engineer", "Data Scientist"]',
             "locations_json": '["Bengaluru", "Remote"]'
         }
@@ -107,8 +107,8 @@ def test_gemini_tailor_resume():
         "bullet_recommendations": [
             {
                 "section": "Patents",
-                "original": "Accident predictor",
-                "tailored": "Multimodal fusion accident predictor using OpenCV and LSTM",
+                "original": "Driver safety predictor",
+                "tailored": "Multimodal driver safety predictor using OpenCV and LSTM",
                 "reason": "Direct alignment with ML requirements"
             }
         ],
@@ -125,7 +125,7 @@ def test_gemini_tailor_resume():
 
 def test_gemini_suggest_form_answer():
     mock_response = json.dumps({
-        "suggested_answer": "I hold an MTech in CSE from VIT Vellore with 2 published patents.",
+        "suggested_answer": "I hold an MTech in CSE from Example Institute with 2 published patents.",
         "confidence": 0.95,
         "reasoning": "Grounded in academic credentials",
         "grounding_source": "Candidate Profile"
@@ -136,7 +136,7 @@ def test_gemini_suggest_form_answer():
             field_type="textarea"
         )
         assert isinstance(res, dict)
-        assert "VIT Vellore" in res["suggested_answer"]
+        assert "Example Institute" in res["suggested_answer"]
         assert res["confidence"] == 0.95
 
 def test_gemini_interview_prep():

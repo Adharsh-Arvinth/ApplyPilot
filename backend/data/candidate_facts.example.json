@@ -1,0 +1,96 @@
+{
+  "personal": {
+    "name": "Alex Morgan",
+    "email": "alex.morgan@example.com",
+    "phone": "+1 555 0100",
+    "linkedin": "https://linkedin.com/in/alex-morgan-example",
+    "github": "https://github.com/alex-morgan-example",
+    "location": "Bengaluru, Karnataka, India"
+  },
+  "education": {
+    "institution": "Example Institute of Technology",
+    "institution_full": "Example Institute of Technology",
+    "degree": "MTech Integrated CSE (Data Science)",
+    "start_date": "Sep 2022",
+    "cgpa": "8.10/10",
+    "cgpa_numeric": 8.1,
+    "expected_graduation": null
+  },
+  "patents": [
+    "A Low-Power Soil Moisture Controller",
+    "Ultrasonic Presence Verification for Secure Sessions"
+  ],
+  "projects": [
+    {
+      "name": "Code Retrieval Engine",
+      "technologies": [
+        "embeddings",
+        "BM25",
+        "AST"
+      ],
+      "corpus": "10,000 Python programs",
+      "metrics": "18% NDCG@10 vs 5% baseline; 40–60 ms CPU latency",
+      "description": "Code retrieval system over 10,000 Python programs using embeddings, BM25, and AST; 18% NDCG@10 vs 5% baseline; 40–60 ms CPU latency."
+    }
+  ],
+  "certifications": [
+    "AWS Cloud Solutions Architect",
+    "Generative AI Fundamentals"
+  ],
+  "skills": [
+    "Python",
+    "SQL",
+    "Java",
+    "FastAPI",
+    "PyTorch",
+    "Scikit-learn",
+    "OpenCV",
+    "MediaPipe",
+    "Pandas",
+    "NumPy",
+    "AWS",
+    "Linux/Bash",
+    "Docker",
+    "Git",
+    "RESTful APIs",
+    "Machine Learning",
+    "Deep Learning",
+    "Data Science",
+    "Distributed Systems"
+  ],
+  "notice_period": null,
+  "work_authorization": null,
+  "relocation_preference": null,
+  "seed_answers": [
+    [
+      "pronouns",
+      "They/Them",
+      "text",
+      "always_use",
+      "demographics",
+      "candidate_profile",
+      true,
+      "Candidate Preference"
+    ],
+    [
+      "cloud experience",
+      "AWS Cloud Solutions Architect with hands-on experience designing scalable cloud architectures.",
+      "text",
+      "always_use",
+      "technical",
+      "certificate",
+      true,
+      "AWS Certification"
+    ]
+  ],
+  "answers": {
+    "discipline": "Computer Science and Engineering (Data Science)",
+    "work_location_preference": "India (Remote)",
+    "gender": null,
+    "name_pronunciation": null,
+    "pronouns": "They/Them",
+    "gitlab_username": null,
+    "current_city": "Bengaluru",
+    "proudest_accomplishment": "Building a semantic code search system and evaluating it rigorously against strong baselines."
+  }
+}

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'shell_config.dart';
 import 'shell_theme.dart';
 
@@ -56,16 +58,28 @@ class _WebShellState extends State<WebShell> {
         onNavigationRequest: (req) {
           final uri = Uri.tryParse(req.url);
           if (uri == null) return NavigationDecision.prevent;
-          if (_sameServer(uri) && !uri.path.startsWith('/output/')) return NavigationDecision.navigate;
+          final download = uri.path.startsWith('/output/') || uri.path.endsWith('/export.csv');
+          if (_sameServer(uri) && !download) return NavigationDecision.navigate;
           _openExternally(uri);
           return NavigationDecision.prevent;
         },
       ))
       ..loadRequest(widget.config.cockpitUri());
+    // Android WebView ignores <input type=file> unless the app supplies a picker (resume upload).
+    final platform = _web.platform;
+    if (platform is AndroidWebViewController) {
+      platform.setOnShowFileSelector(_pickFiles);
+    }
   }
 
-  /// Job postings open in the phone's browser. Resumes and screenshots (/output/) need
-  /// the token because the browser doesn't share the app's session cookie.
+  Future<List<String>> _pickFiles(FileSelectorParams params) async {
+    final files = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: const ['pdf', 'docx', 'txt']);
+    final path = files.isEmpty ? null : files.first.path;
+    return path == null ? const <String>[] : <String>[Uri.file(path).toString()];
+  }
+
+  /// Job postings open in the phone's browser. Downloads from the PC (resumes, screenshots,
+  /// the CSV export) need the token because the browser doesn't share the app's cookie.
   Future<void> _openExternally(Uri uri) async {
     var target = uri;
     if (_sameServer(uri)) {

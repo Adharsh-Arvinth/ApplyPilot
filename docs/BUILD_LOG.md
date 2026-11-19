@@ -88,7 +88,7 @@ Automated end-to-end build log for ApplyPilot (FastAPI Backend + Flutter Mobile 
   - Salary filter checking candidate's ₹7,00,000 INR minimum and blocking sub-threshold roles.
   - `ScoringService` (`backend/app/services/scoring_service.py`) supporting Anthropic Claude 3.5 Sonnet scoring with deterministic domain heuristic fallback.
   - Score routing: $\ge 4.0 \rightarrow$ `queued`, $3.0 - 3.9 \rightarrow$ `maybe`, $< 3.0 \rightarrow$ `blocked`.
-  - `ResumeTailoringService` (`backend/app/services/tailoring_service.py`) producing tailored 1-page ATS resumes strictly bounded to verified facts (VIT MTech, 2 published patents, Agentic Code Intelligence benchmark, AWS Solutions Architect certification) rendered to PDF via Playwright Chromium.
+  - `ResumeTailoringService` (`backend/app/services/tailoring_service.py`) producing tailored 1-page ATS resumes strictly bounded to verified facts (VIT MTech, 2 published patents, Code Retrieval Engine benchmark, AWS Solutions Architect certification) rendered to PDF via Playwright Chromium.
   - `JobsRouter` (`backend/app/api/jobs.py`): Discovery trigger, evaluate trigger, filtering, Maybe swipe action (`queue`/`dismiss`), and tailoring endpoints.
 - **Tests**:
   - Verified ingestion of 20 real jobs across Greenhouse, Lever, and Ashby.

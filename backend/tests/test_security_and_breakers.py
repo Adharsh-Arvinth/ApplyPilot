@@ -1,3 +1,4 @@
+from backend.app.core.facts import LOCKED_FACTS
 import json
 import pytest
 import datetime
@@ -107,7 +108,7 @@ def test_cloudflare_cooldown_and_resubmit_override():
         # Simulate prior live submission with status 'needs_review'
         app1 = Application(
             job_id=job1.id,
-            resume_file=f"Adharsh_Arvinth_{test_comp}.pdf",
+            resume_file=f"Candidate_{test_comp}.pdf",
             status="needs_review",
             submitted_at=datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=2)
         )
@@ -235,9 +236,9 @@ def test_gemini_fake_client_all_conditions():
     # 1. Valid Grounded Answer
     valid_mock = {
         "can_answer": True,
-        "answer": "MTech Integrated CSE (Data Science) from VIT Vellore, started Sep 2022, CGPA 7.62/10.",
+        "answer": f"{LOCKED_FACTS['education']['degree']} from {LOCKED_FACTS['education']['institution']}, started {LOCKED_FACTS['education']['start_date']}, CGPA {LOCKED_FACTS['education']['cgpa']}.",
         "confidence": 0.95,
-        "facts_used": ["MTech Integrated CSE", "VIT Vellore", "CGPA 7.62/10"],
+        "facts_used": [LOCKED_FACTS["education"]["degree"], LOCKED_FACTS["education"]["institution"], f"CGPA {LOCKED_FACTS['education']['cgpa']}"],
         "reason_if_not": ""
     }
     with patch.object(GeminiService, "_call_model", return_value=json.dumps(valid_mock)):

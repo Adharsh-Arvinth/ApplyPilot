@@ -1,4 +1,5 @@
 import io
+import datetime
 import json
 import secrets
 from pathlib import Path
@@ -183,56 +184,88 @@ def rotate_token(db: Session = Depends(get_db)):
         "message": "Token rotated successfully. Update your mobile cockpit settings with this new token."
     }
 
-@router.post("/resume", summary="Upload and parse Master Resume PDF")
+RESUME_EXTS = (".pdf", ".txt", ".docx")
+MAX_RESUME_BYTES = 10 * 1024 * 1024
+
+
+def _extract_resume_text(filename: str, content: bytes) -> str:
+    name = filename.lower()
+    try:
+        if name.endswith(".pdf"):
+            reader = PdfReader(io.BytesIO(content))
+            return "\n".join((page.extract_text() or "") for page in reader.pages).strip()
+        if name.endswith(".docx"):
+            import zipfile, re as _re
+            with zipfile.ZipFile(io.BytesIO(content)) as z:
+                xml = z.read("word/document.xml").decode("utf-8", errors="ignore")
+            text = _re.sub(r"<[^>]+>", " ", xml.replace("</w:p>", "\n"))
+            return _re.sub(r"[ \t]+", " ", text).strip()
+        return content.decode("utf-8", errors="ignore").strip()
+    except Exception as e:
+        return f"(Couldn't read text from this file: {e})"
+
+
+@router.get("/resume", summary="Current resume (the single active upload)")
+def get_resume(db: Session = Depends(get_db)):
+    from backend.app.core.app_settings import get_setting
+    meta = get_setting(db, "resume_meta")
+    if not meta:
+        # A resume uploaded before metadata was recorded still counts.
+        existing = next(iter(sorted((settings.OUTPUT_DIR / "resumes").glob("master_resume.*"))), None)
+        if existing and existing.stat().st_size > 0:
+            meta = {"filename": existing.name, "size_bytes": existing.stat().st_size, "path": f"/output/resumes/{existing.name}",
+                    "uploaded_at": datetime.datetime.fromtimestamp(existing.stat().st_mtime, datetime.timezone.utc).isoformat(), "chars": 0, "preview": ""}
+    return {"uploaded": bool(meta), **(meta or {})}
+
+
+@router.post("/resume", summary="Upload a resume; replaces (deletes) the previous one")
 async def upload_resume(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """One active resume at a time. Every upload deletes the previous file and becomes the master
+    resume used for tailoring. Upload as many times as you like."""
+    from backend.app.core.app_settings import set_setting
+    from backend.app.models import ResumeVersion
     profile = db.query(Profile).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not initialized.")
-    
-    if not file.filename.lower().endswith((".pdf", ".txt")):
-        raise HTTPException(status_code=400, detail="Only PDF and text resume files are supported.")
-    
-    content = await file.read()
-    if len(content) == 0:
-        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
-    # Save to output/resumes
+    name = (file.filename or "resume").strip()
+    ext = Path(name).suffix.lower()
+    if ext not in RESUME_EXTS:
+        raise HTTPException(status_code=400, detail="Upload a PDF, Word (.docx) or text resume.")
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+    if len(content) > MAX_RESUME_BYTES:
+        raise HTTPException(status_code=400, detail="Resume is larger than 10 MB.")
+
     resumes_dir = settings.OUTPUT_DIR / "resumes"
     resumes_dir.mkdir(parents=True, exist_ok=True)
-    target_path = resumes_dir / "master_resume.pdf"
-    with open(target_path, "wb") as f:
-        f.write(content)
-
-    extracted_text = ""
-    if file.filename.lower().endswith(".pdf"):
+    # Delete every previous upload (any extension) so only the new resume remains
+    for old in resumes_dir.glob("master_resume.*"):
         try:
-            reader = PdfReader(io.BytesIO(content))
-            for page in reader.pages:
-                text = page.extract_text()
-                if text:
-                    extracted_text += text + "\n"
-        except Exception as e:
-            extracted_text = f"Error extracting text: {e}"
-    else:
-        extracted_text = content.decode("utf-8", errors="ignore")
+            old.unlink()
+        except OSError:
+            pass
+    target = resumes_dir / f"master_resume{ext}"
+    target.write_bytes(content)
 
-    # Record run log
-    log = RunLog(
-        event_type="profile_update",
-        message=f"Uploaded master resume: {file.filename} ({len(content)} bytes, {len(extracted_text)} chars parsed).",
-        level="info"
-    )
-    db.add(log)
-    db.commit()
-
-    return {
-        "status": "success",
-        "filename": file.filename,
-        "bytes_received": len(content),
-        "saved_path": "/output/resumes/master_resume.pdf",
-        "extracted_text_snippet": extracted_text[:400] if extracted_text else "",
-        "message": "Resume uploaded successfully and ready for auto-tailoring."
+    text_content = _extract_resume_text(name, content)
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    meta = {
+        "filename": name, "size_bytes": len(content), "uploaded_at": now,
+        "path": f"/output/resumes/master_resume{ext}", "chars": len(text_content),
+        "preview": text_content[:600],
     }
+    set_setting(db, "resume_meta", meta)
+    set_setting(db, "resume_text", text_content)
+
+    master = db.query(ResumeVersion).filter(ResumeVersion.is_master == True).first()  # noqa: E712
+    if master:
+        master.pdf_path = meta["path"]
+    db.add(RunLog(event_type="profile_update", level="info", outcome="success",
+                  message=f"Resume replaced with {name} ({len(content):,} bytes, {len(text_content):,} characters read)."))
+    db.commit()
+    return {"status": "success", "message": "Resume uploaded. The previous one was deleted.", "uploaded": True, **meta}
 
 # -------------------------------------------------------------
 # Structured Candidate Intelligence Records (Verifiable Truth)

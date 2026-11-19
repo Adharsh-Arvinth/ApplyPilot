@@ -651,7 +651,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       children: [
-        // 1. Top Header: Date, Status pill, and Serif "Hello, Adharsh"
+        // 1. Top Header: Date, Status pill, and Serif "Hello, Alex"
         _buildStitchGreetingHeader(isDark),
 
         if (isPaused) ...[
@@ -1892,7 +1892,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   TextSpan(text: "Hello, ", style: TextStyle(fontWeight: FontWeight.w400)),
                   TextSpan(
-                    text: "Adharsh",
+                    text: "Alex",
                     style: TextStyle(fontStyle: FontStyle.italic, fontWeight: FontWeight.w300),
                   ),
                 ],

@@ -48,7 +48,7 @@ void main() {
   });
 
   test('Server addresses are normalized', () {
-    expect(ShellConfig.normalizeUrl(' 100.97.30.113:8000 '), 'http://100.97.30.113:8000');
+    expect(ShellConfig.normalizeUrl(' 100.64.0.1:8000 '), 'http://100.64.0.1:8000');
     expect(ShellConfig.normalizeUrl('https://pc.tail.net/app/'), 'https://pc.tail.net');
     expect(ShellConfig.normalizeUrl('http://pc:8000//'), 'http://pc:8000');
   });

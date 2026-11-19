@@ -112,6 +112,30 @@
     });
   }
 
+  // Read-only text sheet (cover letter, interview prep) with a copy button.
+  function textSheet(title, text, note = '') {
+    $('#overlay').innerHTML = `<div class="modal-wrap" data-close><div class="modal sheet-modal" role="dialog" aria-modal="true" aria-labelledby="sheet-t">
+      <h3 id="sheet-t">${esc(title)}</h3>${note ? `<p class="small">${esc(note)}</p>` : ''}
+      <textarea class="textarea sheet-text" id="sheet-text" spellcheck="true">${esc(text || '')}</textarea>
+      <div class="acts"><button class="btn ghost hv" data-x="close">Close</button><button class="btn primary hv" data-act="copy-text">${icon('content_copy')}Copy</button></div></div></div>`;
+    $('#overlay .modal-wrap').addEventListener('click', (e) => { if (e.target.hasAttribute('data-close') || e.target.closest('[data-x="close"]')) $('#overlay').innerHTML = ''; });
+    $('#sheet-text').focus();
+  }
+  function openProof(id) {
+    const p = (S.proofs || []).find(x => x.id === id); if (!p) return;
+    const k = PROOF_KIND[p.kind] || [p.kind, ''];
+    $('#overlay').innerHTML = `<div class="modal-wrap" data-close><div class="modal sheet-modal" role="dialog" aria-modal="true" aria-labelledby="proof-t">
+      <div class="row-between mb-2">${art(p.company, 'lg')}<span class="chip ${k[1]}">${esc(k[0])}</span></div>
+      <h3 id="proof-t">${esc(p.subject || p.company)}</h3>
+      <p class="small">${esc(p.sender)} · ${esc(stamp(p.received_at))}</p>
+      <p class="proof-body">${esc(p.snippet || '')}${(p.snippet || '').length >= 600 ? '…' : ''}</p>
+      <div class="acts"><button class="btn ghost hv" data-x="close">Close</button>${p.job_id ? `<button class="btn primary hv" data-x="job">Open application</button>` : ''}</div></div></div>`;
+    $('#overlay .modal-wrap').addEventListener('click', (e) => {
+      if (e.target.closest('[data-x="job"]')) { $('#overlay').innerHTML = ''; openJob(p.job_id); }
+      else if (e.target.hasAttribute('data-close') || e.target.closest('[data-x="close"]')) $('#overlay').innerHTML = '';
+    });
+  }
+
   function ring(pct, size = 64, stroke = 7, color = 'var(--accent)') {
     const r = (size - stroke) / 2, c = 2 * Math.PI * r, off = c * (1 - Math.max(0, Math.min(1, pct))), mid = size / 2;
     return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">
@@ -126,7 +150,7 @@
     { id: 'queued', label: 'Queued', color: 'indigo', statuses: ['queued', 'approved'] },
     { id: 'active', label: 'In flight', color: 'violet', statuses: ['applying', 'needs_review', 'needs_attention', 'needs_input'] },
     { id: 'submitted', label: 'Submitted', color: 'teal', statuses: ['dry_run', 'applied', 'submitted'] },
-    { id: 'interview', label: 'Interview', color: 'teal', statuses: ['interview', 'offer'] },
+    { id: 'interview', label: 'Interview', color: 'sky', statuses: ['interview', 'offer'] },
     { id: 'new', label: 'Discovered', color: 'slate', statuses: ['discovered'] },
     { id: 'closed', label: 'Closed', color: 'coral', statuses: ['skipped', 'rejected', 'failed', 'dismissed', 'blocked', 'expired'] },
   ];
@@ -137,7 +161,7 @@
     dry_run: 'Dry run', applied: 'Applied', submitted: 'Submitted', interview: 'Interview', offer: 'Offer',
     discovered: 'Discovered', skipped: 'Skipped', rejected: 'Rejected', failed: 'Failed', dismissed: 'Dismissed', blocked: 'Blocked', expired: 'Expired',
   };
-  const statusColor = (s) => ({ needs_review: 'violet', needs_attention: 'amber', needs_input: 'amber', failed: 'coral', rejected: 'coral', blocked: 'coral', skipped: 'slate', dismissed: 'slate', dry_run: 'indigo', offer: 'teal' }[s] || stageOf(s).color);
+  const statusColor = (s) => ({ needs_review: 'violet', needs_attention: 'amber', needs_input: 'amber', failed: 'coral', rejected: 'coral', blocked: 'coral', skipped: 'slate', dismissed: 'slate', dry_run: 'indigo', offer: 'teal', interview: 'sky' }[s] || stageOf(s).color);
   const statusChip = (s) => `<span class="chip ${statusColor(s)}">${esc(STATUS_LABEL[s] || s)}</span>`;
   const scoreColor = (s) => s >= 4 ? 'var(--teal)' : s >= 3 ? 'var(--indigo)' : s >= 2 ? 'var(--amber)' : 'var(--coral)';
   const scoreTag = (s) => s > 0 ? `<span class="score"><span class="dot" style="background:${scoreColor(s)}"></span>${Number(s).toFixed(1)}</span>` : `<span class="faint">—</span>`;
@@ -161,28 +185,34 @@
 
   // ───────────────────────── State ─────────────────────────
   const S = {
-    view: 'today',
+    view: 'home',
     stats: null, analytics: null, logs: [], automation: null, profile: null, gemini: null, resumes: [],
     jobs: null, needs: [], aiAnswers: [], triage: [], answers: null,
+    autopilot: null, proofStatus: null, proofs: [], resume: null,
     inbox: { tab: 'questions', sel: 0, picks: {}, remember: true },
     pipe: { stage: 'all', q: '', source: '', min: '', mode: 'table', sort: 'score', dir: -1, limit: 100, laneLimit: {} },
     ans: { cat: 'all', q: '', editing: null, adding: false },
     act: { level: 'all', q: '' },
+    ins: { tab: 'overview' },
+    proof: { kind: 'all' },
+    set: { section: 'profile' },
     jobId: null, job: null, returnFocus: null,
     online: true, anim: false, lastHtml: '',
   };
 
   const today = () => new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
   const VIEWS = [
-    { id: 'today', label: 'Today', icon: 'space_dashboard', mobile: 'today', sub: today },
-    { id: 'inbox', label: 'Needs you', icon: 'inbox', mobile: 'notifications', sub: () => 'Every decision that needs a human, in one place' },
-    { id: 'pipeline', label: 'Pipeline', icon: 'view_kanban', mobile: 'work', sub: () => S.jobs ? `${fmt(S.jobs.length)} tracked roles` : 'Tracked roles' },
-    { id: 'answers', label: 'Answers', icon: 'forum', mobile: 'forum', sub: () => 'Verified facts the agent reuses on forms' },
-    { id: 'activity', label: 'Activity', icon: 'receipt_long', sub: () => 'Engine run log' },
-    { id: 'settings', label: 'Profile & rules', icon: 'tune', mobile: 'person', sub: () => 'Who you are and how the agent behaves' },
+    { id: 'home', label: 'Home', icon: 'home', mobile: 'home', sub: today },
+    { id: 'inbox', label: 'Needs you', icon: 'inbox', mobile: 'notifications', sub: () => 'Decisions only you can make' },
+    { id: 'pipeline', label: 'Applications', icon: 'work', mobile: 'work', sub: () => S.jobs ? `${fmt(S.jobs.length)} roles tracked` : 'Every role ApplyPilot is tracking' },
+    { id: 'proof', label: 'Proof', icon: 'mark_email_read', mobile: 'mark_email_read', sub: () => 'Emails from employers confirming your applications' },
+    { id: 'insights', label: 'Insights', icon: 'insights', sub: () => 'Trends, funnel and the engine log' },
+    { id: 'settings', label: 'Settings', icon: 'settings', mobile: 'settings', sub: () => 'Profile, resume, autopilot, appearance and help' },
   ];
-  const MOBILE_TABS = ['today', 'inbox', 'pipeline', 'answers', 'settings'];
-  const MOBILE_LABEL = { today: 'Today', inbox: 'Needs You', pipeline: 'Jobs', answers: 'Answers', settings: 'Profile' };
+  // Old links keep working: #/today, #/activity, #/answers
+  const VIEW_ALIAS = { today: ['home'], activity: ['insights', 'log'], answers: ['settings', 'answers'] };
+  const MOBILE_TABS = ['home', 'inbox', 'pipeline', 'proof', 'settings'];
+  const MOBILE_LABEL = { home: 'Home', inbox: 'Needs You', pipeline: 'Jobs', proof: 'Proof', settings: 'Settings' };
 
   const inboxCount = () => (S.stats ? S.stats.needs_you_count : S.needs.length) + S.aiAnswers.length + (S.stats ? S.stats.maybe_count : S.triage.length);
 
@@ -325,12 +355,22 @@
     catch (e) { S.online = false; }
     renderChrome();
   }
+  // Run several requests, keep whatever succeeds (one slow/failed call never blanks a view).
+  async function settle(map) {
+    const keys = Object.keys(map);
+    const res = await Promise.allSettled(keys.map(k => map[k]));
+    res.forEach((r, i) => { if (r.status === 'fulfilled') S[keys[i]] = r.value; });
+  }
   const loaders = {
-    async today() {
-      const [a, l, au] = await Promise.allSettled([api('/analytics'), api('/logs', { query: { limit: 14 } }), api('/automation/status')]);
-      if (a.status === 'fulfilled') S.analytics = a.value;
-      if (l.status === 'fulfilled') S.logs = l.value;
-      if (au.status === 'fulfilled') S.automation = au.value;
+    async home() {
+      await settle({ autopilot: api('/autopilot'), proofStatus: api('/proofs/status'), proofs: api('/proofs', { query: { limit: 5 } }),
+        resume: api('/profile/resume'), profile: api('/profile'), analytics: api('/analytics'), jobs: api('/jobs') });
+    },
+    async proof() {
+      await settle({ proofStatus: api('/proofs/status'), proofs: api('/proofs', { query: { limit: 300 } }), stats: api('/stats') });
+    },
+    async insights() {
+      await settle({ analytics: api('/analytics'), automation: api('/automation/status'), logs: api('/logs', { query: { limit: 250 } }) });
     },
     async inbox() {
       const [n, g, t] = await Promise.allSettled([api('/needs-you'), api('/needs-you/gemini-answers'), api('/jobs', { query: { status: 'maybe' } })]);
@@ -339,21 +379,22 @@
       if (t.status === 'fulfilled') S.triage = t.value;
     },
     async pipeline() { S.jobs = await api('/jobs'); },
-    async answers() { S.answers = await api('/answer-bank'); },
-    async activity() { S.logs = await api('/logs', { query: { limit: 250 } }); },
     async settings() {
-      const [p, g, r, au] = await Promise.allSettled([api('/profile'), api('/profile/gemini-settings'), api('/resumes'), api('/automation/status')]);
-      if (p.status === 'fulfilled') S.profile = p.value;
-      if (g.status === 'fulfilled') S.gemini = g.value;
-      if (r.status === 'fulfilled') S.resumes = r.value;
-      if (au.status === 'fulfilled') S.automation = au.value;
+      await settle({ profile: api('/profile'), gemini: api('/profile/gemini-settings'), resumes: api('/resumes'),
+        automation: api('/automation/status'), autopilot: api('/autopilot'), proofStatus: api('/proofs/status'),
+        resume: api('/profile/resume'), answers: api('/answer-bank') });
     },
   };
 
   // ───────────────────────── Router ─────────────────────────
   let viewToken = 0;
   async function go(view, { silent = false } = {}) {
-    if (!VIEWS.some(v => v.id === view)) view = 'today';
+    // Accept "settings/appearance", "insights/log" and old view names.
+    let [base, sub] = String(view || '').split('/');
+    if (VIEW_ALIAS[base]) [base, sub = sub] = VIEW_ALIAS[base].length > 1 && !sub ? VIEW_ALIAS[base] : [VIEW_ALIAS[base][0], sub];
+    if (base === 'settings' && sub) S.set.section = sub;
+    if (base === 'insights' && sub) S.ins.tab = sub;
+    view = VIEWS.some(v => v.id === base) ? base : 'home';
     const changed = S.view !== view;
     S.view = view;
     if (location.hash !== '#/' + view) history.replaceState(null, '', '#/' + view);
@@ -379,7 +420,7 @@
     afterRender[S.view] && afterRender[S.view]();
   }
   // Loading skeletons shaped like the view that is coming (dashboard vs. list views).
-  const skeleton = (view) => `<div class="view" aria-busy="true"><div class="view-head"><div class="skel sk-title"></div></div>${view === 'today'
+  const skeleton = (view) => `<div class="view" aria-busy="true"><div class="view-head"><div class="skel sk-title"></div></div>${view === 'home' || view === 'insights'
     ? `<div class="kpis">${'<div class="card kpi"><div class="skel sk-line"></div><div class="skel sk-num"></div></div>'.repeat(4)}</div>
        <div class="grid-today"><div class="card card-b span-8"><div class="skel sk-block"></div></div><div class="card card-b span-4"><div class="skel sk-block"></div></div></div>`
     : `<div class="card list">${'<div class="skel sk-row"></div>'.repeat(6)}</div>`}</div>`;
@@ -390,19 +431,11 @@
   const renderers = {};
   const afterRender = {};
 
-  renderers.today = () => {
+  function insightsOverview() {
     const st = S.stats || {}, an = S.analytics || {}, au = S.automation || {};
     const goal = an.goal || {};
     const cap = st.daily_cap || goal.daily_target || 0;
     const applied = st.daily_applied || 0;
-    let alert = '';
-    if (st.is_circuit_broken) {
-      alert = `<div class="alert coral">${icon('report')}<div><div class="alert-t">Circuit breaker tripped</div><div class="alert-d">${esc(st.recovery_instruction || 'Repeated failures paused the queue for safety.')}</div></div>
-        <div class="actions"><button class="btn hv" data-nav="activity">View log</button><button class="btn primary hv" data-act="resume">Run pre-flight & resume</button></div></div>`;
-    } else if (st.is_paused) {
-      alert = `<div class="alert">${icon('pause_circle')}<div><div class="alert-t">Engine paused${st.paused_at ? ` since ${esc(st.paused_at)}` : ''}</div><div class="alert-d">${esc(st.recovery_instruction || st.pause_reason || 'Automation is paused.')}</div></div>
-        <div class="actions"><button class="btn primary hv" data-act="resume" ${st.can_resume === false ? 'disabled' : ''}>${icon('play_arrow')}Resume</button></div></div>`;
-    }
     const nyCount = (st.needs_you_count || 0) + S.aiAnswers.length;
     const kpi = (attrs, dot, label, value, sub, warn = false) => `<button class="card kpi lift" ${attrs}>
       <span class="kpi-l"><span class="dot ${dot}"></span>${label}</span><span class="kpi-v ${warn ? 'warn' : ''}">${value}</span><span class="kpi-s">${sub}</span>${icon('arrow_forward', 'go')}</button>`;
@@ -417,12 +450,6 @@
       ${kpi('data-nav="pipeline" data-stage="interview"', 'teal', 'Interviews', fmt(st.interview_count), an.offers_count ? `${fmt(an.offers_count)} offers` : 'no offers yet')}
     </div>`;
 
-    const top = (an.top_matches || []).slice(0, 10);
-    const shelf = top.length ? `<section class="block"><h2 class="section-t">Top matches <button class="btn sm ghost hv ml-auto" data-nav="pipeline">See all ${icon('chevron_right')}</button></h2>
-      <div class="shelf">${top.map(m => `<button class="tile" data-job="${m.id}" aria-label="${esc(m.title)} at ${esc(m.company)}">
-        <span class="art" style="--h:${hue(m.company)}">${esc(initials(m.company))}${m.match_percent ? `<span class="badge">${m.match_percent}%</span>` : ''}<span class="open">${icon('arrow_outward')}</span></span>
-        <span class="tile-t">${esc(m.title)}</span><span class="tile-s"><span class="ellipsis">${esc(m.company)}</span>${scoreTag(m.score)}</span></button>`).join('')}</div></section>` : '';
-
     const week = an.weekly_trend || [];
     const max = Math.max(1, ...week.map(w => w.count));
     const bars = week.length ? `<div class="bars">${week.map((w, i) => `<div class="col ${i === week.length - 1 ? 'today' : ''}" title="${esc(w.date)}: ${w.count}">
@@ -435,10 +462,6 @@
     const funnelHtml = funnel.map(f => `<div class="funnel-row"><span class="lab">${esc(f.stage)}</span>
       <div class="bar"><i style="width:${Math.max(f.count ? 1.5 : 0, f.count / fMax * 100)}%;background:${fColor[f.color] || 'var(--slate)'}"></i></div>
       <span class="val">${fmt(f.count)}</span></div>`).join('');
-
-    const feed = (S.logs || []).slice(0, 9).map(l => `<div class="feed-item"><span class="dot ${logColor(l)}"></span>
-      <span class="msg"><span class="ty">${esc(l.event_type)}</span>${esc(l.message)}</span><span class="t">${esc(shortLogTime(l.created_at))}</span></div>`).join('')
-      || `<div class="empty">No activity yet</div>`;
 
     const checks = au.checks || {};
     const checkNames = { daily_cap_available: 'Daily cap available', circuit_breaker_clear: 'Circuit breaker clear', backend_healthy: 'Backend healthy', auth_valid: 'Auth valid', no_blocking_captcha: 'No blocking CAPTCHA' };
@@ -456,18 +479,170 @@
       <div class="tier-grid">${tiers.map(t => `<div><span class="dot" style="background:${t[2]}"></span><span class="muted">Score ${t[0]}</span><span class="tnum ml-auto">${fmt(t[1] || 0)} <span class="faint">${Math.round((t[1] || 0) / tTotal * 100)}%</span></span></div>`).join('')}</div>`;
 
     const card = (span, title, aside, body) => `<div class="card ${span}"><div class="card-h"><span class="card-t">${title}</span><span class="aside">${aside}</span></div>${body}</div>`;
-    return `${pageHead()}${alert}${kpis}${shelf}
+    return `${kpis}
     <div class="grid-today">
       ${card('span-8', 'This week', `<span class="tnum">${fmt(goal.weekly_applied || 0)} of ${fmt(goal.weekly_target || 0)} goal</span>`, `<div class="card-b">${bars}</div>`)}
       ${card('span-4', 'Funnel', `<span class="tnum">${fmt(an.total_tracked || 0)} tracked</span>`, `<div class="card-b funnel">${funnelHtml || '<div class="empty">No data</div>'}</div>`)}
-      ${card('span-7', 'Live activity', `<button class="btn sm ghost hv" data-nav="activity">Full log ${icon('chevron_right')}</button>`, `<div class="feed">${feed}</div>`)}
-      ${card('span-5', 'Pre-flight', au.can_resume === false ? '<span class="chip coral">Blocked</span>' : '<span class="chip teal">Clear</span>',
+      ${card('span-12', 'Pre-flight', au.can_resume === false ? '<span class="chip coral">Blocked</span>' : '<span class="chip teal">Clear</span>',
         `<div class="card-b"><div class="checklist">${checkHtml || '<span class="faint">No checks reported</span>'}</div>${na.failed_tasks ? `<div class="alert-d mt-3">${fmt(na.failed_tasks)} failed tasks in the log</div>` : ''}</div>`)}
       ${card('span-6', 'Fit distribution', `<span class="tnum">${fmt(tTotal)} scored</span>`, `<div class="card-b">${tierHtml}</div>`)}
       ${card('span-6', 'Sources', `${src.length} boards`, `<div class="card-b">${srcHtml || '<div class="empty">No sources yet</div>'}</div>`)}
     </div>`;
+  }
+
+  // ───────────────────────── View: Home ─────────────────────────
+  // One glance: who you are, what the autopilot is doing, and only what needs you.
+  const firstName = () => String((S.profile && S.profile.full_name) || '').trim().split(/\s+/)[0] || '';
+  function greeting() {
+    const h = new Date().getHours();
+    const part = h < 5 ? 'Working late' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : h < 22 ? 'Good evening' : 'Good night';
+    return firstName() ? `${part}, ${firstName()}` : part;
+  }
+  const relFuture = (iso) => {
+    const d = toDate(iso); if (!d) return '';
+    const m = Math.round((d - Date.now()) / 60000);
+    if (m <= 0) return 'any moment';
+    if (m < 60) return `in ${m} min`;
+    const h = Math.round(m / 60);
+    return h < 24 ? `in ${h} h` : `in ${Math.round(h / 24)} d`;
+  };
+  function engineStatus() {
+    const st = S.stats || {}, ap = S.autopilot || {}, live = !!st.go_live;
+    const key = st.is_circuit_broken ? 'circuit_broken' : (ap.status || (st.is_paused ? 'paused' : 'running'));
+    const capPause = st.pause_reason === 'paused_by_daily_cap';
+    return ({
+      running: { label: 'Running', dot: 'teal', line: `Applying for you automatically in ${live ? 'live' : 'dry run'} mode.` },
+      sleeping: { label: 'Resting', dot: 'slate', line: 'Outside your active hours. It picks up again on its own.' },
+      paused: { label: 'Paused', dot: 'amber', line: capPause ? 'Today’s limit is reached. It resumes tomorrow on its own.' : 'Paused. Resume whenever you’re ready.' },
+      circuit_broken: { label: 'Stopped for safety', dot: 'coral', line: 'Several job sites failed in a row, so it paused itself.' },
+      off: { label: 'Off', dot: 'slate', line: 'Autopilot is switched off in Settings.' },
+      no_profile: { label: 'Setting up', dot: 'slate', line: 'Finish your profile to start.' },
+    })[key] || { label: 'Running', dot: 'teal', line: 'Applying for you automatically.' };
+  }
+  function followUpsDue() {
+    const now = Date.now();
+    return (S.jobs || []).filter(j => j.follow_up_date && toDate(j.follow_up_date) <= now && !['rejected', 'dismissed', 'skipped', 'offer'].includes(j.status));
+  }
+  function attentionItems() {
+    const st = S.stats || {}, items = [];
+    const n = st.needs_you_count || 0, drafts = S.aiAnswers.length, tri = st.maybe_count || 0, fu = followUpsDue().length;
+    if (S.resume && !S.resume.uploaded) items.push(['upload_file', 'Add your resume', 'It’s used for every application', 'settings/resume']);
+    if (n) items.push(['help', `${n} question${n > 1 ? 's' : ''} to answer`, 'Applications are waiting on you', 'inbox/questions']);
+    if (drafts) items.push(['auto_awesome', `${drafts} AI answer${drafts > 1 ? 's' : ''} to review`, 'Approve once, reused forever', 'inbox/ai']);
+    if (fu) items.push(['schedule', `${fu} follow-up${fu > 1 ? 's' : ''} due`, 'Roles you planned to chase up', 'pipeline']);
+    if (tri) items.push(['swipe', `${tri} role${tri > 1 ? 's' : ''} to triage`, 'Borderline fits — quick yes or no', 'inbox/triage']);
+    const assist = (S.autopilot && S.autopilot.assist_queued) || 0;
+    if (assist) items.push(['touch_app', `${assist} role${assist > 1 ? 's' : ''} to apply yourself`, 'LinkedIn, Indeed and similar sites don’t allow bots', 'pipeline']);
+    if (S.proofStatus && !S.proofStatus.connected) items.push(['mail', 'Connect your email', 'Employer confirmations become proof', 'settings/email']);
+    return items;
+  }
+  const CHECK_KEY = 'ap_checklist_hidden';
+  function checklist() {
+    let hidden = false; try { hidden = localStorage.getItem(CHECK_KEY) === '1'; } catch (e) {}
+    const st = S.stats || {}, ap = (S.autopilot && S.autopilot.config) || {};
+    const steps = [
+      ['Upload your resume', !!(S.resume && S.resume.uploaded), 'settings/resume'],
+      ['Check your job preferences', !!(S.profile && (S.profile.target_roles || []).length && (S.profile.locations || []).length), 'settings/preferences'],
+      ['Connect your email for proof', !!(S.proofStatus && S.proofStatus.connected), 'settings/email'],
+      ['Keep autopilot on', ap.enabled !== false, 'settings/autopilot'],
+      ['Turn on live submissions', !!st.go_live, 'settings/autopilot'],
+    ];
+    const done = steps.filter(s => s[1]).length;
+    if (hidden || done === steps.length) return '';
+    return `<section class="card block checklist-card">
+      <div class="card-h"><span class="card-t">Getting started</span><span class="aside tnum">${done} of ${steps.length}</span>
+        <button class="btn sm icon ghost hv" data-act="hide-checklist" title="Hide checklist">${icon('close')}</button></div>
+      <div class="bar thin mx"><i style="width:${done / steps.length * 100}%"></i></div>
+      <div class="list">${steps.map(([label, ok, to]) => `<button class="row hv ${ok ? 'done' : ''}" data-nav="${to}">
+        ${icon(ok ? 'check_circle' : 'radio_button_unchecked', ok ? 'fill step-ok' : 'step-todo')}<span class="grow">${label}</span>${ok ? '' : icon('chevron_right', 'faint')}</button>`).join('')}</div></section>`;
+  }
+  function topShelf(limit = 10) {
+    const top = ((S.analytics && S.analytics.top_matches) || []).slice(0, limit);
+    if (!top.length) return '';
+    return `<section class="block"><h2 class="section-t">Top matches <button class="btn sm ghost hv ml-auto" data-nav="pipeline">See all ${icon('chevron_right')}</button></h2>
+      <div class="shelf">${top.map(m => `<button class="tile" data-job="${m.id}" aria-label="${esc(m.title)} at ${esc(m.company)}">
+        <span class="art" style="--h:${hue(m.company)}">${esc(initials(m.company))}${m.match_percent ? `<span class="badge">${m.match_percent}%</span>` : ''}<span class="open">${icon('arrow_outward')}</span></span>
+        <span class="tile-t">${esc(m.title)}</span><span class="tile-s"><span class="ellipsis">${esc(m.company)}</span>${scoreTag(m.score)}</span></button>`).join('')}</div></section>`;
+  }
+  const PROOF_KIND = { confirmation: ['Confirmed', 'teal'], interview: ['Interview', 'violet'], rejection: ['Declined', 'slate'] };
+  const proofRow = (p) => `<button class="row hv" data-proof="${p.id}">
+    ${art(p.company, 'sm')}<span class="grow"><span class="main-t">${esc(p.subject || p.company)}</span><span class="sub-t">${esc(p.company)}${p.role ? ' · ' + esc(p.role) : ''}</span></span>
+    <span class="end"><span class="chip ${PROOF_KIND[p.kind] ? PROOF_KIND[p.kind][1] : ''}">${PROOF_KIND[p.kind] ? PROOF_KIND[p.kind][0] : esc(p.kind)}</span><span class="faint small tnum">${rel(p.received_at)}</span></span></button>`;
+
+  renderers.home = () => {
+    const st = S.stats || {}, ap = S.autopilot || {}, ps = S.proofStatus || {};
+    const es = engineStatus(), items = attentionItems();
+    const applied = st.daily_applied || 0, cap = st.daily_cap || 0;
+    const confirmations = (ps.counts && ps.counts.confirmation) || 0;
+    const summary = items.length
+      ? `${es.line} ${items.length === 1 ? 'One thing needs you.' : `${items.length} things need you.`}`
+      : `${es.line} Nothing needs you right now.`;
+    const paused = !!st.is_paused;
+    const next = ap.status === 'running' && ap.queued ? relFuture(ap.next_apply_at) || 'soon' : '—';
+    const metric = (value, label, extra = '') => `<div class="hm"><span class="hm-v tnum">${value}${extra}</span><span class="hm-l">${label}</span></div>`;
+    const hero = `<section class="card status-card block">
+      <div class="sc-top">
+        <span class="sc-state"><span class="dot ${es.dot} ${es.dot === 'teal' ? 'pulse' : ''}"></span>Autopilot · ${esc(es.label)}</span>
+        <span class="chip">${st.go_live ? 'Live' : 'Dry run'}</span>
+        <button class="btn sm hv ml-auto" data-act="${paused ? 'resume' : 'pause'}">${icon(paused ? 'play_arrow' : 'pause')}${paused ? 'Resume' : 'Pause'}</button>
+      </div>
+      <div class="sc-metrics">
+        ${metric(fmt(applied), 'Applied today', `<span class="hm-of"> / ${fmt(cap)}</span>`)}
+        ${metric(fmt(ap.queued ?? st.queue_count ?? 0), 'Waiting in queue')}
+        ${metric(fmt(confirmations), 'Confirmed by email')}
+        ${metric(esc(next), 'Next application')}
+      </div>
+      <div class="bar thin"><i style="width:${cap ? Math.min(100, applied / cap * 100) : 0}%"></i></div>
+    </section>`;
+    const forYou = `<section class="block"><h2 class="section-t">For you</h2><div class="card list">${items.length
+      ? items.map(([ic, t, d, to]) => `<button class="row hv" data-nav="${to}"><span class="row-ic">${icon(ic)}</span><span class="grow"><span class="main-t">${t}</span><span class="sub-t">${d}</span></span>${icon('chevron_right', 'faint')}</button>`).join('')
+      : `<div class="row calm">${icon('check_circle', 'fill step-ok')}<span class="grow"><span class="main-t">You’re all caught up</span><span class="sub-t">ApplyPilot will let you know when something needs you.</span></span></div>`}</div></section>`;
+    const recent = (S.proofs || []).slice(0, 3);
+    const recentHtml = recent.length ? `<section class="block"><h2 class="section-t">Latest from employers <button class="btn sm ghost hv ml-auto" data-nav="proof">All proof ${icon('chevron_right')}</button></h2>
+      <div class="card list">${recent.map(proofRow).join('')}</div></section>` : '';
+    return `<header class="view-head greet"><div class="min0"><div class="eyebrow">${esc(today())}</div><h1>${esc(greeting())}</h1><p class="sub">${esc(summary)}</p></div></header>
+      ${hero}${checklist()}${forYou}${recentHtml}${topShelf(8)}`;
   };
 
+  // ───────────────────────── View: Proof ─────────────────────────
+  function emailConnectForm(compact = false) {
+    return `<form class="stack" data-email-form>
+      ${compact ? '' : `<p class="muted small">ApplyPilot reads your inbox <b>read-only</b> to find “thank you for applying”, interview and decision emails, and links them to the right application. It never sends, deletes or marks mail as read.</p>`}
+      <div class="form-grid">
+        <div class="field"><label for="em-addr">Gmail address</label><input class="input" id="em-addr" name="address" type="email" autocomplete="username" placeholder="you@gmail.com" value="${esc((S.proofStatus && S.proofStatus.address) || '')}" required></div>
+        <div class="field"><label for="em-pass">Google app password</label><input class="input" id="em-pass" name="app_password" type="password" autocomplete="new-password" placeholder="16 characters" required></div>
+      </div>
+      <div class="row-between wrap"><button type="button" class="btn ghost sm hv" data-nav="settings/help" data-tut="email">${icon('help')}How do I get an app password?</button><button class="btn primary hv" type="submit">${icon('link')}Connect</button></div>
+    </form>`;
+  }
+  renderers.proof = () => {
+    const ps = S.proofStatus || {}, c = ps.counts || {}, st = S.stats || {}, kind = S.proof.kind;
+    const list = (S.proofs || []).filter(p => kind === 'all' || p.kind === kind);
+    const head = pageHead(ps.connected ? `<button class="btn hv" data-act="proof-sync">${icon('refresh')}Check inbox</button>` : '');
+    if (!ps.connected) {
+      return `${head}<section class="card block"><div class="card-h"><span class="card-t">Connect your inbox</span></div><div class="card-b">${emailConnectForm()}</div></section>
+        <section class="card"><div class="empty">${icon('mark_email_unread')}<b>Proof appears here</b><span>Once connected, every confirmation an employer sends is matched to its application.</span></div></section>`;
+    }
+    const metric = (v, l) => `<div class="hm"><span class="hm-v tnum">${fmt(v)}</span><span class="hm-l">${l}</span></div>`;
+    const seg = `<div class="seg" data-glide="proof">${[['all', 'All', ps.total || 0], ['confirmation', 'Confirmed', c.confirmation || 0], ['interview', 'Interviews', c.interview || 0], ['rejection', 'Declined', c.rejection || 0]]
+      .map(([id, l, n]) => `<button class="${kind === id ? 'on' : ''}" data-proof-kind="${id}">${l} <span class="n">${n}</span></button>`).join('')}</div>`;
+    return `${head}
+      <section class="card status-card block"><div class="sc-metrics">
+        ${metric(st.total_submitted_real || 0, 'Submitted live')}${metric(c.confirmation || 0, 'Confirmed by email')}${metric(c.interview || 0, 'Interview invites')}
+        <div class="hm"><span class="hm-v small-v">${ps.last_sync ? esc(rel(ps.last_sync)) : 'Not yet'}</span><span class="hm-l">Last checked · ${esc(ps.address || '')}</span></div>
+      </div>${ps.last_error ? `<p class="small bad mt-2">${icon('error')} ${esc(ps.last_error)}</p>` : ''}</section>
+      <div class="toolbar">${seg}<div class="spacer"></div><span class="hint">Checked automatically every ${fmt(((S.autopilot && S.autopilot.config) || {}).proof_sync_minutes || 20)} min</span></div>
+      ${list.length ? `<div class="card list">${list.map(proofRow).join('')}</div>`
+        : emptyCard('mark_email_unread', 'No employer emails yet', 'Dry runs don’t send anything, so confirmations arrive only after live applications — usually within minutes.')}`;
+  };
+
+  // ───────────────────────── View: Insights ─────────────────────────
+  renderers.insights = () => {
+    const tab = S.ins.tab === 'log' ? 'log' : 'overview';
+    const seg = `<div class="seg" data-glide="ins"><button class="${tab === 'overview' ? 'on' : ''}" data-ins-tab="overview">${icon('insights')}Overview</button><button class="${tab === 'log' ? 'on' : ''}" data-ins-tab="log">${icon('receipt_long')}Activity log</button></div>`;
+    return `${pageHead()}<div class="toolbar">${seg}</div>${tab === 'log' ? activityLog() : insightsOverview()}`;
+  };
+  afterRender.insights = () => { if (S.ins.tab === 'log') afterRender.activity(); };
   // ───────────────────────── View: Needs you (inbox) ─────────────────────────
   renderers.inbox = () => {
     const I = S.inbox;
@@ -559,7 +734,7 @@
     const P = S.pipe, jobs = S.jobs || [];
     const counts = {}; jobs.forEach(j => { const s = stageOf(j.status).id; counts[s] = (counts[s] || 0) + 1; });
     const sources = [...new Set(jobs.map(j => j.source))].sort();
-    const chips = `<div class="chips-scroll" role="group" aria-label="Stage"><button class="filter-chip ${P.stage === 'all' ? 'on' : ''}" data-stage-f="all" aria-pressed="${P.stage === 'all'}">All <span class="n">${fmt(jobs.length)}</span></button>${STAGES.map(s => `<button class="filter-chip ${P.stage === s.id ? 'on' : ''}" data-stage-f="${s.id}" aria-pressed="${P.stage === s.id}"><span class="dot ${s.color}"></span>${s.label} <span class="n">${fmt(counts[s.id] || 0)}</span></button>`).join('')}</div>`;
+    const chips = `<div class="chips-scroll" role="group" aria-label="Stage"><button class="filter-chip ${P.stage === 'all' ? 'on' : ''}" data-stage-f="all" aria-pressed="${P.stage === 'all'}">All <span class="n">${fmt(jobs.length)}</span></button>${STAGES.map(s => `<button class="filter-chip ${P.stage === s.id ? 'on' : ''}" style="--tone: var(--${s.color})" data-stage-f="${s.id}" aria-pressed="${P.stage === s.id}"><span class="dot ${s.color}"></span>${s.label} <span class="n">${fmt(counts[s.id] || 0)}</span></button>`).join('')}</div>`;
     const toolbar = `<div class="toolbar">
       <div class="search">${icon('search')}<input class="input" id="pipe-q" aria-label="Filter jobs" placeholder="Filter company, role, location" value="${esc(P.q)}"></div>
       <select class="select w-sm" id="pipe-src" aria-label="Source"><option value="">All sources</option>${sources.map(s => `<option ${P.source === s ? 'selected' : ''} value="${esc(s)}">${esc(s)}</option>`).join('')}</select>
@@ -694,8 +869,14 @@
         ${section('Timeline', `<div class="timeline">${timeline}</div>`)}
         ${section('Manage', `<div class="stack">
           <div class="field"><label for="insp-status">Stage</label><select class="select" id="insp-status">${statusOpts.map(s => `<option value="${s}" ${s === j.status ? 'selected' : ''}>${esc(STATUS_LABEL[s] || s)}</option>`).join('')}</select></div>
-          <div class="field"><label for="insp-notes">Notes</label><textarea class="textarea short" id="insp-notes" placeholder="Recruiter name, referral, follow-up…">${esc(j.notes)}</textarea></div>
+          <div class="form-grid">
+            <div class="field"><label for="insp-contact">Recruiter / contact</label><input class="input" id="insp-contact" placeholder="Name, email or LinkedIn" value="${esc(j.recruiter_info || '')}"></div>
+            <div class="field"><label for="insp-follow">Follow up on</label><input class="input" id="insp-follow" type="date" value="${j.follow_up_date ? esc(String(j.follow_up_date).slice(0, 10)) : ''}"></div>
+          </div>
+          <div class="field"><label for="insp-notes">Notes</label><textarea class="textarea short" id="insp-notes" placeholder="Referral, salary discussion, anything to remember…">${esc(j.notes)}</textarea></div>
           <div class="qactions"><button class="btn sm hv" data-act="save-status" data-id="${j.id}">${icon('save')}Save</button>
+            <button class="btn sm hv" data-act="cover-letter" data-id="${j.id}">${icon('edit_note')}Cover letter</button>
+            <button class="btn sm hv" data-act="interview-prep" data-id="${j.id}">${icon('record_voice_over')}Interview prep</button>
             <button class="btn sm hv" data-act="tailor" data-id="${j.id}">${icon('description')}Tailor resume</button>
             ${st !== 'closed' ? `<button class="btn sm ghost danger hv" data-act="swipe" data-action="exclude" data-id="${j.id}">Exclude company</button>` : ''}</div></div>`)}
       </div>
@@ -709,7 +890,7 @@
   const CATS = { personal: 'Personal contact', education: 'Education & credentials', work_auth: 'Work authorization', technical: 'Technical skills & projects', behavioral: 'Behavioral', demographics: 'Demographics & disclosures', preferences: 'Preferences & pay', general: 'General', custom: 'Custom', ai_suggestion: 'AI suggestions' };
   const catName = (c) => CATS[c] || String(c).replace(/_/g, ' ').replace(/^./, m => m.toUpperCase());
 
-  renderers.answers = () => {
+  function answersBody() {
     const A = S.ans, all = S.answers || [];
     const counts = {}; all.forEach(a => { counts[a.category] = (counts[a.category] || 0) + 1; });
     const cats = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
@@ -721,12 +902,12 @@
     const body = order.length ? order.map(c => `<div class="ans-group"><span class="eyebrow">${esc(catName(c))} · ${groups[c].length}</span><div class="card list">${groups[c].map(answerRow).join('')}</div></div>`).join('')
       : emptyCard('search_off', 'No answers match');
     const catBtn = (id, label, n) => `<button class="hv ${A.cat === id ? 'on' : ''}" data-cat="${esc(id)}" aria-pressed="${A.cat === id}">${esc(label)} <span class="n">${n}</span></button>`;
-    return `${pageHead()}<div class="toolbar"><div class="search">${icon('search')}<input class="input" id="ans-q" aria-label="Search answers" placeholder="Search questions or answers" value="${esc(A.q)}"></div>
+    return `<div class="toolbar"><div class="search">${icon('search')}<input class="input" id="ans-q" aria-label="Search answers" placeholder="Search questions or answers" value="${esc(A.q)}"></div>
       <div class="spacer"></div><span class="hint tnum">${fmt(all.length)} saved · ${fmt(all.reduce((s, a) => s + (a.usage_count || 0), 0))} auto-fills</span>
       <button class="btn primary hv" data-act="ans-add">${icon('add')}New answer</button></div>
       <div class="ans-layout"><nav class="cat-list" aria-label="Categories">${catBtn('all', 'All', all.length)}${cats.map(c => catBtn(c, catName(c), counts[c])).join('')}</nav>
       <div id="ans-body">${addForm}${body}</div></div>`;
-  };
+  }
   function answerRow(a) {
     if (S.ans.editing === a.id) return `<div class="ans-row">${answerForm(a, a.id)}</div>`;
     const review = a.mode !== 'always_use';
@@ -753,29 +934,143 @@
   };
 
   // ───────────────────────── View: Activity ─────────────────────────
-  renderers.activity = () => {
+  function activityLog() {
     const A = S.act, q = A.q.trim().toLowerCase();
     const norm = (l) => l === 'warning' ? 'warn' : l;
     const counts = { all: S.logs.length }; S.logs.forEach(l => { const k = norm(l.level); counts[k] = (counts[k] || 0) + 1; });
     const list = S.logs.filter(l => (A.level === 'all' || norm(l.level) === A.level) && (!q || `${l.message} ${l.event_type} ${l.company}`.toLowerCase().includes(q)));
     const rows = list.map(l => `<tr><td class="faint tnum mono">${esc(l.created_at)}</td><td><span class="lvl ${esc(l.level)}">${esc(l.level)}</span></td>
       <td class="hide-m"><span class="chip">${esc(l.event_type)}</span></td><td class="msg"><span class="dot ${logColor(l)}"></span> ${esc(l.message)}</td></tr>`).join('');
-    return `${pageHead()}<div class="toolbar"><div class="search">${icon('search')}<input class="input" id="act-q" aria-label="Filter log" placeholder="Filter log" value="${esc(A.q)}"></div>
+    return `<div class="toolbar"><div class="search">${icon('search')}<input class="input" id="act-q" aria-label="Filter log" placeholder="Filter log" value="${esc(A.q)}"></div>
       <div class="seg" data-glide="level">${['all', 'info', 'warn', 'error'].map(l => `<button class="${A.level === l ? 'on' : ''}" data-level="${l}" aria-pressed="${A.level === l}">${l[0].toUpperCase() + l.slice(1)} <span class="n">${counts[l] || 0}</span></button>`).join('')}</div>
       <div class="spacer"></div><span class="live-ind"><span class="dot teal pulse"></span>Live</span>
       <button class="btn hv" data-act="backup">${icon('backup')}Back up now</button></div>
       <div class="card"><div class="table-wrap"><table class="tbl log-tbl"><thead><tr><th class="w-time">Time</th><th class="w-lvl">Level</th><th class="hide-m w-ev">Event</th><th>Message</th></tr></thead>
       <tbody>${rows || `<tr><td colspan="4"><div class="empty">No log entries</div></td></tr>`}</tbody></table></div></div>`;
-  };
+  }
   afterRender.activity = () => {
     const q = $('#act-q');
     q && q.addEventListener('input', debounce(e => { S.act.q = e.target.value; const pos = e.target.selectionStart; render(); const n = $('#act-q'); n.focus(); n.setSelectionRange(pos, pos); }, 150));
   };
 
   // ───────────────────────── View: Profile & rules ─────────────────────────
+  // ───────────────────────── Appearance: text size, font, motion ─────────────────────────
+  // Saved per device (localStorage) and applied before first paint by index.html, like the theme.
+  const FONT_KEY = 'ap_font';
+  const FONT_STYLES = [
+    { id: 'default', name: 'System', note: 'SF Pro / Inter' },
+    { id: 'rounded', name: 'Rounded', note: 'Soft and friendly', href: 'Nunito:wght@400;500;600;700' },
+    { id: 'serif', name: 'Serif', note: 'Editorial', href: 'Newsreader:opsz,wght@6..72,400..700' },
+    { id: 'readable', name: 'Readable', note: 'Atkinson Hyperlegible', href: 'Atkinson+Hyperlegible:wght@400;700' },
+    { id: 'mono', name: 'Mono', note: 'Technical', href: 'JetBrains+Mono:wght@400;500;600;700' },
+  ];
+  const FONT_SIZES = [['s', 'Small', 0.9], ['m', 'Default', 1], ['l', 'Large', 1.12], ['xl', 'Extra large', 1.25]];
+  function fontPrefs() {
+    const base = { size: 'm', style: 'default', motion: 'auto' };
+    try { return { ...base, ...(JSON.parse(localStorage.getItem(FONT_KEY) || '{}') || {}) }; } catch (e) { return base; }
+  }
+  function applyFont(p = fontPrefs()) {
+    const root = document.documentElement, size = FONT_SIZES.find(x => x[0] === p.size) || FONT_SIZES[1];
+    root.style.setProperty('--text-scale', size[2]);
+    root.dataset.font = p.style; root.dataset.motion = p.motion;
+    const st = FONT_STYLES.find(f => f.id === p.style);
+    if (st && st.href && !document.getElementById(`font-${st.id}`)) {
+      document.head.insertAdjacentHTML('beforeend', `<link id="font-${st.id}" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${st.href}&display=swap">`);
+    }
+  }
+  function setFont(patch) {
+    const p = { ...fontPrefs(), ...patch };
+    try { localStorage.setItem(FONT_KEY, JSON.stringify(p)); } catch (e) {}
+    const swap = () => applyFont(p);
+    if (document.startViewTransition && p.motion !== 'reduce') document.startViewTransition(swap); else swap();
+    S.lastHtml = ''; render();
+  }
+  function appearancePanel() {
+    const fp = fontPrefs();
+    let open = true; try { open = localStorage.getItem('ap_appearance_open') !== '0'; } catch (e) {}
+    return `<details class="card collapse" data-collapse="appearance" ${open ? 'open' : ''}>
+      <summary class="card-h"><span class="card-t">Appearance</span><span class="aside">Theme, text size and font</span>${icon('expand_more', 'chev')}</summary>
+      <div class="card-b stack">
+        <div><div class="eyebrow mb-2">Theme</div>${themeSwatches()}</div>
+        <div><div class="eyebrow mb-2">Text size</div>
+          <div class="seg wide" data-glide="size" role="radiogroup" aria-label="Text size">${FONT_SIZES.map(([id, label]) => `<button role="radio" aria-checked="${fp.size === id}" class="${fp.size === id ? 'on' : ''}" data-font-size="${id}"><span class="size-a size-${id}" aria-hidden="true">A</span>${label}</button>`).join('')}</div></div>
+        <div><div class="eyebrow mb-2">Font</div>
+          <div class="font-grid" role="radiogroup" aria-label="Font">${FONT_STYLES.map(f => `<button class="font-opt hv ${fp.style === f.id ? 'on' : ''}" role="radio" aria-checked="${fp.style === f.id}" data-font-style="${f.id}"><span class="font-aa" data-font="${f.id}">Aa</span><span class="strong">${f.name}</span><span class="faint small">${f.note}</span></button>`).join('')}</div></div>
+        <label class="set-row hv bordered"><span class="grow">Reduce motion<small>Turns off sliding, lifting and drifting effects</small></span>
+          <span class="toggle"><input type="checkbox" data-reduce-motion ${fp.motion === 'reduce' ? 'checked' : ''}><i></i></span></label>
+      </div></details>`;
+  }
+
+  // ───────────────────────── Help & tutorials ─────────────────────────
+  const TUTORIALS = [
+    { id: 'start', icon: 'rocket_launch', title: 'Getting started in five minutes', to: ['Open Resume', 'settings/resume'], steps: [
+      'Upload your resume in Settings › Resume. Each new upload replaces the old one.',
+      'Check Settings › Job preferences: roles, locations, minimum pay and companies to avoid.',
+      'Connect your email in Settings › Email proof so employer confirmations are tracked.',
+      'Review Settings › Autopilot: limits, active hours and the fit scores it uses.',
+      'Watch a few dry runs, then turn on Live submissions.'] },
+    { id: 'autopilot', icon: 'smart_toy', title: 'How autopilot works', to: ['Open Autopilot', 'settings/autopilot'], steps: [
+      'Every few hours it finds new roles on Greenhouse, Lever and Ashby boards and scores each one against your profile (0–5).',
+      'Roles at or above your auto-queue score are queued. Borderline ones go to Needs you › Triage.',
+      'It applies to the best queued role, spaced out to respect your hourly limit, stops at the daily limit and resumes the next day on its own.',
+      'Dry run fills the form and saves a screenshot without submitting. Live submits for real.',
+      'LinkedIn, Indeed, Naukri and Workday forbid bots, so those stay assist-only: ApplyPilot prepares everything and you press submit.'] },
+    { id: 'needs', icon: 'inbox', title: 'Answering questions', to: ['Open Needs you', 'inbox'], steps: [
+      'When a form asks something your Answer bank doesn’t know, that application waits in Needs you.',
+      'Answer once and keep “Remember” on — it’s reused automatically from then on.',
+      'AI drafts are answers Gemini wrote from your verified facts. Approve or edit them.',
+      'Sensitive questions (visa, salary, legal, identity) always come to you.'] },
+    { id: 'email', icon: 'mail', title: 'Email proof and your Gmail app password', to: ['Open Email proof', 'settings/email'], steps: [
+      'Turn on 2-Step Verification for your Google account (app passwords need it).',
+      'Visit myaccount.google.com/apppasswords, create one called “ApplyPilot” and copy the 16 characters.',
+      'Paste it with your Gmail address in Settings › Email proof and press Connect.',
+      'ApplyPilot checks your inbox read-only every 20 minutes and links confirmations, interview invites and decisions to the right application.',
+      'Disconnect any time here, and revoke the app password from your Google account.'] },
+    { id: 'apply', icon: 'description', title: 'Cover letters, interview prep and follow-ups', to: ['Open Applications', 'pipeline'], steps: [
+      'Open any role in Applications to see why it fits, its timeline and actions.',
+      '“Cover letter” writes a short letter from your verified facts — copy and edit as you like.',
+      '“Interview prep” gives likely technical and behavioural questions with answer outlines.',
+      'Set a follow-up date and a recruiter contact; due follow-ups show up on Home.',
+      'Export everything to a spreadsheet from Settings › Data & privacy.'] },
+    { id: 'look', icon: 'palette', title: 'Themes, text size and shortcuts', to: ['Open Appearance', 'settings/profile'], steps: [
+      'Settings › Profile › Appearance: choose a theme, text size and font. The section folds away when you don’t need it.',
+      'Press Ctrl+K (or /) to search jobs and run any command.',
+      'Press 1–6 to jump between sections and Esc to close panels.'] },
+    { id: 'phone', icon: 'smartphone', title: 'Using the phone app', steps: [
+      'Install the APK and keep Tailscale on, on both your PC and phone.',
+      'Enter your PC’s Tailscale address and token once — the app remembers them.',
+      'Everything here works on the phone, and the bars follow your theme.'] },
+    { id: 'safety', icon: 'shield', title: 'Safety rails', steps: [
+      'Live submissions stay off until you turn them on.',
+      'Daily and hourly limits, a 30-day cooldown per company and an automatic stop after repeated site failures.',
+      'Answers are grounded only in your verified facts; nothing is made up.'] },
+  ];
+  function helpPanel() {
+    const openId = S.helpOpen;
+    return `<section class="card block"><div class="card-b row-between wrap">
+        <div><div class="card-t">New here?</div><div class="muted small">A one-minute tour of how ApplyPilot works.</div></div>
+        <button class="btn primary hv" data-act="tour">${icon('play_circle')}Replay the welcome tour</button></div></section>
+      <div class="stack">${TUTORIALS.map(t => `<details class="card collapse" data-tut-id="${t.id}" ${openId === t.id ? 'open' : ''}>
+        <summary class="card-h"><span class="row-ic">${icon(t.icon)}</span><span class="card-t">${t.title}</span>${icon('expand_more', 'chev ml-auto')}</summary>
+        <div class="card-b"><ol class="steps">${t.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol>
+          ${t.to ? `<div class="row-end mt-3"><button class="btn sm hv" data-nav="${t.to[1]}">${t.to[0]} ${icon('chevron_right')}</button></div>` : ''}</div></details>`).join('')}</div>`;
+  }
+
+  // ───────────────────────── View: Settings ─────────────────────────
+  const SETTINGS_SECTIONS = [
+    ['profile', 'person', 'Profile'], ['resume', 'description', 'Resume'], ['preferences', 'tune', 'Job preferences'],
+    ['autopilot', 'smart_toy', 'Autopilot'], ['email', 'mail', 'Email proof'], ['ai', 'auto_awesome', 'AI answers'],
+    ['answers', 'forum', 'Answer bank'], ['help', 'help', 'Help & tutorials'], ['data', 'shield_lock', 'Data & privacy'],
+  ];
   renderers.settings = () => {
-    const p = S.profile; if (!p) return emptyCard('person_off', 'Profile not available');
-    const g = S.gemini || {}, st = S.stats || {}, au = S.automation || {};
+    const p = S.profile; if (!p) return `${pageHead()}${emptyCard('person_off', 'Profile not available')}`;
+    const sec = SETTINGS_SECTIONS.some(s => s[0] === S.set.section) ? S.set.section : 'profile';
+    const nav = `<nav class="set-nav" aria-label="Settings sections">${SETTINGS_SECTIONS.map(([id, ic, label]) =>
+      `<button class="set-link hv ${sec === id ? 'on' : ''}" data-section="${id}" ${sec === id ? 'aria-current="page"' : ''}>${icon(ic)}<span>${label}</span></button>`).join('')}</nav>`;
+    return `${pageHead()}<div class="settings-shell">${nav}<div class="set-panel" id="set-panel">${settingsPanel(sec)}</div></div>`;
+  };
+  function settingsPanel(sec) {
+    const p = S.profile, g = S.gemini || {}, st = S.stats || {}, au = S.automation || {};
     const f = (name, label, opts = {}) => {
       const v = p[name] ?? '';
       const type = opts.type || 'text';
@@ -784,72 +1079,189 @@
     };
     const tg = (name, label, hint) => `<label class="set-row hv"><div class="grow">${label}${hint ? `<small>${hint}</small>` : ''}</div><span class="toggle"><input type="checkbox" name="${name}" ${p[name] ? 'checked' : ''}><i></i></span></label>`;
     const save = (label) => `<div class="full row-end"><button class="btn primary hv" type="submit">${label}</button></div>`;
-    return `${pageHead()}
-    <div class="settings">
-      <div class="stack">
-        <div class="card"><div class="profile-hero">${art(p.full_name, 'lg')}<div class="min0"><h2>${esc(p.full_name)}</h2><div class="muted small">${esc(p.education)} · CGPA ${esc(p.cgpa)}</div></div></div></div>
+    const card = (title, aside, body) => `<section class="card"><div class="card-h"><span class="card-t">${title}</span><span class="aside">${aside || ''}</span></div>${body}</section>`;
 
-        <div class="card"><div class="card-h"><span class="card-t">Appearance</span><span class="aside">Saved on this device</span></div>
-          <div class="card-b">${themeSwatches()}</div></div>
+    if (sec === 'profile') return `<div class="stack">
+      <div class="card"><div class="profile-hero">${art(p.full_name, 'lg')}<div class="min0"><h2>${esc(p.full_name)}</h2><div class="muted small">${esc(p.education)}${p.cgpa ? ` · CGPA ${esc(p.cgpa)}` : ''}</div></div></div></div>
+      ${appearancePanel()}
+      <form class="card" data-profile-form="contact"><div class="card-h"><span class="card-t">Contact & credentials</span><span class="aside">Used exactly as written on forms</span></div>
+        <div class="card-b form-grid">
+          ${f('full_name', 'Full name')}${f('email', 'Email', { type: 'email' })}
+          ${f('phone', 'Phone')}${f('cgpa', 'CGPA')}
+          ${f('education', 'Education', { full: true })}
+          ${f('linkedin', 'LinkedIn', { full: true })}${f('github', 'GitHub', { full: true })}
+          ${f('graduation_date', 'Graduation date')}${f('notice_period', 'Notice period')}
+          ${f('work_authorization', 'Work authorization')}${f('relocation_preference', 'Relocation')}
+          ${save('Save profile')}
+        </div></form></div>`;
 
-        <form class="card" data-profile-form="engine"><div class="card-h"><span class="card-t">Engine</span><span class="aside">${st.go_live ? '<span class="chip accent">Live submissions</span>' : '<span class="chip">Dry run</span>'}</span></div>
-          <div class="set-list">
-            <div class="set-row"><div class="grow">Live submissions<small>${st.go_live ? 'Applications are really submitted to employers.' : 'Forms are filled and screenshotted but never submitted.'}</small></div><button type="button" class="btn sm hv ${st.go_live ? 'danger' : ''}" data-act="${st.go_live ? 'mode-dry' : 'mode-live'}">${st.go_live ? 'Switch to dry run' : 'Go live…'}</button></div>
-            <div class="set-row"><div class="grow">Queue<small>${esc(engineLabel(st)[0])}${au.affected_queue_count ? ` · ${au.affected_queue_count} jobs waiting` : ''}</small></div><button type="button" class="btn sm hv" data-act="${st.is_paused ? 'resume' : 'pause'}">${st.is_paused ? 'Resume' : 'Pause'}</button></div>
-          </div>
+    if (sec === 'resume') {
+      const r = S.resume || {};
+      return `<div class="stack">
+        <section class="card"><div class="card-h"><span class="card-t">Your resume</span><span class="aside">One file · each upload replaces the last</span></div>
+          <div class="card-b stack">
+            ${r.uploaded ? `<div class="file-row"><span class="art plain lg">${icon('description')}</span><div class="grow"><div class="strong ellipsis">${esc(r.filename)}</div>
+              <div class="muted small tnum">${fmt(Math.round((r.size_bytes || 0) / 1024))} KB · ${fmt(r.chars || 0)} characters read · uploaded ${esc(rel(r.uploaded_at))}</div></div>
+              ${r.path ? `<a class="btn sm hv" href="${esc(r.path)}" target="_blank" rel="noopener">${icon('open_in_new')}View</a>` : ''}</div>` : ''}
+            <label class="dropzone hv" data-dropzone>
+              <input type="file" id="resume-file" accept=".pdf,.docx,.txt,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+              ${icon('upload_file')}<span class="strong">${r.uploaded ? 'Upload a new version' : 'Upload your resume'}</span>
+              <span class="muted small">PDF, Word or text · up to 10 MB${r.uploaded ? ' · replaces the current file' : ''}</span></label>
+            ${r.preview ? `<details class="collapse plain"><summary class="small muted">What ApplyPilot read ${icon('expand_more', 'chev')}</summary><p class="preview-text small">${esc(r.preview)}…</p></details>` : ''}
+          </div></section>
+        ${card('Tailored versions', `${S.resumes.length}`, `<div class="list">${S.resumes.map(v => `<div class="row"><span class="art plain">${icon('description')}</span>
+          <div class="grow"><div class="main-t">${esc(v.version_name)}</div><div class="sub-t">${esc(v.target_role)} · ATS ${Math.round(v.ats_score)}</div></div>
+          <div class="end">${v.is_master ? '<span class="chip">Master</span>' : ''}</div></div>`).join('') || '<div class="empty tight">No tailored versions yet</div>'}</div>`)}</div>`;
+    }
+
+    if (sec === 'preferences') return `<form class="card" data-profile-form="targeting"><div class="card-h"><span class="card-t">Job preferences</span><span class="aside">What autopilot looks for</span></div>
+        <div class="card-b form-grid">
+          ${f('target_roles', 'Target roles', { full: true, hint: 'Comma separated' })}
+          ${f('locations', 'Locations', { full: true, hint: 'Comma separated' })}
+          ${f('excluded_companies', 'Never apply to', { full: true, hint: 'Comma separated' })}
+          ${f('min_salary_inr', 'Minimum salary (₹ / year)', { type: 'number', min: 0 })}${f('min_stipend_inr', 'Minimum stipend (₹ / month)', { type: 'number', min: 0 })}
+          ${f('preferred_work_mode', 'Work mode', { full: true })}
+        </div>
+        <div class="set-list card-sep">${tg('allow_unknown_salary', 'Apply when pay is not listed')}${tg('allow_unpaid_internships', 'Allow unpaid internships')}</div>
+        <div class="card-b row-end">${save('Save preferences')}</div></form>`;
+
+    if (sec === 'autopilot') {
+      const ap = S.autopilot || {}, cfg = ap.config || {}, sta = ap.state || {}, es = engineStatus();
+      const opt = (vals, cur, unit) => vals.map(v => `<option value="${v}" ${Number(cur) === v ? 'selected' : ''}>${v} ${unit}</option>`).join('');
+      return `<div class="stack">
+        <form class="card" data-ap-form><div class="card-h"><span class="card-t">Autopilot</span><span class="aside"><span class="dot ${es.dot}"></span>${esc(es.label)}</span></div>
+          <div class="set-list"><label class="set-row hv"><span class="grow">Apply automatically<small>Find, score and apply in the background, within your limits.</small></span>
+            <span class="toggle"><input type="checkbox" name="enabled" ${cfg.enabled !== false ? 'checked' : ''}><i></i></span></label></div>
           <div class="card-b form-grid card-sep">
-            ${f('daily_cap', 'Daily cap', { type: 'number', min: 0 })}${f('daily_target', 'Daily target', { type: 'number', min: 0 })}
-            ${f('hourly_cap', 'Hourly cap', { type: 'number', min: 0 })}${f('timezone', 'Timezone')}
-            ${f('active_hours_start', 'Active from (hour)', { type: 'number', min: 0, max: 23 })}${f('active_hours_end', 'Active until (hour)', { type: 'number', min: 0, max: 24 })}
-            ${f('min_fit_score', 'Auto-queue at score ≥', { type: 'number', step: '0.1', min: 0, max: 5, hint: 'Jobs at or above this are queued automatically' })}${f('maybe_fit_score', 'Triage at score ≥', { type: 'number', step: '0.1', min: 0, max: 5, hint: 'Between the two lands in Needs you › Triage' })}
-            ${save('Save engine rules')}
+            <div class="field"><label for="ap-disc">Look for new roles every</label><select class="select" id="ap-disc" name="discovery_hours">${opt([2, 4, 6, 12, 24], cfg.discovery_hours, 'hours')}</select></div>
+            <div class="field"><label for="ap-proof">Check email every</label><select class="select" id="ap-proof" name="proof_sync_minutes">${opt([10, 20, 30, 60], cfg.proof_sync_minutes, 'minutes')}</select></div>
+            <div class="full facts-list small">
+              <div><span class="faint">Last search</span><span>${sta.last_discovery_at ? `${esc(rel(sta.last_discovery_at))} · ${fmt(sta.last_discovered || 0)} new` : 'Not yet'}</span></div>
+              <div><span class="faint">Last application</span><span class="ellipsis">${sta.last_apply_at ? `${esc(rel(sta.last_apply_at))} · ${esc(sta.last_apply_job || '')}` : 'Not yet'}</span></div>
+              <div><span class="faint">Pace</span><span>One application every ${fmt(ap.apply_gap_minutes || 6)} min while active</span></div>
+            </div>
+            <div class="full row-between"><button type="button" class="btn hv" data-act="ap-run">${icon('bolt')}Run a cycle now</button><button class="btn primary hv" type="submit">Save</button></div>
           </div></form>
-
-        <form class="card" data-gemini-form><div class="card-h"><span class="card-t">Gemini auto-answer</span><span class="aside tnum">${fmt(g.gemini_answers_today || 0)} today · ~${fmt(g.saved_minutes || 0)} min saved</span></div>
-          <div class="set-list"><label class="set-row hv"><div class="grow">Draft answers for unknown questions<small>Grounded only in your locked facts. Drafts wait in Needs you › AI drafts.</small></div><span class="toggle"><input type="checkbox" name="gemini_auto_answer_enabled" ${g.gemini_auto_answer_enabled ? 'checked' : ''}><i></i></span></label></div>
-          <div class="card-b form-grid card-sep">
-            <div class="field"><label for="g-conf">Minimum confidence</label><div class="range-row"><input type="range" id="g-conf" name="gemini_min_confidence" min="0.5" max="1" step="0.01" value="${g.gemini_min_confidence ?? 0.85}"><output>${Math.round((g.gemini_min_confidence ?? 0.85) * 100)}%</output></div></div>
-            <div class="field"><label for="g-cap">Daily answer cap</label><input class="input tnum" id="g-cap" type="number" name="gemini_daily_cap" min="0" value="${g.gemini_daily_cap ?? 30}"></div>
-            <div class="field full"><label>Always asks you about</label><div class="tags">${(g.gemini_sensitive_categories || []).map(c => `<span class="chip">${esc(c.replace(/_/g, ' '))}</span>`).join('')}</div></div>
-            <div class="full row-between"><span class="faint small">${esc(g.model_name || '')}${g.circuit_breaker_active ? ' · <span class="bad">rate-limit breaker active</span>' : ''}</span><button class="btn primary hv" type="submit">Save</button></div>
-          </div></form>
-      </div>
-
-      <div class="stack">
-        <form class="card" data-profile-form="targeting"><div class="card-h"><span class="card-t">Targeting</span></div>
+        <section class="card"><div class="set-list">
+          <div class="set-row"><div class="grow">Live submissions<small>${st.go_live ? 'Applications are really submitted to employers.' : 'Dry run: forms are filled and screenshotted, never submitted.'}</small></div>
+            <button type="button" class="btn sm hv ${st.go_live ? 'danger' : 'primary'}" data-act="${st.go_live ? 'mode-dry' : 'mode-live'}">${st.go_live ? 'Switch to dry run' : 'Go live…'}</button></div>
+          <div class="set-row"><div class="grow">Queue<small>${esc(engineLabel(st)[0])}${au.affected_queue_count ? ` · ${au.affected_queue_count} waiting` : ''}</small></div>
+            <button type="button" class="btn sm hv" data-act="${st.is_paused ? 'resume' : 'pause'}">${st.is_paused ? 'Resume' : 'Pause'}</button></div>
+        </div></section>
+        <form class="card" data-profile-form="engine"><div class="card-h"><span class="card-t">Limits & schedule</span></div>
           <div class="card-b form-grid">
-            ${f('target_roles', 'Target roles', { full: true, hint: 'Comma separated' })}
-            ${f('locations', 'Locations', { full: true, hint: 'Comma separated' })}
-            ${f('excluded_companies', 'Never apply to', { full: true, hint: 'Comma separated' })}
-            ${f('min_salary_inr', 'Minimum salary (₹ / year)', { type: 'number', min: 0 })}${f('min_stipend_inr', 'Minimum stipend (₹ / month)', { type: 'number', min: 0 })}
-            ${f('preferred_work_mode', 'Work mode', { full: true })}
-          </div>
-          <div class="set-list card-sep">${tg('allow_unknown_salary', 'Apply when pay is not listed')}${tg('allow_unpaid_internships', 'Allow unpaid internships')}</div>
-          <div class="card-b row-end">${save('Save targeting')}</div></form>
+            ${f('daily_cap', 'Daily limit', { type: 'number', min: 0 })}${f('hourly_cap', 'Hourly limit', { type: 'number', min: 1 })}
+            ${f('daily_target', 'Daily goal', { type: 'number', min: 0 })}${f('timezone', 'Timezone')}
+            ${f('active_hours_start', 'Active from (hour, 0–23)', { type: 'number', min: 0, max: 23 })}${f('active_hours_end', 'Active until (hour, 0–24)', { type: 'number', min: 0, max: 24 })}
+            ${f('min_fit_score', 'Auto-apply at score ≥', { type: 'number', step: '0.1', min: 0, max: 5, hint: 'Roles at or above this are applied to automatically' })}${f('maybe_fit_score', 'Ask me at score ≥', { type: 'number', step: '0.1', min: 0, max: 5, hint: 'Between the two goes to Needs you › Triage' })}
+            ${save('Save limits')}
+          </div></form></div>`;
+    }
 
-        <form class="card" data-profile-form="contact"><div class="card-h"><span class="card-t">Contact & credentials</span><span class="aside">Used verbatim on forms</span></div>
-          <div class="card-b form-grid">
-            ${f('full_name', 'Full name')}${f('email', 'Email', { type: 'email' })}
-            ${f('phone', 'Phone')}${f('cgpa', 'CGPA')}
-            ${f('education', 'Education', { full: true })}
-            ${f('linkedin', 'LinkedIn', { full: true })}${f('github', 'GitHub', { full: true })}
-            ${f('graduation_date', 'Graduation date')}${f('notice_period', 'Notice period')}
-            ${f('work_authorization', 'Work authorization')}${f('relocation_preference', 'Relocation')}
-            ${save('Save contact')}
-          </div></form>
+    if (sec === 'email') {
+      const ps = S.proofStatus || {}, c = ps.counts || {};
+      return `<div class="stack">${ps.connected
+        ? card('Email proof', '<span class="dot teal"></span>Connected', `<div class="set-list">
+            <div class="set-row"><span class="grow">${esc(ps.address)}<small>${ps.source === 'env' ? 'From the server’s .env file' : 'Read-only · app password stored encrypted on your PC'}</small></span></div>
+            <div class="set-row"><span class="grow">Last checked<small>${ps.last_sync ? esc(rel(ps.last_sync)) : 'Not yet'}${ps.last_error ? ` · <span class="bad">${esc(ps.last_error)}</span>` : ''}</small></span><button class="btn sm hv" data-act="proof-sync">${icon('refresh')}Check now</button></div>
+            <div class="set-row"><span class="grow">Found so far<small class="tnum">${fmt(c.confirmation || 0)} confirmations · ${fmt(c.interview || 0)} interviews · ${fmt(c.rejection || 0)} decisions</small></span><button class="btn sm ghost hv" data-nav="proof">View ${icon('chevron_right')}</button></div>
+            ${ps.source === 'app' ? `<div class="set-row"><span class="grow">Disconnect<small>Stops reading your inbox and deletes the stored app password</small></span><button class="btn sm danger hv" data-act="proof-disconnect">Disconnect</button></div>` : ''}
+          </div>`)
+        : card('Connect your inbox', 'Read-only', `<div class="card-b">${emailConnectForm()}</div>`)}
+        <details class="card collapse" ${ps.connected ? '' : 'open'}><summary class="card-h"><span class="card-t">How to create a Gmail app password</span>${icon('expand_more', 'chev ml-auto')}</summary>
+          <div class="card-b"><ol class="steps">${TUTORIALS.find(t => t.id === 'email').steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol></div></details></div>`;
+    }
 
-        <div class="card"><div class="card-h"><span class="card-t">Resume versions</span><span class="aside">${S.resumes.length}</span></div>
-          <div class="list">${S.resumes.map(r => `<div class="row"><span class="art plain">${icon('description')}</span>
-            <div class="grow"><div class="main-t">${esc(r.version_name)}</div><div class="sub-t">${esc(r.target_role)} · ATS ${Math.round(r.ats_score)}</div></div>
-            <div class="end">${r.is_master ? '<span class="chip teal">Master</span>' : ''}${r.pdf_path ? `<a class="btn sm icon ghost hv" href="${esc(r.pdf_path)}" target="_blank" rel="noopener" title="Open PDF">${icon('open_in_new')}</a>` : ''}</div></div>`).join('') || '<div class="empty">No resume versions</div>'}</div></div>
-        ${IN_SHELL ? `<div class="card"><div class="set-list"><div class="set-row"><div class="grow">Phone app connection<small>${esc(location.host)}</small></div><button type="button" class="btn sm hv" data-act="shell-server">Change server</button></div></div></div>` : ''}
-      </div>
+    if (sec === 'ai') return `<form class="card" data-gemini-form><div class="card-h"><span class="card-t">AI answers</span><span class="aside tnum">${fmt(g.gemini_answers_today || 0)} today · ~${fmt(g.saved_minutes || 0)} min saved</span></div>
+        <div class="set-list"><label class="set-row hv"><div class="grow">Draft answers for new questions<small>Grounded only in your verified facts. Drafts wait in Needs you › AI drafts.</small></div><span class="toggle"><input type="checkbox" name="gemini_auto_answer_enabled" ${g.gemini_auto_answer_enabled ? 'checked' : ''}><i></i></span></label></div>
+        <div class="card-b form-grid card-sep">
+          <div class="field"><label for="g-conf">Minimum confidence</label><div class="range-row"><input type="range" id="g-conf" name="gemini_min_confidence" min="0.5" max="1" step="0.01" value="${g.gemini_min_confidence ?? 0.85}"><output>${Math.round((g.gemini_min_confidence ?? 0.85) * 100)}%</output></div></div>
+          <div class="field"><label for="g-cap">Daily answer limit</label><input class="input tnum" id="g-cap" type="number" name="gemini_daily_cap" min="0" value="${g.gemini_daily_cap ?? 30}"></div>
+          <div class="field full"><label>Always asks you about</label><div class="tags">${(g.gemini_sensitive_categories || []).map(c => `<span class="chip">${esc(c.replace(/_/g, ' '))}</span>`).join('')}</div></div>
+          <div class="full row-between"><span class="faint small">${esc(g.model_name || '')}${g.circuit_breaker_active ? ' · <span class="bad">rate-limit pause active</span>' : ''}</span><button class="btn primary hv" type="submit">Save</button></div>
+        </div></form>`;
+
+    if (sec === 'answers') return answersBody();
+    if (sec === 'help') return helpPanel();
+
+    // data & privacy
+    return `<div class="stack">
+      ${card('Your data', '', `<div class="set-list">
+        <div class="set-row"><span class="grow">Export applications<small>Every tracked role, its status, score and notes as a spreadsheet (CSV)</small></span><button class="btn sm hv" data-act="export-csv">${icon('download')}Export</button></div>
+        <div class="set-row"><span class="grow">Back up now<small>Saves the database and Answer bank to the backups folder on your PC</small></span><button class="btn sm hv" data-act="backup">${icon('backup')}Back up</button></div>
+      </div>`)}
+      ${card('Privacy', '', `<div class="card-b small muted stack">
+        <p>Everything is stored on your own PC. Data leaves it only to: the job sites you apply to, Google Gemini (questions and job text, to draft answers), and Gmail (read-only) if you connect it.</p>
+        <p>Your email app password is encrypted on disk. Your access token is kept in a secure, script-proof cookie and never shown in the address bar.</p></div>`)}
+      ${IN_SHELL ? card('Phone app', '', `<div class="set-list"><div class="set-row"><div class="grow">Connected to<small>${esc(location.host)}</small></div><button type="button" class="btn sm hv" data-act="shell-server">Change server</button></div></div>`) : ''}
     </div>`;
-  };
+  }
   afterRender.settings = () => {
     const r = $('#g-conf');
     r && r.addEventListener('input', () => { r.nextElementSibling.value = Math.round(r.value * 100) + '%'; });
+    if (S.set.section === 'answers') afterRender.answers();
+    const input = $('#resume-file'), zone = $('[data-dropzone]');
+    if (input) input.addEventListener('change', () => input.files[0] && uploadResume(input.files[0]));
+    if (zone) {
+      zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('drag'); });
+      zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+      zone.addEventListener('drop', (e) => { e.preventDefault(); zone.classList.remove('drag'); const file = e.dataTransfer.files[0]; if (file) uploadResume(file); });
+    }
+    $$('details[data-collapse]').forEach(d => d.addEventListener('toggle', () => { try { localStorage.setItem(`ap_${d.dataset.collapse}_open`, d.open ? '1' : '0'); } catch (e) {} }));
   };
+
+  async function uploadResume(file) {
+    const zone = $('[data-dropzone]');
+    if (zone) zone.classList.add('busy-zone');
+    const fd = new FormData(); fd.append('file', file);
+    const headers = TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {};
+    try {
+      const r = await fetch('/api/v1/profile/resume', { method: 'POST', headers, body: fd });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.detail || `Upload failed (${r.status})`);
+      S.resume = data; toast(`Resume uploaded · ${file.name}`); S.lastHtml = ''; render();
+    } catch (e) { toast(e.message, true); if (zone) zone.classList.remove('busy-zone'); }
+  }
+
+  // ───────────────────────── Welcome tour ─────────────────────────
+  const TOUR_KEY = 'ap_tour_done';
+  const TOUR = [
+    { icon: 'waving_hand', title: 'Welcome to ApplyPilot', text: 'It finds roles that fit you, applies on your behalf and keeps proof of every application — while you get on with your day.' },
+    { icon: 'smart_toy', title: 'Autopilot does the work', text: 'Every few hours it searches job boards, scores each role against your profile and applies to the best ones, within the daily and hourly limits you set.' },
+    { icon: 'inbox', title: 'Only what needs you', text: 'If a form asks something new, it waits in Needs you. Answer once and it’s remembered. Home shows only what needs your attention.' },
+    { icon: 'mark_email_read', title: 'Proof in your inbox', text: 'Connect Gmail (read-only) and each employer confirmation — “Thanks for applying” — is linked to its application in Proof.' },
+    { icon: 'shield', title: 'You stay in control', text: 'It starts in dry run: forms are filled but not sent. Turn on Live submissions in Settings › Autopilot when you’re ready.' },
+    { icon: 'palette', title: 'Make it yours', text: 'Pick a theme, text size and font in Settings › Profile › Appearance. Replay this tour any time from Help & tutorials.' },
+  ];
+  function openTour(step = 0) {
+    const s = TOUR[step], last = step === TOUR.length - 1;
+    $('#overlay').innerHTML = `<div class="modal-wrap" data-tour-wrap><div class="modal tour" role="dialog" aria-modal="true" aria-labelledby="tour-t">
+      <div class="tour-ic">${icon(s.icon, 'fill')}</div>
+      <h3 id="tour-t">${esc(s.title)}</h3><p>${esc(s.text)}</p>
+      <div class="tour-dots" aria-label="Step ${step + 1} of ${TOUR.length}">${TOUR.map((_, i) => `<i class="${i === step ? 'on' : ''}"></i>`).join('')}</div>
+      <div class="acts"><button class="btn ghost hv" data-tour="skip">${last ? '' : 'Skip'}</button><span class="grow"></span>
+        ${step ? `<button class="btn hv" data-tour="back">Back</button>` : ''}
+        <button class="btn primary hv" data-tour="${last ? 'done' : 'next'}" data-step="${step}">${last ? 'Get started' : 'Next'}</button></div></div></div>`;
+    $('#overlay [data-tour="' + (last ? 'done' : 'next') + '"]').focus();
+  }
+  function closeTour(goStart) {
+    try { localStorage.setItem(TOUR_KEY, '1'); } catch (e) {}
+    $('#overlay').innerHTML = '';
+    if (goStart) go('home');
+  }
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-tour]'); if (!b) return;
+    const cur = Number(($('#overlay [data-step]') || {}).dataset?.step || 0);
+    const a = b.dataset.tour;
+    if (a === 'next') openTour(cur + 1); else if (a === 'back') openTour(Math.max(0, cur - 1)); else closeTour(a === 'done');
+  });
+  document.addEventListener('keydown', (e) => {
+    if (!$('#overlay .tour')) return;
+    const cur = Number(($('#overlay [data-step]') || {}).dataset?.step || 0);
+    if (e.key === 'Escape') { e.stopImmediatePropagation(); closeTour(false); }
+    else if (e.key === 'ArrowRight' && cur < TOUR.length - 1) openTour(cur + 1);
+    else if (e.key === 'ArrowLeft' && cur > 0) openTour(cur - 1);
+  }, true);
 
   const PROFILE_SECTIONS = {
     engine: ['daily_cap', 'daily_target', 'hourly_cap', 'timezone', 'active_hours_start', 'active_hours_end', 'min_fit_score', 'maybe_fit_score'],
@@ -861,7 +1273,7 @@
   async function refreshAfterJobChange() {
     loadStats();
     if (S.view === 'pipeline') { S.jobs = await api('/jobs'); $('#pipe-body') ? ($('#pipe-body').innerHTML = S.pipe.mode === 'table' ? pipeTable() : pipeBoard()) : render(); }
-    else if (S.view === 'inbox' || S.view === 'today') { await loaders[S.view](); render(); }
+    else if (['inbox', 'home', 'proof'].includes(S.view)) { await loaders[S.view](); render(); }
   }
 
   async function setMode(live) {
@@ -871,7 +1283,7 @@
       if (!ok) return;
     }
     await run(null, () => api('/profile/toggle-go-live', { method: 'POST' }), r => r.go_live ? 'Live submissions on' : 'Back to dry run');
-    await loadStats(); if (S.view === 'settings' || S.view === 'today') go(S.view, { silent: true });
+    await loadStats(); if (['settings', 'home'].includes(S.view)) go(S.view, { silent: true });
   }
 
   const actions = {
@@ -881,7 +1293,7 @@
     'mode-live': () => setMode(true),
     async pause(btn) {
       await run(btn, () => api('/automation/pause', { method: 'POST', query: { reason: 'paused_by_user', details: 'Paused from command center' } }), 'Engine paused');
-      await loadStats(); if (['today', 'settings'].includes(S.view)) go(S.view, { silent: true });
+      await loadStats(); if (['home', 'settings'].includes(S.view)) go(S.view, { silent: true });
     },
     async resume(btn) {
       let r = await run(btn, () => api('/automation/resume', { method: 'POST' }));
@@ -892,7 +1304,7 @@
         if (r === undefined) return;
       }
       toast('Engine running');
-      await loadStats(); if (['today', 'settings'].includes(S.view)) go(S.view, { silent: true });
+      await loadStats(); if (['home', 'settings'].includes(S.view)) go(S.view, { silent: true });
     },
     async discover(btn) {
       await run(btn, () => api('/jobs/discover', { method: 'POST' }), r => `Discovery finished · ${fmt(r.new_jobs_discovered)} new roles`);
@@ -942,8 +1354,9 @@
       openJob(btn.dataset.id);
     },
     async 'save-status'(btn) {
-      const status = $('#insp-status').value, notes = $('#insp-notes').value;
-      await run(btn, () => api(`/jobs/${btn.dataset.id}/status`, { method: 'PUT', body: { status, notes } }), 'Saved');
+      const status = $('#insp-status').value, notes = $('#insp-notes').value, recruiter_info = $('#insp-contact').value.trim();
+      const follow = $('#insp-follow').value, follow_up_date = follow ? `${follow}T09:00:00` : null;
+      await run(btn, () => api(`/jobs/${btn.dataset.id}/status`, { method: 'PUT', body: { status, notes, recruiter_info, follow_up_date } }), 'Saved');
       openJob(btn.dataset.id); refreshAfterJobChange();
     },
     async tailor(btn) {
@@ -1017,6 +1430,46 @@
       S.answers = S.answers.filter(x => x.id !== id); render();
     },
     async backup(btn) { await run(btn, () => api('/backup', { method: 'POST' }), 'Backup created'); },
+    'hide-checklist'() { try { localStorage.setItem(CHECK_KEY, '1'); } catch (e) {} S.lastHtml = ''; render(); },
+    tour() { openTour(0); },
+    async 'ap-run'(btn) {
+      await run(btn, () => api('/autopilot/run-now', { method: 'POST' }), 'Autopilot cycle started — results appear in a minute');
+      setTimeout(() => { if (['home', 'settings'].includes(S.view)) go(S.view, { silent: true }); }, 8000);
+    },
+    async 'proof-sync'(btn) {
+      const r = await run(btn, () => api('/proofs/sync', { method: 'POST' }), (r) => r.status === 'error' ? `Inbox check failed: ${r.error}` : `Inbox checked · ${fmt(r.new || 0)} new`);
+      if (r) go(S.view, { silent: true });
+    },
+    async 'proof-disconnect'(btn) {
+      const ok = await confirmModal({ title: 'Disconnect your inbox?', body: 'ApplyPilot stops checking for employer emails and deletes the stored app password. Proof already found is kept.', ok: 'Disconnect', danger: true });
+      if (!ok) return;
+      const r = await run(btn, () => api('/proofs/connection', { method: 'DELETE' }), 'Inbox disconnected');
+      if (r) { S.proofStatus = r; S.lastHtml = ''; render(); }
+    },
+    'export-csv'() {
+      // Server builds the CSV. In the phone app the shell hands this URL to the phone's browser.
+      if (IN_SHELL) { location.href = '/api/v1/jobs/export.csv'; return; }
+      const a = document.createElement('a');
+      a.href = '/api/v1/jobs/export.csv'; a.download = '';
+      document.body.appendChild(a); a.click(); a.remove();
+      toast('Exporting applications…');
+    },
+    async 'cover-letter'(btn) {
+      const r = await run(btn, () => api('/ai/cover-letter', { method: 'POST', body: { job_id: Number(btn.dataset.id) } }));
+      if (r) textSheet('Cover letter', r.cover_letter, r.source === 'gemini' ? 'Written by Gemini from your verified facts. Review before sending.' : (r.note || 'Template built from your verified facts (AI unavailable).'));
+    },
+    async 'interview-prep'(btn) {
+      const j = S.job || {};
+      const r = await run(btn, () => api('/ai/interview-prep', { method: 'POST', body: { job_id: Number(btn.dataset.id), title: j.title, company: j.company, location: j.location } }));
+      if (!r) return;
+      const qs = (r.technical_questions || []).map(q => `• ${q.question}\n  ${q.hint ? 'Tests: ' + q.hint + '\n  ' : ''}${q.model_answer || ''}`).join('\n\n');
+      const bs = (r.behavioral_questions || []).map(q => `• ${q.question}\n  Situation: ${q.star_situation || ''}\n  Action: ${q.star_action || ''}\n  Result: ${q.star_result || ''}`).join('\n\n');
+      textSheet(`Interview prep · ${j.company || ''}`, [r.company_overview, qs && `Technical\n\n${qs}`, bs && `Behavioural\n\n${bs}`, r.candidate_edge && `Your edge: ${r.candidate_edge}`].filter(Boolean).join('\n\n'), 'Generated from your verified facts and the role.');
+    },
+    async 'copy-text'() {
+      const t = $('#sheet-text'); if (!t) return;
+      try { await navigator.clipboard.writeText(t.value); toast('Copied'); } catch (e) { t.select(); document.execCommand('copy'); toast('Copied'); }
+    },
     'shell-server'() { if (IN_SHELL) window.ApplyPilotShell.postMessage('change-server'); },
   };
 
@@ -1025,9 +1478,13 @@
     const t = e.target;
     const nav = t.closest('[data-nav]');
     if (nav) {
+      e.preventDefault();
+      const [base, sub] = nav.dataset.nav.split('/');
       if (nav.dataset.stage) { S.pipe.stage = nav.dataset.stage; S.pipe.limit = 100; }
       if (nav.dataset.tab) S.inbox.tab = nav.dataset.tab;
-      closeJob(); go(nav.dataset.nav); return;
+      if (base === 'inbox' && sub) S.inbox.tab = sub;
+      if (nav.dataset.tut) S.helpOpen = nav.dataset.tut;
+      closeJob(); go(nav.dataset.nav, { silent: S.view === base }); return;
     }
     const act = t.closest('[data-act]');
     if (act && !act.disabled) { e.preventDefault(); actions[act.dataset.act] && actions[act.dataset.act](act); return; }
@@ -1049,6 +1506,18 @@
     if (cat) { S.ans.cat = cat.dataset.cat; render(); return; }
     const lv = t.closest('[data-level]');
     if (lv) { S.act.level = lv.dataset.level; render(); return; }
+    const sec = t.closest('[data-section]');
+    if (sec) { S.set.section = sec.dataset.section; history.replaceState(null, '', `#/settings/${S.set.section}`); S.anim = false; render(); $('#content').scrollTop = 0; return; }
+    const ins = t.closest('[data-ins-tab]');
+    if (ins) { S.ins.tab = ins.dataset.insTab; go(`insights/${S.ins.tab}`, { silent: true }); return; }
+    const pk = t.closest('[data-proof-kind]');
+    if (pk) { S.proof.kind = pk.dataset.proofKind; render(); return; }
+    const pr = t.closest('[data-proof]');
+    if (pr) { openProof(Number(pr.dataset.proof)); return; }
+    const fs = t.closest('[data-font-size]');
+    if (fs) { setFont({ size: fs.dataset.fontSize }); return; }
+    const fst = t.closest('[data-font-style]');
+    if (fst) { setFont({ style: fst.dataset.fontStyle }); return; }
     if (t.id === 'scrim') closeJob();
   });
 
@@ -1081,6 +1550,18 @@
       if (r) { S.profile = r; loadStats(); }
       return;
     }
+    if (form.hasAttribute('data-ap-form')) {
+      const body = { enabled: form.elements.enabled.checked, discovery_hours: Number(form.elements.discovery_hours.value), proof_sync_minutes: Number(form.elements.proof_sync_minutes.value) };
+      const r = await run(btn, () => api('/autopilot', { method: 'PUT', body }), body.enabled ? 'Autopilot saved' : 'Autopilot switched off');
+      if (r) { S.autopilot = r; S.lastHtml = ''; render(); }
+      return;
+    }
+    if (form.hasAttribute('data-email-form')) {
+      const body = { address: form.elements.address.value.trim(), app_password: form.elements.app_password.value };
+      const r = await run(btn, () => api('/proofs/connection', { method: 'PUT', body }), 'Inbox connected · checking now');
+      if (r) { S.proofStatus = r; actions['proof-sync'](null); S.lastHtml = ''; render(); }
+      return;
+    }
     if (form.hasAttribute('data-gemini-form')) {
       const body = {
         gemini_auto_answer_enabled: form.elements.gemini_auto_answer_enabled.checked,
@@ -1104,6 +1585,13 @@
       S.stats && S.stats.is_paused ? { icon: 'play_arrow', label: 'Resume engine', run: () => actions.resume() } : { icon: 'pause', label: 'Pause engine', run: () => actions.pause() },
       { icon: 'science', label: S.stats && S.stats.go_live ? 'Switch to dry run' : 'Go live…', run: () => setMode(!(S.stats && S.stats.go_live)) },
       { icon: 'backup', label: 'Back up database now', run: () => actions.backup() },
+      { icon: 'play_circle', label: 'Replay the welcome tour', run: () => openTour(0) },
+      { icon: 'download', label: 'Export applications (CSV)', run: () => actions['export-csv']() },
+      { icon: 'mark_email_read', label: 'Check inbox for proof', run: () => actions['proof-sync']() },
+      { icon: 'smart_toy', label: 'Run an autopilot cycle now', run: () => actions['ap-run']() },
+      { icon: 'upload_file', label: 'Upload a new resume', run: () => go('settings/resume') },
+      { icon: 'text_fields', label: 'Appearance: theme, text size and font', run: () => go('settings/profile') },
+      { icon: 'help', label: 'Help & tutorials', run: () => go('settings/help') },
       ...THEMES.map(t => ({ icon: 'palette', label: `Theme: ${t.name}`, hint: themePref() === t.id ? 'Current' : t.note, run: () => setTheme(t.id) })),
       { icon: 'brightness_auto', label: 'Theme: Match system', hint: themePref() === 'auto' ? 'Current' : '', run: () => setTheme('auto') },
       ...(IN_SHELL ? [{ icon: 'dns', label: 'Phone app: change server', run: () => actions['shell-server']() }] : []),
@@ -1220,6 +1708,7 @@
   });
   document.addEventListener('change', (e) => {
     if (e.target.matches('[data-theme-auto]')) setTheme(e.target.checked ? 'auto' : resolveTheme('auto'));
+    if (e.target.matches('[data-reduce-motion]')) setFont({ motion: e.target.checked ? 'reduce' : 'auto' });
   });
   // Arrow keys move between swatches; Escape closes the popover.
   document.addEventListener('keydown', (e) => {
@@ -1260,7 +1749,7 @@
     if ($('#overlay').innerHTML) { if (pal) closePalette(); else $('#overlay').innerHTML = ''; return true; }
     if (S.jobId) { closeJob(); return true; }
     if (S.ans.editing || S.ans.adding) { actions['ans-cancel'](); return true; }
-    if (S.view !== 'today') { go('today'); return true; }
+    if (S.view !== 'home') { go('home'); return true; }
     return false;
   };
 
@@ -1273,19 +1762,23 @@
     const editing = isTyping() || $('#overlay').innerHTML || S.ans.editing || S.ans.adding;
     if (editing) return;
     // render({ poll: true }) skips the DOM entirely when nothing changed, so hovers are never interrupted.
-    if (S.view === 'today') { try { await loaders.today(); if (S.view === 'today') render({ poll: true }); } catch (e) {} }
-    if (S.view === 'activity') { try { await loaders.activity(); if (S.view === 'activity') render({ poll: true }); } catch (e) {} }
+    if (S.view === 'home') { try { await settle({ autopilot: api('/autopilot'), proofStatus: api('/proofs/status'), proofs: api('/proofs', { query: { limit: 5 } }) }); if (S.view === 'home') render({ poll: true }); } catch (e) {} }
+    if (S.view === 'proof') { try { await loaders.proof(); if (S.view === 'proof') render({ poll: true }); } catch (e) {} }
+    if (S.view === 'insights' && S.ins.tab === 'log') { try { await settle({ logs: api('/logs', { query: { limit: 250 } }) }); if (S.view === 'insights') render({ poll: true }); } catch (e) {} }
   }
 
   // ───────────────────────── Boot ─────────────────────────
   (async () => {
     applyTheme(themePref(), false);   // pre-paint script set the theme; this syncs the browser chrome colour
+    applyFont();
     initLiquidGlass();
     renderChrome();
-    const start = location.hash.replace(/^#\/?/, '') || 'today';
+    const start = location.hash.replace(/^#\/?/, '') || 'home';
     // Inbox counts power the nav badge everywhere, so fetch them alongside the first view.
     await Promise.allSettled([loadStats(), loaders.inbox()]);
-    go(start);
+    await go(start);
+    let toured = false; try { toured = localStorage.getItem(TOUR_KEY) === '1'; } catch (e) {}
+    if (!toured) openTour(0);
     setInterval(poll, 15000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
   })();

@@ -142,7 +142,7 @@ def test_answer_bank_enhanced_fields():
         "category": "education",
         "source": "verified_patent",
         "is_verified": True,
-        "supporting_evidence": "Patent filing #202441058291",
+        "supporting_evidence": "Patent filing #0000000000",
         "allow_reuse": True
     })
     assert res.status_code == 201

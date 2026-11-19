@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from backend.app.core.database import get_db
 from backend.app.core.security import verify_token
+from backend.app.core.facts import LOCKED_FACTS
 from backend.app.core.config import settings
 from backend.app.models import Job, Profile, NeedsInput, Application, RunLog
 from backend.app.schemas import JobOut, JobStatusUpdate, StatsOut, RunLogOut
@@ -187,6 +188,24 @@ def get_kanban_jobs(db: Session = Depends(get_db)):
         if st in result:
             result[st].append(_format_job_out(j))
     return result
+
+@router.get("/jobs/export.csv", summary="Export every tracked role as a CSV spreadsheet")
+def export_jobs_csv(db: Session = Depends(get_db)):
+    import csv
+    import io
+    from fastapi.responses import Response
+    cols = [("company", "Company"), ("title", "Role"), ("status", "Status"), ("score", "Fit score"), ("source", "Source"),
+            ("location", "Location"), ("salary_raw", "Pay"), ("url", "Posting"), ("notes", "Notes"), ("recruiter_info", "Contact"),
+            ("follow_up_date", "Follow-up"), ("created_at", "Found"), ("updated_at", "Updated")]
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([label for _, label in cols])
+    for job in db.query(Job).order_by(Job.score.desc(), Job.created_at.desc()).all():
+        writer.writerow(["" if getattr(job, key, None) is None else getattr(job, key) for key, _ in cols])
+    name = f"applypilot-applications-{datetime.date.today().isoformat()}.csv"
+    return Response(content="﻿" + buf.getvalue(), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
+
 
 @router.get("/jobs/{job_id}", response_model=JobOut)
 def get_job(job_id: int, db: Session = Depends(get_db)):
@@ -390,8 +409,8 @@ def get_assist_draft(job_id: int, db: Session = Depends(get_db)):
             "work_auth": profile.work_authorization or "Yes, Indian citizen",
             "work_auth_india": profile.work_authorization or "Yes, Indian citizen",
             "verified_credentials": profile.education or "Integrated MTech CSE",
-            "patents": "2 published patents (Driver Accident Predictor & Acoustic Doppler Session Guard)",
-            "certifications": "AWS Solutions Architect"
+            "patents": "; ".join(LOCKED_FACTS["patents"]),
+            "certifications": "; ".join(LOCKED_FACTS["certifications"])
         }
     }
 

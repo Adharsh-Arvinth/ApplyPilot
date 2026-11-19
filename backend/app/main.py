@@ -21,6 +21,9 @@ from backend.app.api.resumes import router as resumes_router
 from backend.app.api.analytics import router as analytics_router
 from backend.app.api.ai import router as ai_router
 from backend.app.api.firebase import router as firebase_router
+from backend.app.api.autopilot import router as autopilot_router
+from backend.app.services.autopilot import Autopilot
+import sys
 
 # Configure logging
 logging.basicConfig(
@@ -42,7 +45,11 @@ async def lifespan(app: FastAPI):
         db.close()
     
     logger.info("ApplyPilot Backend initialized and ready on Windows host.")
+    # Background autopilot (discover → score → apply → check email). Never under tests.
+    if settings.AUTOPILOT_ENABLED and "pytest" not in sys.modules:
+        Autopilot.start()
     yield
+    await Autopilot.stop()
     logger.info("ApplyPilot Backend shutting down.")
 
 app = FastAPI(
@@ -214,6 +221,7 @@ app.include_router(resumes_router, prefix="/api/v1")
 app.include_router(analytics_router, prefix="/api/v1")
 app.include_router(ai_router, prefix="/api/v1")
 app.include_router(firebase_router, prefix="/api/v1")
+app.include_router(autopilot_router, prefix="/api/v1")
 
 @app.get("/")
 def root(request: Request):

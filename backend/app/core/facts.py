@@ -1,61 +1,62 @@
 """
-LOCKED FACTS: Single read-only source of truth for candidate claims.
-Strictly verified credentials for Adharsh Arvinth.
-No other claims, patents, dates, certifications, employers, or metrics may ever be used.
+LOCKED FACTS: the single read-only source of truth for every claim made about the candidate.
+No other claims, patents, dates, certifications, employers or metrics may ever be used.
+
+The facts live outside the code so personal details never enter version control:
+  backend/data/candidate_facts.json          – your real facts (gitignored, stays on your PC)
+  backend/data/candidate_facts.example.json  – a fictional example used when no local file exists
+Set APPLYPILOT_FACTS_FILE to point somewhere else.
 """
 
+import json
+import os
 import re
+from pathlib import Path
 from typing import Dict, Any, List, Optional
 from types import MappingProxyType
 
-# Immutable dictionary of verified facts
-LOCKED_FACTS = MappingProxyType({
-    "personal": {
-        "name": "Adharsh Arvinth",
-        "email": "adharsharvinth2108@gmail.com",
-        "phone": "+91 7397161512",
-        "linkedin": "https://linkedin.com/in/Adharsh-Arvinth",
-        "github": "https://github.com/Adharsh-Arvinth",
-        "location": "Vellore, Tamil Nadu, India"
-    },
-    "education": {
-        "institution": "VIT Vellore",
-        "institution_full": "Vellore Institute of Technology",
-        "degree": "MTech Integrated CSE (Data Science)",
-        "start_date": "Sep 2022",
-        "cgpa": "7.62/10",
-        "cgpa_numeric": 7.62,
-        # Expected graduation must NOT be guessed. If empty in profile, send questions to Needs You.
-        "expected_graduation": None
-    },
-    "patents": (
-        "A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver",
-        "Acoustic Doppler Session Guard"
-    ),
-    "projects": (
-        {
-            "name": "Agentic Code Intelligence",
-            "technologies": ("embeddings", "BM25", "AST"),
-            "corpus": "8,765 Python programs",
-            "metrics": "25.59% NDCG@10 vs 5.14% baseline; 43–63 ms CPU latency",
-            "description": "Code retrieval system over 8,765 Python programs using embeddings, BM25, and AST; 25.59% NDCG@10 vs 5.14% baseline; 43–63 ms CPU latency."
-        },
-    ),
-    "certifications": (
-        "AWS Cloud Solutions Architect",
-        "Generative AI for Data Analysts"
-    ),
-    "skills": (
-        "Python", "SQL", "Java", "FastAPI", "PyTorch", "Scikit-learn",
-        "OpenCV", "MediaPipe", "Pandas", "NumPy", "AWS", "Linux/Bash",
-        "Docker", "Git", "RESTful APIs", "Machine Learning", "Deep Learning",
-        "Data Science", "Distributed Systems"
-    ),
-    # Notice period, work authorization, relocation: Empty until user fills them in the app. Never guess!
-    "notice_period": None,
-    "work_authorization": None,
-    "relocation_preference": None
-})
+_DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+FACTS_FILE = Path(os.environ.get("APPLYPILOT_FACTS_FILE") or (_DATA_DIR / "candidate_facts.json"))
+if not FACTS_FILE.exists():
+    FACTS_FILE = _DATA_DIR / "candidate_facts.example.json"
+
+
+def _freeze(value):
+    """Lists become tuples and dicts become read-only views, so the facts can't be mutated at runtime."""
+    if isinstance(value, dict):
+        return MappingProxyType({k: _freeze(v) for k, v in value.items()})
+    if isinstance(value, list):
+        return tuple(_freeze(v) for v in value)
+    return value
+
+
+LOCKED_FACTS = _freeze(json.loads(FACTS_FILE.read_text(encoding="utf-8")))
+
+
+def candidate_summary() -> str:
+    """Plain-text profile used to ground AI prompts (built from the facts, never hard-coded)."""
+    f = LOCKED_FACTS
+    p, e = f["personal"], f["education"]
+    lines = [
+        "CANDIDATE PROFILE (VERIFIED TRUTH SOURCE):",
+        f"- Full Name: {p['name']}",
+        f"- Email: {p['email']}",
+        f"- Phone: {p['phone']}",
+        f"- Links: GitHub ({p['github']}), LinkedIn ({p['linkedin']})",
+        f"- Degree: {e['degree']}, {e.get('institution_full') or e['institution']}",
+        f"- Education: Started {e.get('start_date', '')} | CGPA: {e.get('cgpa', '')}",
+    ]
+    if f.get("patents"):
+        lines.append("- Published Patents:")
+        lines += [f'  {i}. "{t}"' for i, t in enumerate(f["patents"], 1)]
+    if f.get("projects"):
+        lines.append("- Key Benchmarks & Projects:")
+        lines += [f"  * {pr['name']}: {pr.get('description', '')}" for pr in f["projects"]]
+    if f.get("certifications"):
+        lines.append(f"- Certifications: {'; '.join(f['certifications'])}")
+    if f.get("skills"):
+        lines.append(f"- Core Technical Skills: {', '.join(f['skills'])}")
+    return "\n".join(lines) + "\n"
 
 import base64
 
@@ -124,10 +125,10 @@ def assert_resume_grounded(text_or_html: str, profile_graduation_date: Optional[
         cert_lines = [l for l in lower_text.splitlines() if "certif" in l]
         for cl in cert_lines:
             if "associate" in cl and "aws" in cl:
-                raise UngroundedFactError("Ungrounded certification detected. Must be 'AWS Cloud Solutions Architect'.")
+                raise UngroundedFactError(f"Ungrounded certification detected. Allowed: {'; '.join(LOCKED_FACTS['certifications'])}.")
 
     # 6. Check for ungrounded inflated metrics
-    # Only verified metrics: 25.59%, 5.14%, 8,765, 43–63 ms, 7.62
+    # Only the metrics written in the facts file are allowed
     inflated_metrics = [
         r'\b99\.\d+%', r'\b98\.\d+%', r'\b100k\b', r'\b10x\b', r'\b50x\b', r'\b100x\b'
     ]

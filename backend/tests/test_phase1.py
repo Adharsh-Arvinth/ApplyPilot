@@ -50,7 +50,7 @@ def test_auth_protection():
     res = client.get("/api/v1/profile", headers=AUTH_HEADERS)
     assert res.status_code == 200
     data = res.json()
-    assert data["full_name"] in ["Adharsh Arvinth", "Candidate Profile"]
+    assert isinstance(data["full_name"], str) and data["full_name"]
     assert "Data Scientist" in data["target_roles"]
 
 def test_encryption_at_rest():
@@ -89,7 +89,7 @@ def test_answer_bank_crud():
     payload = {
         "question_text": "Do you have experience with PyTorch and LSTM?",
         "field_type": "textarea",
-        "answer": "Yes, built and benchmarked driver accident predictor with LSTM.",
+        "answer": "Yes, built and benchmarked object detection model with LSTM.",
         "mode": "always_use",
         "category": "technical"
     }

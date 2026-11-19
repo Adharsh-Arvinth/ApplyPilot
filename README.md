@@ -146,11 +146,11 @@ Generates a clear **Score out of 5.0** and percentage match, with transparent ma
 ## Verifiable Candidate Intelligence & Answer Bank
 
 - **Structured Proof Points**:
-  - **Education**: Differentiates Higher Degree Academic Program (Integrated Masters in Computer Science & Data Science) from secondary schooling.
-  - **Patents (Strict Grounding)**: Grounded strictly in 2 published patent filings: *Accident Predictor with Multimodal Sensor Fusion* and *Acoustic Doppler Telemetry Session Guard*.
-  - **Projects vs Benchmarks**: *Agentic Code Intelligence* (25.59% NDCG@10 vs 5.14% baseline on 8,765 Python functions) is strictly categorized under system benchmarks and research projects, never confused with patents.
-  - **Certifications**: AWS Certified Solutions Architect - Associate.
-- **Answer Bank Deduplication**: Redundant fields (`highest degree`) merged into canonical `degree`. Demographics harmonized to candidate profile (`Male`).
+  - **Education**: Separates your degree programme from secondary schooling.
+  - **Patents (Strict Grounding)**: Only the patent filings listed in your local facts file are ever mentioned.
+  - **Projects vs Benchmarks**: Research projects and benchmark results are kept separate from patents.
+  - **Certifications**: Only verified certifications from your facts file.
+- **Answer Bank Deduplication**: Redundant fields (`highest degree`) merged into canonical `degree`. Demographic answers come from your own Answer Bank.
 - **Needs You Autonomous Inbox**: Escalates only true edge questions. Once answered, ApplyPilot stores the answer in the Answer Bank to resolve future identical questions autonomously. Displays an active autonomous shield, real-time resolved counts, and recent learning logs.
 
 ---
@@ -190,7 +190,7 @@ ApplyPilot integrates official Google GenAI (`google.genai`) using **Gemini 2.5 
 
 ### 4. Intelligent Answer Bank Recall & Suggestions
 - Suggests concise, professional answers to ATS screening questions.
-- Grounded strictly in candidate proof points: **Integrated Masters CSE (Data Science)**, **2 published patent filings** (Multimodal Sensor Fusion & Acoustic Doppler Telemetry), **Agentic Code Intelligence** benchmark (43-63ms CPU latency), and **AWS Solutions Architect** certification.
+- Grounded strictly in the proof points in your local `candidate_facts.json` (degree, patents, projects, certifications).
 - **Zero Hallucination Guarantee**: Strict system boundaries prevent inventing employment history, fake degrees, or fabricated metrics.
 
 ### 5. Predictive Interview Preparation
@@ -370,3 +370,21 @@ python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
 2. Enter your Windows host Tailscale IP (e.g. `http://100.x.y.z:8000`).
 3. Enter your bearer token configured in `backend/.env`.
 4. Tap **Verify Connection** and take full control of your career search!
+
+---
+
+## Your data stays on your PC
+
+ApplyPilot never keeps personal details in the code. Everything about the candidate lives in one local file:
+
+| File | In git? | Purpose |
+| :--- | :---: | :--- |
+| `backend/data/candidate_facts.json` | No (gitignored) | Your real verified facts: name, contact, education, patents, projects, certifications, personal answers |
+| `backend/data/candidate_facts.example.json` | Yes | A fictional example. Copy it to `candidate_facts.json` and fill in your own details |
+| `backend/.env` | No | Access token, Gemini key, optional `GMAIL_ADDRESS` / `GMAIL_APP_PASSWORD` |
+
+Resumes, screenshots and evidence under `output/` are also kept out of git. Email proof uses a Google **app password** stored encrypted on your PC (Settings › Email proof).
+
+## Autopilot
+
+When the backend starts, a background loop discovers roles, scores them, applies to the best ones within your daily/hourly limits and active hours, checks your inbox for employer confirmations, and resumes by itself the day after a daily limit is reached. It starts in **dry run**; turn on Live submissions in Settings › Autopilot. LinkedIn, Indeed, Naukri and Workday stay assist-only.

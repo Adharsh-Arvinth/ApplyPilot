@@ -15,8 +15,8 @@ class Profile(Base):
     phone = Column(String(64), default="+91 98765 43210")
     linkedin = Column(String(256), default="https://linkedin.com/in/candidate")
     github = Column(String(256), default="https://github.com/candidate")
-    education = Column(String(256), default="MTech Integrated CSE (Data Science), VIT Vellore")
-    cgpa = Column(String(32), default="7.62/10")
+    education = Column(String(256), default="")
+    cgpa = Column(String(32), default="")
     graduation_date = Column(String(64), default=None)
     notice_period = Column(String(64), default=None)
     work_authorization = Column(String(64), default=None)
@@ -57,10 +57,7 @@ class Profile(Base):
     gemini_last_reset_date = Column(String(32), default="")
     
     # Verified facts and proof points (Immutable truth source)
-    proof_points_text = Column(Text, default="""* 2 published patents: A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver; Acoustic Doppler Session Guard
-* Agentic Code Intelligence: hybrid code retrieval over 8,765 Python programs (embeddings + BM25 + AST), 25.59% NDCG@10 vs 5.14% baseline, 43–63 ms CPU latency
-* Certifications: AWS Cloud Solutions Architect; Generative AI for Data Analysts
-* Education: MTech Integrated CSE (Data Science), VIT Vellore (Started Sep 2022), CGPA 7.62/10""")
+    proof_points_text = Column(Text, default="")
 
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
@@ -290,3 +287,30 @@ class JobStateTransition(Base):
 
     job = relationship("Job", back_populates="state_transitions")
 
+
+
+class AppSetting(Base):
+    """Small key/value store for app-level settings and state (autopilot config,
+    encrypted email connection, resume metadata). JSON-encoded values."""
+    __tablename__ = "app_settings"
+
+    key = Column(String(64), primary_key=True)
+    value = Column(Text, default="")
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class EmailProof(Base):
+    """An employer email (confirmation / interview / rejection) found in the connected inbox,
+    linked to the job it refers to when the company can be matched."""
+    __tablename__ = "email_proofs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    message_id = Column(String(512), unique=True, index=True, nullable=False)
+    job_id = Column(Integer, ForeignKey("jobs.id", ondelete="SET NULL"), nullable=True, index=True)
+    company = Column(String(128), default="")
+    sender = Column(String(256), default="")
+    subject = Column(String(512), default="")
+    snippet = Column(Text, default="")
+    kind = Column(String(32), default="confirmation")  # confirmation | interview | rejection
+    received_at = Column(DateTime, default=utcnow)
+    created_at = Column(DateTime, default=utcnow)

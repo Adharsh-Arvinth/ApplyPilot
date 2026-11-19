@@ -1107,7 +1107,7 @@ class _ApplicationDetailSheetState extends State<_ApplicationDetailSheet> {
                 if (reason.isNotEmpty) {
                   fitBullets.add(reason);
                 }
-                fitBullets.add("Early-career profile matches candidate's MTech Integrated CSE (VIT Vellore).");
+                fitBullets.add("Early-career profile matches candidate's MTech Integrated CSE (Example Institute).");
                 fitBullets.add("100% grounded in verified facts.py record.");
               }
 

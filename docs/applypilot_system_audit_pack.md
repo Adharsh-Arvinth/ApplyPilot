@@ -10,18 +10,18 @@
 
 ### 1.1 Single Read-Only Source of Truth (`backend/app/core/facts.py`)
 All facts about the candidate are strictly locked in `LOCKED_FACTS` (`MappingProxyType` immutability):
-- **Candidate Name**: Adharsh Arvinth
-- **Contact Details**: `adharsharvinth2108@gmail.com` | `+91 7397161512`
-- **Profiles**: LinkedIn (`https://linkedin.com/in/Adharsh-Arvinth`), GitHub (`https://github.com/Adharsh-Arvinth`)
-- **Education**: MTech Integrated CSE (Data Science), VIT Vellore (Started Sep 2022, CGPA 7.62/10). *Graduation date is unconfirmed until candidate enters it in the app; never guessed.*
+- **Candidate Name**: Alex Morgan
+- **Contact Details**: `alex.morgan@example.com` | `+1 555 0100`
+- **Profiles**: LinkedIn (`https://linkedin.com/in/alex-morgan-example`), GitHub (`https://github.com/alex-morgan-example`)
+- **Education**: MTech Integrated CSE (Data Science), Example Institute (Started Sep 2022, CGPA 8.10/10). *Graduation date is unconfirmed until candidate enters it in the app; never guessed.*
 - **Patents (Exact Titles Only)**:
-  1. *"A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver"*
-  2. *"Acoustic Doppler Session Guard"*
+  1. *"A Low-Power Soil Moisture Controller"*
+  2. *"Ultrasonic Presence Verification for Secure Sessions"*
 - **Core Project**:
-  - *Agentic Code Intelligence*: Hybrid code retrieval across 8,765 Python programs using embeddings, BM25, and AST; 25.59% NDCG@10 vs 5.14% baseline; 43–63 ms CPU latency.
+  - *Code Retrieval Engine*: Hybrid code retrieval across 10,000 Python programs using embeddings, BM25, and AST; 18% NDCG@10 vs 5% baseline; 40–60 ms CPU latency.
 - **Certifications**:
   1. *"AWS Cloud Solutions Architect"* (never append unapproved modifiers)
-  2. *"Generative AI for Data Analysts"*
+  2. *"Generative AI Fundamentals"*
 - **Core Skills**: Python, FastAPI, PyTorch, LangChain, Transformers, Docker, Kubernetes, AWS, SQL, Vector Databases, Data Engineering, REST APIs, Git.
 - **Preferences (Notice Period, Work Authorization, Relocation)**: Empty until candidate specifies in app. Never assumed.
 

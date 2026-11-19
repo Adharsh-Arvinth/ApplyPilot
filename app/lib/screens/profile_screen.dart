@@ -616,25 +616,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: _buildFactItem("CANDIDATE", candidate["name"] ?? "Adharsh Arvinth", primaryColor, secondaryColor)),
+              Expanded(child: _buildFactItem("CANDIDATE", candidate["name"] ?? "Alex Morgan", primaryColor, secondaryColor)),
               const SizedBox(width: AppSpacing.s12),
-              Expanded(child: _buildFactItem("PHONE", candidate["phone"] ?? "+91 7397161512", primaryColor, secondaryColor)),
+              Expanded(child: _buildFactItem("PHONE", candidate["phone"] ?? "+1 555 0100", primaryColor, secondaryColor)),
             ],
           ),
           const SizedBox(height: AppSpacing.s12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: _buildFactItem("PRIMARY EMAIL", candidate["email"] ?? "adharsharvinth2108@gmail.com", primaryColor, secondaryColor)),
+              Expanded(child: _buildFactItem("PRIMARY EMAIL", candidate["email"] ?? "alex.morgan@example.com", primaryColor, secondaryColor)),
               const SizedBox(width: AppSpacing.s12),
-              Expanded(child: _buildFactItem("DEGREE & CGPA", "${education['degree'] ?? 'MTech CSE'} • ${education['cgpa'] ?? '7.62/10'}", primaryColor, secondaryColor)),
+              Expanded(child: _buildFactItem("DEGREE & CGPA", "${education['degree'] ?? 'MTech CSE'} • ${education['cgpa'] ?? '8.10/10'}", primaryColor, secondaryColor)),
             ],
           ),
           const SizedBox(height: AppSpacing.s12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: _buildFactItem("INSTITUTION", education["institution"] ?? "Vellore Institute of Technology (VIT)", primaryColor, secondaryColor)),
+              Expanded(child: _buildFactItem("INSTITUTION", education["institution"] ?? "Example Institute of Technology (VIT)", primaryColor, secondaryColor)),
               const SizedBox(width: AppSpacing.s12),
               Expanded(child: _buildFactItem("ATTENDANCE", "Sep 2022 – Present", primaryColor, secondaryColor)),
             ],
@@ -660,9 +660,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             );
           }) else ...[
-            Text("• A Proactive Multimodal Fusion-Based Accident Predictor System for a Driver", style: TextStyle(fontSize: 12, color: primaryColor)),
+            Text("• A Low-Power Soil Moisture Controller", style: TextStyle(fontSize: 12, color: primaryColor)),
             const SizedBox(height: 2),
-            Text("• Acoustic Doppler Session Guard", style: TextStyle(fontSize: 12, color: primaryColor)),
+            Text("• Ultrasonic Presence Verification for Secure Sessions", style: TextStyle(fontSize: 12, color: primaryColor)),
           ],
 
           const SizedBox(height: AppSpacing.s12),
@@ -677,7 +677,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  "${project['name'] ?? 'Agentic Code Intelligence'}: 8,765 Python programs; 25.59% NDCG@10 vs 5.14% baseline; 43–63 ms CPU latency",
+                  "${project['name'] ?? 'Code Retrieval Engine'}: 10,000 Python programs; 18% NDCG@10 vs 5% baseline; 40–60 ms CPU latency",
                   style: TextStyle(fontSize: 12, height: 1.35, color: primaryColor),
                 ),
               ),
@@ -697,7 +697,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             );
           }) else ...[
             Text("• AWS Cloud Solutions Architect", style: TextStyle(fontSize: 12, color: primaryColor)),
-            Text("• Generative AI for Data Analysts", style: TextStyle(fontSize: 12, color: primaryColor)),
+            Text("• Generative AI Fundamentals", style: TextStyle(fontSize: 12, color: primaryColor)),
           ],
         ],
       ),

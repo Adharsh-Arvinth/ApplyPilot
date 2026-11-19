@@ -63,3 +63,13 @@ career-ops/
 Thumbs.db
 .idea/
 .vscode/
+
+# Personal data never goes to GitHub
+backend/data/candidate_facts.json
+backend/data/*.local.json
+output/evidence/
+output/resumes/*
+!output/resumes/.gitkeep
+output/screenshots/*
+!output/screenshots/.gitkeep
+.cockpit-dev/
