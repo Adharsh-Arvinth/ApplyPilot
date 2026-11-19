@@ -45,8 +45,11 @@
   const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = (n) => (n ?? 0).toLocaleString('en-IN');
-  const icon = (name, cls = '') => `<span class="ms ${cls}">${name}</span>`;
+  const icon = (name, cls = '') => `<span class="ms ${cls}" aria-hidden="true">${name}</span>`;
   const initials = (s) => (String(s || '?').replace(/[^A-Za-z0-9 ]/g, ' ').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('') || '?').toUpperCase();
+  // Stable hue per company name -> generated "album art" tiles.
+  const hue = (s) => { let h = 7; for (const ch of String(s || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h % 360; };
+  const art = (name, size = '') => `<span class="art ${size}" style="--h:${hue(name)}" aria-hidden="true">${esc(initials(name))}</span>`;
   const toDate = (iso) => { if (!iso) return null; const s = /[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : iso + 'Z'; const d = new Date(s); return isNaN(d) ? null : d; };
   function rel(iso) {
     const d = toDate(iso); if (!d) return '';
@@ -67,7 +70,7 @@
     el.className = 'toast' + (err ? ' err' : '');
     el.innerHTML = icon(err ? 'error' : 'check_circle') + `<span>${esc(msg)}</span>`;
     $('#toasts').appendChild(el);
-    setTimeout(() => el.remove(), err ? 5200 : 3000);
+    setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 320); }, err ? 5200 : 3000);
   }
 
   async function run(btn, fn, okMsg) {
@@ -82,13 +85,17 @@
 
   function confirmModal({ title, body, ok = 'Confirm', danger = false }) {
     return new Promise(resolve => {
-      const ov = $('#overlay');
-      ov.innerHTML = `<div class="modal-wrap" data-close><div class="modal" role="dialog" aria-modal="true">
-        <h3>${esc(title)}</h3><p>${body}</p>
-        <div class="acts"><button class="btn ghost" data-x="0">Cancel</button><button class="btn ${danger ? 'danger' : 'primary'}" data-x="1">${esc(ok)}</button></div>
+      const ov = $('#overlay'), prev = document.activeElement;
+      ov.innerHTML = `<div class="modal-wrap" data-close><div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="modal-t">
+        <h3 id="modal-t">${esc(title)}</h3><p>${body}</p>
+        <div class="acts"><button class="btn ghost hv" data-x="0">Cancel</button><button class="btn primary hv ${danger ? 'danger' : ''}" data-x="1">${esc(ok)}</button></div>
       </div></div>`;
-      const done = (v) => { ov.innerHTML = ''; document.removeEventListener('keydown', onKey, true); resolve(v); };
-      const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); done(false); } if (e.key === 'Enter') { e.preventDefault(); done(true); } };
+      const done = (v) => { ov.innerHTML = ''; document.removeEventListener('keydown', onKey, true); if (prev && prev.isConnected) prev.focus({ preventScroll: true }); resolve(v); };
+      const onKey = (e) => {
+        if (e.key === 'Escape') { e.stopPropagation(); done(false); }
+        else if (e.key === 'Enter') { e.preventDefault(); done(true); }
+        else if (e.key === 'Tab') { e.preventDefault(); const bs = $$('.modal button', ov); const i = bs.indexOf(document.activeElement); bs[(i + (e.shiftKey ? -1 : 1) + bs.length) % bs.length].focus(); }
+      };
       document.addEventListener('keydown', onKey, true);
       ov.querySelector('.modal-wrap').addEventListener('click', (e) => {
         const x = e.target.closest('[data-x]');
@@ -99,12 +106,12 @@
     });
   }
 
-  function ring(pct, size = 64, stroke = 7, color = 'var(--indigo)') {
-    const r = (size - stroke) / 2, c = 2 * Math.PI * r, off = c * (1 - Math.max(0, Math.min(1, pct)));
-    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-      <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="var(--track)" stroke-width="${stroke}"/>
-      <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round"
-        stroke-dasharray="${c.toFixed(2)}" stroke-dashoffset="${off.toFixed(2)}" style="transition:stroke-dashoffset .8s var(--ease)"/></svg>`;
+  function ring(pct, size = 64, stroke = 7, color = 'var(--accent)') {
+    const r = (size - stroke) / 2, c = 2 * Math.PI * r, off = c * (1 - Math.max(0, Math.min(1, pct))), mid = size / 2;
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">
+      <circle cx="${mid}" cy="${mid}" r="${r}" fill="none" stroke="var(--track)" stroke-width="${stroke}"/>
+      <circle class="v" cx="${mid}" cy="${mid}" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round"
+        stroke-dasharray="${c.toFixed(2)}" stroke-dashoffset="${off.toFixed(2)}"/></svg>`;
   }
 
   // ───────────────────────── Domain mapping ─────────────────────────
@@ -155,12 +162,13 @@
     pipe: { stage: 'all', q: '', source: '', min: '', mode: 'table', sort: 'score', dir: -1, limit: 100, laneLimit: {} },
     ans: { cat: 'all', q: '', editing: null, adding: false },
     act: { level: 'all', q: '' },
-    jobId: null, job: null,
-    online: true,
+    jobId: null, job: null, returnFocus: null,
+    online: true, anim: false, lastHtml: '',
   };
 
+  const today = () => new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
   const VIEWS = [
-    { id: 'today', label: 'Today', icon: 'space_dashboard', mobile: 'today', sub: () => new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' }) },
+    { id: 'today', label: 'Today', icon: 'space_dashboard', mobile: 'today', sub: today },
     { id: 'inbox', label: 'Needs you', icon: 'inbox', mobile: 'notifications', sub: () => 'Every decision that needs a human, in one place' },
     { id: 'pipeline', label: 'Pipeline', icon: 'view_kanban', mobile: 'work', sub: () => S.jobs ? `${fmt(S.jobs.length)} tracked roles` : 'Tracked roles' },
     { id: 'answers', label: 'Answers', icon: 'forum', mobile: 'forum', sub: () => 'Verified facts the agent reuses on forms' },
@@ -172,52 +180,89 @@
 
   const inboxCount = () => (S.stats ? S.stats.needs_you_count : S.needs.length) + S.aiAnswers.length + (S.stats ? S.stats.maybe_count : S.triage.length);
 
-  // ───────────────────────── Chrome (nav, engine, tabbar) ─────────────────────────
+  // ───────────────────────── Rendering primitives ─────────────────────────
+  // Only touch the DOM when markup really changed, so background polling never
+  // interrupts a hover, press or sliding animation.
+  function setHTML(el, html) {
+    if (!el || el.__html === html) return false;
+    el.innerHTML = html; el.__html = html; return true;
+  }
+
+  // Sliding selection pill for nav and segmented controls. It remembers its last
+  // position per control, so it glides from the old item even after a re-render.
+  const glidePos = {};
+  function glide(root, key, activeSel = '.on') {
+    if (!root || !root.offsetParent) return;
+    let ind = root.querySelector(':scope > .glide');
+    const fresh = !ind;
+    if (fresh) { ind = document.createElement('i'); ind.className = 'glide'; ind.setAttribute('aria-hidden', 'true'); root.prepend(ind); }
+    const on = root.querySelector(activeSel);
+    if (!on || !on.offsetWidth) { ind.style.opacity = '0'; return; }
+    const to = { x: on.offsetLeft, y: on.offsetTop, w: on.offsetWidth, h: on.offsetHeight };
+    const place = (p) => { ind.style.transform = `translate3d(${p.x}px, ${p.y}px, 0)`; ind.style.width = `${p.w}px`; ind.style.height = `${p.h}px`; };
+    if (fresh) { ind.style.transition = 'none'; place(glidePos[key] || to); void ind.offsetWidth; ind.style.transition = ''; }
+    place(to); ind.style.opacity = '1';
+    glidePos[key] = to;
+  }
+
+  // After every render: sliding pills + accessible names for icon-only controls.
+  function enhance(root) {
+    $$('.seg', root).forEach((el, i) => glide(el, `${S.view}:${el.dataset.glide || i}`));
+    $$('button[title]:not([aria-label]), a[title]:not([aria-label])', root).forEach(b => {
+      const text = Array.from(b.childNodes).filter(n => !(n.classList && n.classList.contains('ms'))).map(n => n.textContent).join('').trim();
+      if (!text) b.setAttribute('aria-label', b.title);
+    });
+  }
+
+  // ───────────────────────── Chrome (nav, engine display, tabbar) ─────────────────────────
   function renderNav() {
-    const counts = { inbox: inboxCount(), pipeline: S.stats ? S.stats.queue_count : 0 };
-    $('#nav').innerHTML = `<div class="nav-label">Workspace</div>` + VIEWS.map((v, i) => {
-      const n = counts[v.id];
-      const badge = v.id === 'inbox' ? `<span class="nav-count ${n ? '' : 'zero'}">${n || 0}</span>` : `<span class="kbd">${i + 1}</span>`;
-      return `<button class="nav-item ${S.view === v.id ? 'active' : ''}" data-nav="${v.id}" title="${esc(v.label)}">${icon(v.icon)}<span class="lbl">${esc(v.label)}</span>${badge}</button>`;
-    }).join('');
-    $('#tabbar').innerHTML = MOBILE_TABS.map(id => {
-      const v = VIEWS.find(x => x.id === id);
-      const n = id === 'inbox' ? inboxCount() : 0;
-      return `<button class="${S.view === id ? 'active' : ''}" data-nav="${id}">${icon(v.mobile)}<span>${MOBILE_LABEL[id]}</span>${n ? `<span class="badge">${n > 99 ? '99+' : n}</span>` : ''}</button>`;
-    }).join('');
+    const n = inboxCount();
+    setHTML($('#nav'), `<div class="nav-label">Workspace</div>` + VIEWS.map((v, i) => {
+      const on = S.view === v.id;
+      const end = v.id === 'inbox' ? `<span class="nav-count ${n ? '' : 'zero'}">${n || 0}</span>` : `<span class="kbd" aria-hidden="true">${i + 1}</span>`;
+      return `<button class="nav-item hv ${on ? 'active' : ''}" data-nav="${v.id}" title="${esc(v.label)}" ${on ? 'aria-current="page"' : ''}>${icon(v.icon)}<span class="lbl">${esc(v.label)}</span>${end}</button>`;
+    }).join(''));
+    glide($('#nav'), 'nav', '.nav-item.active');
+    setHTML($('#tabbar'), MOBILE_TABS.map(id => {
+      const v = VIEWS.find(x => x.id === id), on = S.view === id, b = id === 'inbox' ? n : 0;
+      return `<button class="${on ? 'active' : ''}" data-nav="${id}" ${on ? 'aria-current="page"' : ''}>${icon(v.mobile)}<span>${MOBILE_LABEL[id]}</span>${b ? `<span class="badge">${b > 99 ? '99+' : b}</span>` : ''}</button>`;
+    }).join(''));
   }
 
   function renderEngine() {
     const st = S.stats;
     const [label, color] = engineLabel(st);
-    const live = st && st.go_live;
-    const paused = st && st.is_paused;
+    const live = !!(st && st.go_live), paused = !!(st && st.is_paused);
     const applied = st ? st.daily_applied : 0, cap = st ? st.daily_cap : 0;
-    $('#engine').innerHTML = `
-      <div class="engine-row"><span class="engine-title">Engine</span><span class="engine-state"><span class="dot ${color} ${color === 'teal' ? 'pulse' : ''}"></span>${esc(label)}</span></div>
-      <div class="mode-switch" role="group" aria-label="Submission mode">
-        <button class="${!live ? 'on' : ''}" data-act="mode-dry">Dry run</button>
-        <button class="${live ? 'on live' : ''}" data-act="mode-live">Live</button>
-      </div>
-      <div>
-        <div class="engine-row" style="font-size:12px;margin-bottom:6px"><span class="muted">Today</span><span class="tnum">${fmt(applied)} / ${fmt(cap)}</span></div>
-        <div class="bar"><i style="width:${cap ? Math.min(100, applied / cap * 100) : 0}%"></i></div>
-      </div>
-      <button class="btn ${paused ? 'primary' : ''}" data-act="${paused ? 'resume' : 'pause'}" ${st ? '' : 'disabled'}>${icon(paused ? 'play_arrow' : 'pause')}${paused ? 'Resume engine' : 'Pause engine'}</button>`;
-    $('#top-actions').innerHTML = `
-      <button class="btn" data-act="discover" title="Scan ATS boards for new roles">${icon('travel_explore')}Discover</button>
-      <button class="btn primary" data-act="apply-next" title="Process the top queued job" ${paused ? 'disabled' : ''}>${icon('bolt')}Apply next</button>`;
+    const pct = cap ? Math.min(1, applied / cap) : 0;
+    setHTML($('#engine'), `<div class="engine-title">Submission mode</div>
+      <div class="mode-switch" role="radiogroup" aria-label="Submission mode">
+        <button role="radio" aria-checked="${!live}" class="${live ? '' : 'on'}" data-act="mode-dry">Dry run</button>
+        <button role="radio" aria-checked="${live}" class="${live ? 'on live' : ''}" data-act="mode-live">Live</button>
+      </div>`);
+    glide($('#engine .mode-switch'), 'mode');
+    const verb = paused ? 'Resume engine' : 'Pause engine';
+    setHTML($('#lcd'), `
+      <button class="lcd-btn hv" data-act="${paused ? 'resume' : 'pause'}" ${st ? '' : 'disabled'} aria-label="${verb}" title="${verb}">${icon(paused ? 'play_arrow' : 'pause')}</button>
+      <div class="lcd-text"><div class="lcd-t"><span class="dot ${color} ${color === 'teal' ? 'pulse' : ''}"></span>${esc(label)}</div>
+        <div class="lcd-s tnum">${fmt(applied)} of ${fmt(cap)} applied today</div></div>
+      <span class="chip ${live ? 'accent' : ''}">${live ? 'Live' : 'Dry run'}</span>
+      <div class="lcd-bar"><i style="transform:scaleX(${pct.toFixed(3)})"></i></div>`);
+    setHTML($('#top-actions'), `
+      <button class="btn hv" data-act="discover" title="Scan ATS boards for new roles">${icon('travel_explore')}Discover</button>
+      <button class="btn primary hv" data-act="apply-next" title="Process the top queued job" ${paused ? 'disabled' : ''}>${icon('bolt')}Apply next</button>`);
   }
 
   function renderChrome() {
     renderNav(); renderEngine();
-    const v = VIEWS.find(x => x.id === S.view);
-    $('#page-title').textContent = v.label;
-    $('#page-sub').textContent = v.sub();
-    document.title = `${v.label} · ApplyPilot`;
+    document.title = `${VIEWS.find(x => x.id === S.view).label} · ApplyPilot`;
   }
 
-  const mobileHead = (title, right = '') => `<div class="view-head"><div><div class="date">${esc(new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' }))}</div><h1>${esc(title)}</h1></div>${right}</div>`;
+  const pageHead = (right = '') => {
+    const v = VIEWS.find(x => x.id === S.view);
+    return `<header class="view-head"><div class="min0"><h1><span class="t-desk">${esc(v.label)}</span><span class="t-mob">${esc(MOBILE_LABEL[v.id] || v.label)}</span></h1>
+      <div class="sub">${esc(v.sub())}</div></div>${right}</header>`;
+  };
 
   // ───────────────────────── Loaders ─────────────────────────
   async function loadStats() {
@@ -260,22 +305,29 @@
     renderChrome();
     const my = ++viewToken;
     if (changed) S.anim = true;
-    if (changed || !silent) { $('#content').innerHTML = skeleton(); $('#content').scrollTop = 0; }
+    if (changed || !silent) { $('#content').innerHTML = skeleton(); $('#content').scrollTop = 0; S.lastHtml = ''; }
     try { await loaders[view](); }
     catch (e) { if (my === viewToken) $('#content').innerHTML = errorView(e); return; }
     if (my !== viewToken) return;
     render();
   }
-  function render() {
+  function render({ poll = false } = {}) {
     const html = renderers[S.view]();
+    if (poll && html === S.lastHtml) { renderChrome(); return; }
+    S.lastHtml = html;
     const anim = S.anim; S.anim = false;
-    $('#content').innerHTML = `<div class="view ${anim ? 'enter' : ''}">${html}</div>`;
+    const content = $('#content'), y = content.scrollTop;
+    content.innerHTML = `<div class="view ${anim ? 'enter' : ''}">${html}</div>`;
+    if (!anim) content.scrollTop = y;
     renderChrome();
+    enhance(content);
     afterRender[S.view] && afterRender[S.view]();
   }
-  const skeleton = () => `<div class="view"><div class="kpis">${'<div class="card kpi"><div class="skel" style="height:14px;width:50%"></div><div class="skel" style="height:28px;width:40%"></div></div>'.repeat(4)}</div>
-    <div class="grid-today"><div class="card span-8" style="height:240px;padding:16px"><div class="skel" style="height:100%"></div></div><div class="card span-4" style="height:240px;padding:16px"><div class="skel" style="height:100%"></div></div></div></div>`;
-  const errorView = (e) => `<div class="view"><div class="card"><div class="empty">${icon('cloud_off')}<b>Couldn't reach the ApplyPilot backend</b><span>${esc(e.message)}</span><button class="btn" data-act="reload">${icon('refresh')}Try again</button></div></div></div>`;
+  const skeleton = () => `<div class="view"><div class="view-head"><div class="skel sk-title"></div></div>
+    <div class="kpis">${'<div class="card kpi"><div class="skel sk-line"></div><div class="skel sk-num"></div></div>'.repeat(4)}</div>
+    <div class="grid-today"><div class="card card-b span-8"><div class="skel sk-block"></div></div><div class="card card-b span-4"><div class="skel sk-block"></div></div></div></div>`;
+  const errorView = (e) => `<div class="view"><div class="card"><div class="empty">${icon('cloud_off')}<b>Couldn't reach the ApplyPilot backend</b><span>${esc(e.message)}</span><button class="btn hv" data-act="reload">${icon('refresh')}Try again</button></div></div></div>`;
+  const emptyCard = (ic, title, text = '', extra = '') => `<div class="card"><div class="empty">${icon(ic)}<b>${title}</b>${text ? `<span>${text}</span>` : ''}${extra}</div></div>`;
 
   // ───────────────────────── View: Today ─────────────────────────
   const renderers = {};
@@ -289,27 +341,34 @@
     let alert = '';
     if (st.is_circuit_broken) {
       alert = `<div class="alert coral">${icon('report')}<div><div class="alert-t">Circuit breaker tripped</div><div class="alert-d">${esc(st.recovery_instruction || 'Repeated failures paused the queue for safety.')}</div></div>
-        <div class="actions"><button class="btn" data-nav="activity">View log</button><button class="btn primary" data-act="resume">Run pre-flight & resume</button></div></div>`;
+        <div class="actions"><button class="btn hv" data-nav="activity">View log</button><button class="btn primary hv" data-act="resume">Run pre-flight & resume</button></div></div>`;
     } else if (st.is_paused) {
       alert = `<div class="alert">${icon('pause_circle')}<div><div class="alert-t">Engine paused${st.paused_at ? ` since ${esc(st.paused_at)}` : ''}</div><div class="alert-d">${esc(st.recovery_instruction || st.pause_reason || 'Automation is paused.')}</div></div>
-        <div class="actions"><button class="btn primary" data-act="resume" ${st.can_resume === false ? 'disabled' : ''}>${icon('play_arrow')}Resume</button></div></div>`;
+        <div class="actions"><button class="btn primary hv" data-act="resume" ${st.can_resume === false ? 'disabled' : ''}>${icon('play_arrow')}Resume</button></div></div>`;
     }
     const nyCount = (st.needs_you_count || 0) + S.aiAnswers.length;
+    const kpi = (attrs, dot, label, value, sub, warn = false) => `<button class="card kpi lift" ${attrs}>
+      <span class="kpi-l"><span class="dot ${dot}"></span>${label}</span><span class="kpi-v ${warn ? 'warn' : ''}">${value}</span><span class="kpi-s">${sub}</span>${icon('arrow_forward', 'go')}</button>`;
     const kpis = `<div class="kpis">
-      <div class="card kpi quota"><div class="ring">${ring(cap ? applied / cap : 0, 64, 7)}<div class="c">${fmt(applied)}</div></div>
+      <div class="card kpi quota"><div class="ring">${ring(cap ? applied / cap : 0, 66, 7)}<div class="c">${fmt(applied)}</div></div>
         <div><div class="kpi-l">Applied today</div><div class="kpi-s tnum">of ${fmt(cap)} cap · target ${fmt(st.daily_target || 0)}</div>
         <div class="kpi-s tnum">${fmt(st.real_applied_today || 0)} live · ${fmt(st.dry_run_today || 0)} dry run</div></div></div>
-      <div class="card kpi link" data-nav="pipeline" data-stage="queued"><div class="kpi-l"><span class="dot indigo"></span>Queued</div><div class="kpi-v">${fmt(st.queue_count)}</div><div class="kpi-s">ready to apply</div></div>
-      <div class="card kpi link" data-nav="inbox"><div class="kpi-l"><span class="dot amber"></span>Needs you</div><div class="kpi-v" style="color:${nyCount ? 'var(--amber)' : 'inherit'}">${fmt(nyCount)}</div><div class="kpi-s">${fmt(st.needs_you_count || 0)} questions · ${fmt(S.aiAnswers.length)} AI drafts</div></div>
-      <div class="card kpi link" data-nav="inbox" data-tab="triage"><div class="kpi-l"><span class="dot violet"></span>To triage</div><div class="kpi-v">${fmt(st.maybe_count)}</div><div class="kpi-s">borderline fits</div></div>
-      <div class="card kpi link" data-nav="pipeline" data-stage="submitted"><div class="kpi-l"><span class="dot teal"></span>Submitted</div><div class="kpi-v">${fmt((st.total_submitted_real || 0) + (st.total_dry_run || 0))}</div><div class="kpi-s">${fmt(st.total_submitted_real || 0)} live · ${fmt(st.total_dry_run || 0)} dry run</div></div>
-      <div class="card kpi link" data-nav="pipeline" data-stage="interview"><div class="kpi-l"><span class="dot teal"></span>Interviews</div><div class="kpi-v">${fmt(st.interview_count)}</div><div class="kpi-s">${an.offers_count ? `${fmt(an.offers_count)} offers` : 'no offers yet'}</div></div>
+      ${kpi('data-nav="pipeline" data-stage="queued"', 'indigo', 'Queued', fmt(st.queue_count), 'ready to apply')}
+      ${kpi('data-nav="inbox"', 'amber', 'Needs you', fmt(nyCount), `${fmt(st.needs_you_count || 0)} questions · ${fmt(S.aiAnswers.length)} AI drafts`, nyCount > 0)}
+      ${kpi('data-nav="inbox" data-tab="triage"', 'violet', 'To triage', fmt(st.maybe_count), 'borderline fits')}
+      ${kpi('data-nav="pipeline" data-stage="submitted"', 'teal', 'Submitted', fmt((st.total_submitted_real || 0) + (st.total_dry_run || 0)), `${fmt(st.total_submitted_real || 0)} live · ${fmt(st.total_dry_run || 0)} dry run`)}
+      ${kpi('data-nav="pipeline" data-stage="interview"', 'teal', 'Interviews', fmt(st.interview_count), an.offers_count ? `${fmt(an.offers_count)} offers` : 'no offers yet')}
     </div>`;
 
+    const top = (an.top_matches || []).slice(0, 10);
+    const shelf = top.length ? `<section class="block"><h2 class="section-t">Top matches <button class="btn sm ghost hv ml-auto" data-nav="pipeline">See all ${icon('chevron_right')}</button></h2>
+      <div class="shelf">${top.map(m => `<button class="tile" data-job="${m.id}" aria-label="${esc(m.title)} at ${esc(m.company)}">
+        <span class="art" style="--h:${hue(m.company)}">${esc(initials(m.company))}${m.match_percent ? `<span class="badge">${m.match_percent}%</span>` : ''}<span class="open">${icon('arrow_outward')}</span></span>
+        <span class="tile-t">${esc(m.title)}</span><span class="tile-s"><span class="ellipsis">${esc(m.company)}</span>${scoreTag(m.score)}</span></button>`).join('')}</div></section>` : '';
+
     const week = an.weekly_trend || [];
-    const max = Math.max(1, ...week.map(w => w.count), goal.daily_target ? 0 : 1);
-    const todayIdx = week.length - 1;
-    const bars = week.length ? `<div class="bars">${week.map((w, i) => `<div class="col ${i === todayIdx ? 'today' : ''}" title="${esc(w.date)}: ${w.count}">
+    const max = Math.max(1, ...week.map(w => w.count));
+    const bars = week.length ? `<div class="bars">${week.map((w, i) => `<div class="col ${i === week.length - 1 ? 'today' : ''}" title="${esc(w.date)}: ${w.count}">
         <span class="v">${w.count}</span><div class="b" style="height:${Math.max(2, w.count / max * 100)}%"></div><span class="d">${esc(w.day)}</span></div>`).join('')}</div>`
       : `<div class="empty">No submissions this week yet</div>`;
 
@@ -320,13 +379,7 @@
       <div class="bar"><i style="width:${Math.max(f.count ? 1.5 : 0, f.count / fMax * 100)}%;background:${fColor[f.color] || 'var(--slate)'}"></i></div>
       <span class="val">${fmt(f.count)}</span></div>`).join('');
 
-    const matches = (an.top_matches || []).slice(0, 6).map(m => `<button class="row" data-job="${m.id}">
-      <div class="mono-av">${esc(initials(m.company))}</div>
-      <div class="grow"><div class="main-t">${esc(m.title)}</div><div class="sub-t">${esc(m.company)} · ${esc(m.location || '')}</div></div>
-      <div class="end">${m.match_percent ? `<span class="chip teal">${m.match_percent}%</span>` : ''}${scoreTag(m.score)}</div></button>`).join('')
-      || `<div class="empty">No scored matches yet</div>`;
-
-    const feed = (S.logs || []).slice(0, 10).map(l => `<div class="feed-item"><span class="dot ${logColor(l)}"></span>
+    const feed = (S.logs || []).slice(0, 9).map(l => `<div class="feed-item"><span class="dot ${logColor(l)}"></span>
       <span class="msg"><span class="ty">${esc(l.event_type)}</span>${esc(l.message)}</span><span class="t">${esc(shortLogTime(l.created_at))}</span></div>`).join('')
       || `<div class="empty">No activity yet</div>`;
 
@@ -342,20 +395,19 @@
     const dist = an.match_score_distribution || {};
     const tiers = [['4–5', dist.tier_4_5, 'var(--teal)'], ['3–4', dist.tier_3_4, 'var(--indigo)'], ['2–3', dist.tier_2_3, 'var(--amber)'], ['1–2', dist.tier_1_2, 'var(--coral)']];
     const tTotal = Math.max(1, tiers.reduce((a, t) => a + (t[1] || 0), 0));
-    const tierBar = `<div style="display:flex;height:8px;border-radius:4px;overflow:hidden;gap:2px;margin:4px 0 10px">${tiers.map(t => t[1] ? `<i style="flex:${t[1]};background:${t[2]}" title="${t[0]}: ${t[1]}"></i>` : '').join('')}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:12px">${tiers.map(t => `<div style="display:flex;align-items:center;gap:6px"><span class="dot" style="background:${t[2]}"></span><span class="muted">Score ${t[0]}</span><span class="tnum" style="margin-left:auto">${fmt(t[1] || 0)} <span class="faint">${Math.round((t[1] || 0) / tTotal * 100)}%</span></span></div>`).join('')}</div>`;
+    const tierHtml = `<div class="tier-bar">${tiers.map(t => t[1] ? `<i style="flex:${t[1]};background:${t[2]}" title="${t[0]}: ${t[1]}"></i>` : '').join('')}</div>
+      <div class="tier-grid">${tiers.map(t => `<div><span class="dot" style="background:${t[2]}"></span><span class="muted">Score ${t[0]}</span><span class="tnum ml-auto">${fmt(t[1] || 0)} <span class="faint">${Math.round((t[1] || 0) / tTotal * 100)}%</span></span></div>`).join('')}</div>`;
 
-    return `${mobileHead('Today', `<span class="chip ${st.go_live ? 'coral' : ''}">${st.go_live ? 'Live' : 'Dry run'}</span>`)}${alert}${kpis}
+    const card = (span, title, aside, body) => `<div class="card ${span}"><div class="card-h"><span class="card-t">${title}</span><span class="aside">${aside}</span></div>${body}</div>`;
+    return `${pageHead()}${alert}${kpis}${shelf}
     <div class="grid-today">
-      <div class="card span-8"><div class="card-h"><span class="card-t">Submissions this week</span><span class="aside tnum">${fmt(goal.weekly_applied || 0)} of ${fmt(goal.weekly_target || 0)} weekly goal</span></div><div class="card-b">${bars}</div></div>
-      <div class="card span-4"><div class="card-h"><span class="card-t">Funnel</span><span class="aside tnum">${fmt(an.total_tracked || 0)} tracked</span></div><div class="card-b funnel">${funnelHtml || '<div class="empty">No data</div>'}</div></div>
-      <div class="card span-7"><div class="card-h"><span class="card-t">Best matches</span><span class="aside"><button class="btn sm ghost" data-nav="pipeline">Open pipeline ${icon('arrow_forward')}</button></span></div><div class="list" style="padding-top:6px">${matches}</div></div>
-      <div class="card span-5"><div class="card-h"><span class="card-t">Live activity</span><span class="aside"><button class="btn sm ghost" data-nav="activity">Full log ${icon('arrow_forward')}</button></span></div><div style="padding-top:6px">${feed}</div></div>
-      <div class="card span-4"><div class="card-h"><span class="card-t">Pre-flight</span><span class="aside">${au.can_resume === false ? '<span class="chip coral">Blocked</span>' : '<span class="chip teal">Clear</span>'}</span></div>
-        <div class="card-b"><div class="checklist">${checkHtml || '<span class="faint">No checks reported</span>'}</div>
-        ${na.failed_tasks ? `<div style="margin-top:12px" class="alert-d">${icon('error', 'bad')} ${fmt(na.failed_tasks)} failed tasks in the log</div>` : ''}</div></div>
-      <div class="card span-4"><div class="card-h"><span class="card-t">Fit distribution</span><span class="aside tnum">${fmt(tTotal)} scored</span></div><div class="card-b">${tierBar}</div></div>
-      <div class="card span-4"><div class="card-h"><span class="card-t">Sources</span><span class="aside">${src.length} boards</span></div><div class="card-b">${srcHtml || '<div class="empty">No sources yet</div>'}</div></div>
+      ${card('span-8', 'This week', `<span class="tnum">${fmt(goal.weekly_applied || 0)} of ${fmt(goal.weekly_target || 0)} goal</span>`, `<div class="card-b">${bars}</div>`)}
+      ${card('span-4', 'Funnel', `<span class="tnum">${fmt(an.total_tracked || 0)} tracked</span>`, `<div class="card-b funnel">${funnelHtml || '<div class="empty">No data</div>'}</div>`)}
+      ${card('span-7', 'Live activity', `<button class="btn sm ghost hv" data-nav="activity">Full log ${icon('chevron_right')}</button>`, `<div class="feed">${feed}</div>`)}
+      ${card('span-5', 'Pre-flight', au.can_resume === false ? '<span class="chip coral">Blocked</span>' : '<span class="chip teal">Clear</span>',
+        `<div class="card-b"><div class="checklist">${checkHtml || '<span class="faint">No checks reported</span>'}</div>${na.failed_tasks ? `<div class="alert-d mt-3">${fmt(na.failed_tasks)} failed tasks in the log</div>` : ''}</div>`)}
+      ${card('span-6', 'Fit distribution', `<span class="tnum">${fmt(tTotal)} scored</span>`, `<div class="card-b">${tierHtml}</div>`)}
+      ${card('span-6', 'Sources', `${src.length} boards`, `<div class="card-b">${srcHtml || '<div class="empty">No sources yet</div>'}</div>`)}
     </div>`;
   };
 
@@ -363,78 +415,78 @@
   renderers.inbox = () => {
     const I = S.inbox;
     const tabs = [['questions', 'Questions', S.needs.length], ['ai', 'AI drafts', S.aiAnswers.length], ['triage', 'Triage', S.triage.length]];
-    const seg = `<div class="seg" role="tablist">${tabs.map(([id, l, n]) => `<button role="tab" class="${I.tab === id ? 'on' : ''}" data-inbox-tab="${id}">${l} <span class="n">${n}</span></button>`).join('')}</div>`;
-    let body = '';
-    if (I.tab === 'questions') body = inboxQuestions();
-    else if (I.tab === 'ai') body = inboxAI();
-    else body = inboxTriage();
-    return `${mobileHead('Needs You')}<div class="toolbar">${seg}<div class="spacer"></div><span class="faint" style="font-size:12px">${I.tab === 'triage' ? 'Q queue · X dismiss the first card' : I.tab === 'questions' ? 'J / K to move between questions' : ''}</span></div>${body}`;
+    const seg = `<div class="seg" role="tablist" data-glide="inbox">${tabs.map(([id, l, n]) => `<button role="tab" aria-selected="${I.tab === id}" class="${I.tab === id ? 'on' : ''}" data-inbox-tab="${id}">${l} <span class="n">${n}</span></button>`).join('')}</div>`;
+    const hint = I.tab === 'triage' ? 'Q queue · X dismiss the first card' : I.tab === 'questions' ? 'J / K to move between questions' : '';
+    const body = I.tab === 'questions' ? inboxQuestions() : I.tab === 'ai' ? inboxAI() : inboxTriage();
+    return `${pageHead()}<div class="toolbar">${seg}<div class="spacer"></div><span class="hint">${hint}</span></div>${body}`;
   };
 
   function inboxQuestions() {
     const I = S.inbox;
-    if (!S.needs.length) return `<div class="card"><div class="empty">${icon('task_alt')}<b>Nothing is waiting on you</b><span>When an application form asks something the Answer Bank can't answer, it lands here.</span>${S.aiAnswers.length ? `<button class="btn" data-inbox-tab="ai">Review ${S.aiAnswers.length} AI drafts</button>` : ''}</div></div>`;
+    if (!S.needs.length) return emptyCard('task_alt', 'Nothing is waiting on you', 'When an application form asks something the Answer Bank can’t answer, it lands here.',
+      S.aiAnswers.length ? `<button class="btn hv" data-inbox-tab="ai">Review ${S.aiAnswers.length} AI drafts</button>` : '');
     I.sel = Math.min(I.sel, S.needs.length - 1);
     const q = S.needs[I.sel];
-    const list = S.needs.map((n, i) => `<button class="inbox-item ${i === I.sel ? 'sel' : ''}" data-q="${i}">
-      <div class="mono-av" style="width:30px;height:30px;font-size:11px">${esc(initials(n.company))}</div>
-      <div style="min-width:0"><div class="q">${esc(n.question_text)}</div><div class="meta">${esc(n.company)} · ${esc(n.role)} · ${rel(n.created_at)}</div></div></button>`).join('');
+    const list = S.needs.map((n, i) => `<button class="inbox-item hv ${i === I.sel ? 'sel' : ''}" data-q="${i}" ${i === I.sel ? 'aria-current="true"' : ''}>
+      ${art(n.company, 'sm')}<div class="min0"><div class="q">${esc(n.question_text)}</div><div class="meta">${esc(n.company)} · ${esc(n.role)} · ${rel(n.created_at)}</div></div></button>`).join('');
     const pick = I.picks[q.id] ?? q.suggested_answer ?? '';
     const opts = (q.options || []).filter(Boolean);
     const input = opts.length
-      ? `<div class="opts">${opts.map(o => `<button class="opt ${pick === o ? 'on' : ''}" data-pick="${esc(o)}"><span>${esc(o)}</span>${icon('check_circle')}</button>`).join('')}</div>`
-      : `<textarea class="textarea" id="q-answer" placeholder="Type the answer exactly as it should appear on the form">${esc(pick)}</textarea>`;
+      ? `<div class="opts" role="radiogroup">${opts.map(o => `<button role="radio" aria-checked="${pick === o}" class="opt ${pick === o ? 'on' : ''}" data-pick="${esc(o)}"><span>${esc(o)}</span>${icon('check_circle', 'fill')}</button>`).join('')}</div>`
+      : `<textarea class="textarea" id="q-answer" aria-label="Answer" placeholder="Type the answer exactly as it should appear on the form">${esc(pick)}</textarea>`;
     return `<div class="inbox">
       <div class="card inbox-list">${list}</div>
       <div class="card qcard">
-        <div class="who"><div class="mono-av lg">${esc(initials(q.company))}</div><div><div style="font-weight:600;font-size:15px">${esc(q.company)}</div><div class="muted" style="font-size:13px">${esc(q.role)}</div></div>
-          <span class="chip" style="margin-left:auto">Question ${I.sel + 1} of ${S.needs.length}</span></div>
+        <div class="who">${art(q.company, 'lg')}<div class="min0"><div class="strong">${esc(q.company)}</div><div class="muted small">${esc(q.role)}</div></div>
+          <span class="chip ml-auto">Question ${I.sel + 1} of ${S.needs.length}</span></div>
         <h2>${esc(q.question_text)}</h2>
-        ${q.suggested_answer ? `<div class="faint" style="font-size:12px;margin:-8px 0 12px">${icon('auto_awesome')} Suggested: ${esc(q.suggested_answer)}</div>` : ''}
+        ${q.suggested_answer ? `<div class="suggest">${icon('auto_awesome')} Suggested: ${esc(q.suggested_answer)}</div>` : ''}
         ${input}
         <label class="remember"><div class="grow">Remember for future applications<small>Saves to the Answer Bank so similar fields are filled automatically</small></div>
           <span class="toggle"><input type="checkbox" id="q-remember" ${I.remember ? 'checked' : ''}><i></i></span></label>
         <div class="qactions">
-          <button class="btn primary" data-act="q-resolve" data-id="${q.id}">Save & continue ${icon('arrow_forward')}</button>
-          <button class="btn" data-act="q-dismiss" data-id="${q.id}" title="Skip this question and the job">Skip job</button>
-          <button class="btn ghost danger" data-act="q-reject" data-id="${q.id}" data-company="${esc(q.company)}">Reject & block company</button>
-          <button class="btn ghost" data-job="${q.job_id}" style="margin-left:auto">View job ${icon('open_in_new')}</button>
+          <button class="btn primary lg hv" data-act="q-resolve" data-id="${q.id}">Save & continue ${icon('arrow_forward')}</button>
+          <button class="btn hv" data-act="q-dismiss" data-id="${q.id}" title="Skip this question and the job">Skip job</button>
+          <button class="btn ghost danger hv" data-act="q-reject" data-id="${q.id}" data-company="${esc(q.company)}">Reject & block company</button>
+          <button class="btn ghost hv ml-auto" data-job="${q.job_id}">View job ${icon('open_in_new')}</button>
         </div>
       </div></div>`;
   }
 
   function inboxAI() {
-    if (!S.aiAnswers.length) return `<div class="card"><div class="empty">${icon('verified')}<b>No AI drafts to review</b><span>Answers Gemini writes on the fly appear here until you approve them.</span></div></div>`;
-    return `<div style="display:flex;flex-direction:column;gap:12px">${S.aiAnswers.map(a => `<div class="card" data-ai="${a.id}"><div class="card-b">
-      <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px"><span class="chip violet">${icon('auto_awesome')}AI draft</span><span class="muted" style="font-size:12px">${esc(a.company)}${a.role ? ' · ' + esc(a.role) : ''}</span>
-        <span class="conf" style="margin-left:auto">Confidence <span class="bar"><i style="width:${Math.round((a.confidence || 0) * 100)}%;background:${a.confidence >= .85 ? 'var(--teal)' : 'var(--amber)'}"></i></span><span class="tnum">${Math.round((a.confidence || 0) * 100)}%</span></span></div>
-      <div style="font-weight:600;font-size:15px;letter-spacing:-.01em">${esc(a.question)}</div>
-      <div class="ai-answer" style="color:var(--ink-2);margin-top:6px;white-space:pre-wrap">${esc(a.answer)}</div>
+    if (!S.aiAnswers.length) return emptyCard('verified', 'No AI drafts to review', 'Answers Gemini writes on the fly appear here until you approve them.');
+    return `<div class="stack">${S.aiAnswers.map(a => {
+      const pct = Math.round((a.confidence || 0) * 100);
+      return `<div class="card ai-card" data-ai="${a.id}"><div class="card-b">
+      <div class="ai-head"><span class="chip violet">${icon('auto_awesome')}AI draft</span><span class="muted small">${esc(a.company)}${a.role ? ' · ' + esc(a.role) : ''}</span>
+        <span class="conf">Confidence <span class="bar"><i style="width:${pct}%;background:${a.confidence >= .85 ? 'var(--teal)' : 'var(--amber)'}"></i></span><span class="tnum">${pct}%</span></span></div>
+      <div class="q">${esc(a.question)}</div>
+      <div class="ai-answer">${esc(a.answer)}</div>
       ${(a.facts_used || []).length ? `<div class="facts">${a.facts_used.slice(0, 6).map(f => `<span class="chip" title="${esc(f)}">${esc(String(f).slice(0, 48))}${String(f).length > 48 ? '…' : ''}</span>`).join('')}</div>` : ''}
-      <div class="qactions" style="margin-top:14px">
-        <button class="btn primary sm" data-act="ai-approve" data-id="${a.id}">${icon('check')}Approve</button>
-        <button class="btn sm" data-act="ai-edit" data-id="${a.id}">${icon('edit')}Edit</button>
-        <button class="btn sm ghost danger" data-act="ai-reject" data-id="${a.id}">Reject</button>
-        <span class="faint" style="margin-left:auto;font-size:11px">${rel(a.created_at)}</span>
-      </div></div></div>`).join('')}</div>`;
+      <div class="qactions mt-3">
+        <button class="btn primary sm hv" data-act="ai-approve" data-id="${a.id}">${icon('check')}Approve</button>
+        <button class="btn sm hv" data-act="ai-edit" data-id="${a.id}">${icon('edit')}Edit</button>
+        <button class="btn sm ghost danger hv" data-act="ai-reject" data-id="${a.id}">Reject</button>
+        <span class="faint small ml-auto">${rel(a.created_at)}</span>
+      </div></div></div>`;
+    }).join('')}</div>`;
   }
 
   function inboxTriage() {
-    if (!S.triage.length) return `<div class="card"><div class="empty">${icon('done_all')}<b>Triage is clear</b><span>Borderline matches (between your maybe and minimum fit scores) show up here for a quick yes / no.</span></div></div>`;
-    return `<div class="triage">${S.triage.map(j => `<div class="card tcard" data-tcard="${j.id}">
-      <div class="top"><div class="mono-av">${esc(initials(j.company))}</div>
-        <div style="min-width:0;flex:1"><div style="font-weight:600">${esc(j.company)}</div><div class="muted" style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(j.title)}</div></div>${scoreTag(j.score)}</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="chip">${esc(j.location)}</span><span class="chip">${esc(j.source)}</span>${j.salary_raw ? `<span class="chip">${esc(j.salary_raw)}</span>` : ''}${j.is_assist_only ? '<span class="chip violet">Assist only</span>' : ''}</div>
+    if (!S.triage.length) return emptyCard('done_all', 'Triage is clear', 'Borderline matches (between your maybe and minimum fit scores) show up here for a quick yes / no.');
+    return `<div class="triage">${S.triage.map(j => `<div class="card tcard lift" data-tcard="${j.id}">
+      <div class="top">${art(j.company)}<div class="grow"><div class="strong">${esc(j.company)}</div><div class="muted small ellipsis">${esc(j.title)}</div></div>${scoreTag(j.score)}</div>
+      <div class="tags"><span class="chip">${esc(j.location)}</span><span class="chip cap">${esc(j.source)}</span>${j.salary_raw ? `<span class="chip">${esc(j.salary_raw)}</span>` : ''}${j.is_assist_only ? '<span class="chip violet">Assist only</span>' : ''}</div>
       <div class="reason">${esc(j.score_reason || j.eligibility_reason || 'No scoring notes')}</div>
-      <div class="acts"><button class="btn" data-act="swipe" data-action="dismiss" data-id="${j.id}">${icon('close')}Dismiss</button>
-        <button class="btn primary" data-act="swipe" data-action="queue" data-id="${j.id}">${icon('playlist_add')}Queue</button>
-        <button class="btn icon" data-job="${j.id}" title="Details">${icon('open_in_full')}</button></div></div>`).join('')}</div>`;
+      <div class="acts"><button class="btn hv" data-act="swipe" data-action="dismiss" data-id="${j.id}">${icon('close')}Dismiss</button>
+        <button class="btn primary hv" data-act="swipe" data-action="queue" data-id="${j.id}">${icon('playlist_add')}Queue</button>
+        <button class="btn icon hv" data-job="${j.id}" title="Details">${icon('open_in_full')}</button></div></div>`).join('')}</div>`;
   }
 
   // ───────────────────────── View: Pipeline ─────────────────────────
   function filteredJobs() {
     const P = S.pipe, q = P.q.trim().toLowerCase();
-    let list = (S.jobs || []).filter(j => {
+    const list = (S.jobs || []).filter(j => {
       if (P.stage !== 'all' && stageOf(j.status).id !== P.stage) return false;
       if (P.source && j.source !== P.source) return false;
       if (P.min && j.score < Number(P.min)) return false;
@@ -450,32 +502,32 @@
     const P = S.pipe, jobs = S.jobs || [];
     const counts = {}; jobs.forEach(j => { const s = stageOf(j.status).id; counts[s] = (counts[s] || 0) + 1; });
     const sources = [...new Set(jobs.map(j => j.source))].sort();
-    const chips = `<div class="chips-scroll"><button class="filter-chip ${P.stage === 'all' ? 'on' : ''}" data-stage-f="all">All <span class="n">${fmt(jobs.length)}</span></button>${STAGES.map(s => `<button class="filter-chip ${P.stage === s.id ? 'on' : ''}" data-stage-f="${s.id}"><span class="dot ${s.color}"></span>${s.label} <span class="n">${fmt(counts[s.id] || 0)}</span></button>`).join('')}</div>`;
+    const chips = `<div class="chips-scroll" role="group" aria-label="Stage"><button class="filter-chip ${P.stage === 'all' ? 'on' : ''}" data-stage-f="all" aria-pressed="${P.stage === 'all'}">All <span class="n">${fmt(jobs.length)}</span></button>${STAGES.map(s => `<button class="filter-chip ${P.stage === s.id ? 'on' : ''}" data-stage-f="${s.id}" aria-pressed="${P.stage === s.id}"><span class="dot ${s.color}"></span>${s.label} <span class="n">${fmt(counts[s.id] || 0)}</span></button>`).join('')}</div>`;
     const toolbar = `<div class="toolbar">
-      <div class="search">${icon('search')}<input class="input" id="pipe-q" placeholder="Filter company, role, location" value="${esc(P.q)}"></div>
-      <select class="select" id="pipe-src" style="width:140px"><option value="">All sources</option>${sources.map(s => `<option ${P.source === s ? 'selected' : ''} value="${esc(s)}">${esc(s)}</option>`).join('')}</select>
-      <select class="select" id="pipe-min" style="width:130px"><option value="">Any score</option>${[4.5, 4, 3.5, 3].map(v => `<option ${String(P.min) === String(v) ? 'selected' : ''} value="${v}">Score ≥ ${v}</option>`).join('')}</select>
+      <div class="search">${icon('search')}<input class="input" id="pipe-q" aria-label="Filter jobs" placeholder="Filter company, role, location" value="${esc(P.q)}"></div>
+      <select class="select w-sm" id="pipe-src" aria-label="Source"><option value="">All sources</option>${sources.map(s => `<option ${P.source === s ? 'selected' : ''} value="${esc(s)}">${esc(s)}</option>`).join('')}</select>
+      <select class="select w-sm" id="pipe-min" aria-label="Minimum score"><option value="">Any score</option>${[4.5, 4, 3.5, 3].map(v => `<option ${String(P.min) === String(v) ? 'selected' : ''} value="${v}">Score ≥ ${v}</option>`).join('')}</select>
       <div class="spacer"></div>
-      <button class="btn" data-act="evaluate" title="Score newly discovered jobs">${icon('analytics')}Score new</button>
-      <div class="seg"><button class="${P.mode === 'table' ? 'on' : ''}" data-pipe-mode="table">${icon('table_rows')}Table</button><button class="${P.mode === 'board' ? 'on' : ''}" data-pipe-mode="board">${icon('view_kanban')}Board</button></div>
-    </div>${chips}<div style="height:12px"></div>`;
-    return `${mobileHead('Jobs', `<span class="faint tnum">${fmt(jobs.length)} tracked</span>`)}${toolbar}<div id="pipe-body">${P.mode === 'table' ? pipeTable() : pipeBoard()}</div>`;
+      <button class="btn hv" data-act="evaluate" title="Score newly discovered jobs">${icon('analytics')}Score new</button>
+      <div class="seg" data-glide="mode"><button class="${P.mode === 'table' ? 'on' : ''}" data-pipe-mode="table">${icon('table_rows')}Table</button><button class="${P.mode === 'board' ? 'on' : ''}" data-pipe-mode="board">${icon('view_kanban')}Board</button></div>
+    </div>${chips}`;
+    return `${pageHead()}${toolbar}<div id="pipe-body">${P.mode === 'table' ? pipeTable() : pipeBoard()}</div>`;
   };
 
   function pipeTable() {
     const P = S.pipe, list = filteredJobs();
-    if (!list.length) return `<div class="card"><div class="empty">${icon('search_off')}<b>No roles match these filters</b><button class="btn" data-act="pipe-reset">Reset filters</button></div></div>`;
-    const th = (key, label, cls = '') => `<th class="sortable ${cls}" data-sort="${key}">${label}${P.sort === key ? icon(P.dir > 0 ? 'arrow_upward' : 'arrow_downward') : ''}</th>`;
-    const rows = list.slice(0, P.limit).map(j => `<tr data-job="${j.id}" class="${S.jobId === j.id ? 'sel' : ''}">
-      <td><div class="co"><div class="mono-av">${esc(initials(j.company))}</div><div style="min-width:0"><div style="font-weight:600;overflow:hidden;text-overflow:ellipsis">${esc(j.title)}</div><div class="muted" style="font-size:12px">${esc(j.company)}</div></div></div></td>
+    if (!list.length) return emptyCard('search_off', 'No roles match these filters', '', `<button class="btn hv" data-act="pipe-reset">Reset filters</button>`);
+    const th = (key, label, cls = '') => `<th class="sortable ${cls}" data-sort="${key}" aria-sort="${P.sort === key ? (P.dir > 0 ? 'ascending' : 'descending') : 'none'}">${label}${P.sort === key ? icon(P.dir > 0 ? 'arrow_upward' : 'arrow_downward') : ''}</th>`;
+    const rows = list.slice(0, P.limit).map(j => `<tr data-job="${j.id}" tabindex="0" class="${S.jobId === j.id ? 'sel' : ''}">
+      <td><div class="co">${art(j.company, 'sm')}<div class="min0"><div class="strong ellipsis">${esc(j.title)}</div><div class="muted small">${esc(j.company)}</div></div></div></td>
       <td>${statusChip(j.status)}</td>
       <td class="r">${scoreTag(j.score)}</td>
-      <td class="hide-m muted" style="text-transform:capitalize">${esc(j.source)}</td>
+      <td class="hide-m muted cap">${esc(j.source)}</td>
       <td class="hide-m muted loc" title="${esc(j.location)}">${esc(j.location)}</td>
       <td class="hide-m muted">${esc(j.salary_raw || (j.stipend_raw ? j.stipend_raw + ' stipend' : '—'))}</td>
       <td class="hide-m faint tnum">${rel(j.updated_at)}</td></tr>`).join('');
     return `<div class="card"><div class="table-wrap"><table class="tbl"><thead><tr>${th('title', 'Role')}<th>Stage</th>${th('score', 'Score', 'r')}<th class="hide-m">Source</th><th class="hide-m">Location</th><th class="hide-m">Pay</th>${th('updated', 'Updated', 'hide-m')}</tr></thead><tbody>${rows}</tbody></table></div>
-      <div class="table-foot"><span class="tnum">Showing ${fmt(Math.min(P.limit, list.length))} of ${fmt(list.length)}</span>${list.length > P.limit ? `<button class="btn sm" data-act="pipe-more">Show more</button>` : ''}</div></div>`;
+      <div class="table-foot"><span class="tnum">Showing ${fmt(Math.min(P.limit, list.length))} of ${fmt(list.length)}</span>${list.length > P.limit ? `<button class="btn sm hv" data-act="pipe-more">Show more</button>` : ''}</div></div>`;
   }
 
   function pipeBoard() {
@@ -484,50 +536,59 @@
     return `<div class="board">${lanes.map(s => {
       const items = list.filter(j => stageOf(j.status).id === s.id);
       const lim = P.laneLimit[s.id] || 25;
-      return `<div class="lane"><div class="lane-h"><span class="dot ${s.color}"></span>${s.label}<span class="n">${fmt(items.length)}</span></div>
-        <div class="lane-b">${items.slice(0, lim).map(j => `<button class="jcard ${S.jobId === j.id ? 'sel' : ''}" data-job="${j.id}">
-          <div class="t1"><span>${esc(j.company)}</span>${scoreTag(j.score)}</div><div class="t2">${esc(j.title)}</div>
-          <div class="t3">${s.statuses.length > 1 || s.id === 'closed' ? statusChip(j.status) : ''}<span class="chip">${esc(j.source)}</span>${j.is_assist_only ? '<span class="chip violet">Assist</span>' : ''}</div></button>`).join('') || '<div class="empty" style="padding:20px 8px">Empty</div>'}
-        ${items.length > lim ? `<button class="btn sm ghost lane-more" data-act="lane-more" data-lane="${s.id}">+ ${fmt(items.length - lim)} more</button>` : ''}</div></div>`;
+      return `<section class="lane" aria-label="${s.label}"><div class="lane-h"><span class="dot ${s.color}"></span>${s.label}<span class="n">${fmt(items.length)}</span></div>
+        <div class="lane-b">${items.slice(0, lim).map(j => `<button class="jcard hv ${S.jobId === j.id ? 'sel' : ''}" data-job="${j.id}">
+          ${art(j.company, 'sm')}<div class="body"><div class="t1"><span>${esc(j.company)}</span>${scoreTag(j.score)}</div><div class="t2">${esc(j.title)}</div>
+          <div class="t3">${s.statuses.length > 1 || s.id === 'closed' ? statusChip(j.status) : ''}<span class="chip cap">${esc(j.source)}</span>${j.is_assist_only ? '<span class="chip violet">Assist</span>' : ''}</div></div></button>`).join('') || '<div class="empty tight">Empty</div>'}
+        ${items.length > lim ? `<button class="btn sm ghost hv lane-more" data-act="lane-more" data-lane="${s.id}">+ ${fmt(items.length - lim)} more</button>` : ''}</div></section>`;
     }).join('')}</div>`;
   }
 
   afterRender.pipeline = () => {
-    const rerender = () => { $('#pipe-body').innerHTML = S.pipe.mode === 'table' ? pipeTable() : pipeBoard(); };
+    const rerender = () => { $('#pipe-body').innerHTML = S.pipe.mode === 'table' ? pipeTable() : pipeBoard(); enhance($('#pipe-body')); };
     const q = $('#pipe-q');
     q && q.addEventListener('input', debounce(e => { S.pipe.q = e.target.value; S.pipe.limit = 100; rerender(); }, 120));
     $('#pipe-src') && $('#pipe-src').addEventListener('change', e => { S.pipe.source = e.target.value; rerender(); });
     $('#pipe-min') && $('#pipe-min').addEventListener('change', e => { S.pipe.min = e.target.value; rerender(); });
   };
 
-  // ───────────────────────── Inspector (job detail) ─────────────────────────
+  // ───────────────────────── Inspector (job sheet) ─────────────────────────
   async function openJob(id) {
     id = Number(id);
+    if (!S.jobId) S.returnFocus = document.activeElement;
     S.jobId = id;
     const insp = $('#inspector');
-    insp.innerHTML = `<div class="insp-h"><span class="eyebrow">Job</span><div style="flex:1"></div><button class="btn icon ghost" data-act="close-insp">${icon('close')}</button></div><div class="insp-b"><div class="skel" style="height:60px"></div><div class="skel" style="height:120px"></div><div class="skel" style="height:180px"></div></div>`;
+    insp.innerHTML = `<div class="insp-h"><div class="grow"></div><button class="btn icon hv" data-act="close-insp" title="Close">${icon('close')}</button></div>
+      <div class="insp-b"><div class="insp-hero"><div class="skel sk-art"></div><div class="skel sk-title"></div></div><div class="skel sk-block"></div></div>`;
     insp.classList.add('on'); $('#scrim').classList.add('on');
+    insp.setAttribute('aria-modal', 'true'); insp.setAttribute('role', 'dialog');
     $$('[data-job]').forEach(el => el.classList.toggle('sel', Number(el.dataset.job) === id));
     try {
       const j = await api(`/jobs/${id}`);
       if (S.jobId !== id) return;
       S.job = j; renderInspector();
+      const close = $('#inspector [data-act=close-insp]'); close && close.focus({ preventScroll: true });
     } catch (e) {
       insp.querySelector('.insp-b').innerHTML = `<div class="empty">${icon('error')}<b>Couldn't load this job</b><span>${esc(e.message)}</span></div>`;
     }
   }
   function closeJob() {
+    if (!S.jobId) return;
     S.jobId = null; S.job = null;
     $('#inspector').classList.remove('on'); $('#scrim').classList.remove('on');
     $$('[data-job].sel').forEach(el => el.classList.remove('sel'));
+    const back = S.returnFocus; S.returnFocus = null;
+    if (back && back.isConnected) back.focus({ preventScroll: true });
   }
   function renderInspector() {
     const j = S.job; if (!j) return;
     const st = stageOf(j.status).id;
     const fits = [['Skills', j.skills_score, 'skills'], ['Experience', j.experience_score, 'experience'], ['Education', j.education_score, 'education'], ['Location', j.location_score, 'location'], ['Compensation', j.compensation_score, 'compensation'], ['Role relevance', j.role_relevance_score, 'role_relevance']];
     const fb = j.fit_breakdown || {};
-    const hasFit = fits.some(f => f[1] > 0);
-    const fitHtml = hasFit ? fits.map(([l, v, k]) => `<div class="fit-row" title="${esc(fb[k] || '')}"><span>${l}</span><div class="bar"><i style="width:${Math.min(100, v)}%;background:${v >= 80 ? 'var(--teal)' : v >= 60 ? 'var(--indigo)' : v >= 40 ? 'var(--amber)' : 'var(--coral)'}"></i></div><span>${Math.round(v)}</span></div>`).join('') : '<div class="faint" style="font-size:13px">Not scored yet. Run "Score new" from the pipeline.</div>';
+    const fitColor = (v) => v >= 80 ? 'var(--teal)' : v >= 60 ? 'var(--indigo)' : v >= 40 ? 'var(--amber)' : 'var(--coral)';
+    const fitHtml = fits.some(f => f[1] > 0)
+      ? fits.map(([l, v, k]) => `<div class="fit-row" title="${esc(fb[k] || '')}"><span>${l}</span><div class="bar"><i style="width:${Math.min(100, v)}%;background:${fitColor(v)}"></i></div><span>${Math.round(v)}</span></div>`).join('')
+      : '<div class="faint small">Not scored yet. Run “Score new” from the pipeline.</div>';
     const skills = (arr, cls) => (arr || []).map(s => `<span class="chip ${cls}">${esc(s)}</span>`).join('');
     const apps = (j.applications || []).map(a => `<div class="tl ${a.status === 'submitted' ? 'teal' : a.status === 'failed' ? 'coral' : 'indigo'}">
       <b>${esc(STATUS_LABEL[a.status] || a.status)}</b> <span class="faint">${esc(stamp(a.submitted_at || a.applied_at))}</span>
@@ -540,47 +601,50 @@
 
     let primary = '', secondary = '';
     if (j.is_assist_only && !['submitted', 'interview'].includes(st)) {
-      primary = `<a class="btn primary" href="${esc(j.url)}" target="_blank" rel="noopener">${icon('open_in_new')}Open & apply myself</a>`;
-      secondary = `<button class="btn" data-act="mark-applied" data-id="${j.id}">${icon('done')}Mark applied</button>`;
+      primary = `<a class="btn primary hv" href="${esc(j.url)}" target="_blank" rel="noopener">${icon('open_in_new')}Open & apply myself</a>`;
+      secondary = `<button class="btn hv" data-act="mark-applied" data-id="${j.id}">${icon('done')}Mark applied</button>`;
     } else if (st === 'triage' || st === 'new') {
-      primary = `<button class="btn primary" data-act="swipe" data-action="queue" data-id="${j.id}">${icon('playlist_add')}Queue</button>`;
-      secondary = `<button class="btn" data-act="swipe" data-action="dismiss" data-id="${j.id}">Dismiss</button>`;
+      primary = `<button class="btn primary hv" data-act="swipe" data-action="queue" data-id="${j.id}">${icon('playlist_add')}Queue</button>`;
+      secondary = `<button class="btn hv" data-act="swipe" data-action="dismiss" data-id="${j.id}">Dismiss</button>`;
     } else if (st === 'queued') {
-      primary = `<button class="btn primary" data-act="apply" data-id="${j.id}">${icon('bolt')}Apply now</button>`;
-      secondary = `<button class="btn" data-act="swipe" data-action="dismiss" data-id="${j.id}">Remove</button>`;
+      primary = `<button class="btn primary hv" data-act="apply" data-id="${j.id}">${icon('bolt')}Apply now</button>`;
+      secondary = `<button class="btn hv" data-act="swipe" data-action="dismiss" data-id="${j.id}">Remove</button>`;
     } else {
-      primary = `<a class="btn primary" href="${esc(j.url)}" target="_blank" rel="noopener">${icon('open_in_new')}Open posting</a>`;
+      primary = `<a class="btn primary hv" href="${esc(j.url)}" target="_blank" rel="noopener">${icon('open_in_new')}Open posting</a>`;
     }
     const statusOpts = ['discovered', 'maybe', 'queued', 'needs_review', 'applied', 'interview', 'offer', 'rejected', 'dismissed', 'skipped'];
     if (!statusOpts.includes(j.status)) statusOpts.unshift(j.status);
+    const section = (title, body) => `<div class="card"><div class="card-b"><div class="eyebrow mb-2">${title}</div>${body}</div></div>`;
 
     $('#inspector').innerHTML = `
-      <div class="insp-h">${statusChip(j.status)}<div style="flex:1"></div>
-        <button class="btn icon ghost" data-act="save-job" data-id="${j.id}" title="${j.is_saved ? 'Unsave' : 'Save'}">${icon('bookmark', j.is_saved ? 'fill' : '')}</button>
-        <a class="btn icon ghost" href="${esc(j.url)}" target="_blank" rel="noopener" title="Open posting">${icon('open_in_new')}</a>
-        <button class="btn icon ghost" data-act="close-insp" title="Close (Esc)">${icon('close')}</button></div>
+      <div class="insp-h"><div class="grow"></div>
+        <button class="btn icon hv" data-act="save-job" data-id="${j.id}" title="${j.is_saved ? 'Unsave' : 'Save'}">${icon('bookmark', j.is_saved ? 'fill' : '')}</button>
+        <a class="btn icon hv" href="${esc(j.url)}" target="_blank" rel="noopener" title="Open posting">${icon('open_in_new')}</a>
+        <button class="btn icon hv" data-act="close-insp" title="Close">${icon('close')}</button></div>
       <div class="insp-b">
-        <div class="jd-head"><div class="mono-av lg">${esc(initials(j.company))}</div><div style="min-width:0"><h2>${esc(j.title)}</h2><div class="co">${esc(j.company)}</div></div>
-          ${j.score > 0 ? `<div class="score-ring">${ring(j.score / 5, 52, 4, scoreColor(j.score))}<div>${Number(j.score).toFixed(1)}</div></div>` : ''}</div>
-        <div class="meta-grid">
-          <div><small>Location</small><span>${esc(j.location)}</span></div><div><small>Work mode</small><span style="text-transform:capitalize">${esc(j.work_mode)}</span></div>
-          <div><small>Pay</small><span>${esc(j.salary_raw || j.stipend_raw || 'Not listed')}</span></div><div><small>Experience</small><span>${esc(j.experience_required)}</span></div>
-          <div><small>Source</small><span style="text-transform:capitalize">${esc(j.source)}${j.is_assist_only ? ' · assist only' : ''}</span></div><div><small>Readiness</small><span class="tnum">${Math.round(j.quality_readiness_score)}%</span></div>
+        <div class="insp-hero" style="--h:${hue(j.company)}">
+          <div class="row-between">${art(j.company, 'xl')}${j.score > 0 ? `<div class="score-ring">${ring(j.score / 5, 56, 5, scoreColor(j.score))}<div>${Number(j.score).toFixed(1)}</div></div>` : ''}</div>
+          <div><div class="mb-2">${statusChip(j.status)}</div><h2 id="insp-title">${esc(j.title)}</h2><div class="co">${esc(j.company)}</div></div>
         </div>
-        ${j.score_reason || j.eligibility_reason ? `<div class="card"><div class="card-b"><div class="eyebrow" style="margin-bottom:6px">Why this fits</div><div style="font-size:13px;line-height:1.5">${esc(j.score_reason || j.eligibility_reason)}</div></div></div>` : ''}
-        <div class="card"><div class="card-b"><div class="eyebrow" style="margin-bottom:8px">Fit breakdown</div>${fitHtml}</div></div>
-        ${(j.matching_skills || []).length || (j.missing_skills || []).length ? `<div class="card"><div class="card-b"><div class="eyebrow" style="margin-bottom:8px">Skills</div><div class="skills">${skills(j.matching_skills, 'teal')}${skills(j.missing_skills, 'coral')}</div></div></div>` : ''}
-        <div class="card"><div class="card-b"><div class="eyebrow" style="margin-bottom:10px">Timeline</div><div class="timeline">${timeline}</div></div></div>
-        <div class="card"><div class="card-b" style="display:flex;flex-direction:column;gap:10px">
-          <div class="eyebrow">Manage</div>
-          <div class="field"><label>Stage</label><select class="select" id="insp-status">${statusOpts.map(s => `<option value="${s}" ${s === j.status ? 'selected' : ''}>${esc(STATUS_LABEL[s] || s)}</option>`).join('')}</select></div>
-          <div class="field"><label>Notes</label><textarea class="textarea" id="insp-notes" placeholder="Recruiter name, referral, follow-up…" style="min-height:64px">${esc(j.notes)}</textarea></div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" data-act="save-status" data-id="${j.id}">${icon('save')}Save</button>
-            <button class="btn sm" data-act="tailor" data-id="${j.id}">${icon('description')}Tailor resume</button>
-            ${st !== 'closed' ? `<button class="btn sm ghost danger" data-act="swipe" data-action="exclude" data-id="${j.id}">Exclude company</button>` : ''}</div>
-        </div></div>
+        <div class="meta-grid">
+          <div><small>Location</small><span>${esc(j.location)}</span></div><div><small>Work mode</small><span class="cap">${esc(j.work_mode)}</span></div>
+          <div><small>Pay</small><span>${esc(j.salary_raw || j.stipend_raw || 'Not listed')}</span></div><div><small>Experience</small><span>${esc(j.experience_required)}</span></div>
+          <div><small>Source</small><span class="cap">${esc(j.source)}${j.is_assist_only ? ' · assist only' : ''}</span></div><div><small>Readiness</small><span class="tnum">${Math.round(j.quality_readiness_score)}%</span></div>
+        </div>
+        ${j.score_reason || j.eligibility_reason ? section('Why this fits', `<div class="small">${esc(j.score_reason || j.eligibility_reason)}</div>`) : ''}
+        ${section('Fit breakdown', fitHtml)}
+        ${(j.matching_skills || []).length || (j.missing_skills || []).length ? section('Skills', `<div class="skills">${skills(j.matching_skills, 'teal')}${skills(j.missing_skills, 'coral')}</div>`) : ''}
+        ${section('Timeline', `<div class="timeline">${timeline}</div>`)}
+        ${section('Manage', `<div class="stack">
+          <div class="field"><label for="insp-status">Stage</label><select class="select" id="insp-status">${statusOpts.map(s => `<option value="${s}" ${s === j.status ? 'selected' : ''}>${esc(STATUS_LABEL[s] || s)}</option>`).join('')}</select></div>
+          <div class="field"><label for="insp-notes">Notes</label><textarea class="textarea short" id="insp-notes" placeholder="Recruiter name, referral, follow-up…">${esc(j.notes)}</textarea></div>
+          <div class="qactions"><button class="btn sm hv" data-act="save-status" data-id="${j.id}">${icon('save')}Save</button>
+            <button class="btn sm hv" data-act="tailor" data-id="${j.id}">${icon('description')}Tailor resume</button>
+            ${st !== 'closed' ? `<button class="btn sm ghost danger hv" data-act="swipe" data-action="exclude" data-id="${j.id}">Exclude company</button>` : ''}</div></div>`)}
       </div>
       <div class="insp-f">${secondary}${primary}</div>`;
+    $('#inspector').setAttribute('aria-labelledby', 'insp-title');
+    enhance($('#inspector'));
   }
 
   // ───────────────────────── View: Answers ─────────────────────────
@@ -596,37 +660,39 @@
     const list = all.filter(a => (A.cat === 'all' || a.category === A.cat) && (!q || `${a.question_text} ${a.answer}`.toLowerCase().includes(q)));
     const groups = {}; list.forEach(a => (groups[a.category] = groups[a.category] || []).push(a));
     const order = cats.filter(c => groups[c]);
-    const addForm = A.adding ? `<div class="card" style="margin-bottom:16px"><div class="card-b">${answerForm({ question_text: '', answer: '', category: A.cat !== 'all' ? A.cat : 'custom', mode: 'always_use' }, 'new')}</div></div>` : '';
+    const addForm = A.adding ? `<div class="card block"><div class="card-b">${answerForm({ question_text: '', answer: '', category: A.cat !== 'all' ? A.cat : 'custom', mode: 'always_use' }, 'new')}</div></div>` : '';
     const body = order.length ? order.map(c => `<div class="ans-group"><span class="eyebrow">${esc(catName(c))} · ${groups[c].length}</span><div class="card list">${groups[c].map(answerRow).join('')}</div></div>`).join('')
-      : `<div class="card"><div class="empty">${icon('search_off')}<b>No answers match</b></div></div>`;
-    return `${mobileHead('Answers')}<div class="toolbar"><div class="search">${icon('search')}<input class="input" id="ans-q" placeholder="Search questions or answers" value="${esc(A.q)}"></div>
-      <div class="spacer"></div><span class="faint tnum" style="font-size:12px">${fmt(all.length)} saved · ${fmt(all.reduce((s, a) => s + (a.usage_count || 0), 0))} auto-fills</span>
-      <button class="btn primary" data-act="ans-add">${icon('add')}New answer</button></div>
-      <div class="ans-layout"><div class="cat-list"><button class="${A.cat === 'all' ? 'on' : ''}" data-cat="all">All <span class="n">${all.length}</span></button>${cats.map(c => `<button class="${A.cat === c ? 'on' : ''}" data-cat="${esc(c)}">${esc(catName(c))} <span class="n">${counts[c]}</span></button>`).join('')}</div>
+      : emptyCard('search_off', 'No answers match');
+    const catBtn = (id, label, n) => `<button class="hv ${A.cat === id ? 'on' : ''}" data-cat="${esc(id)}" aria-pressed="${A.cat === id}">${esc(label)} <span class="n">${n}</span></button>`;
+    return `${pageHead()}<div class="toolbar"><div class="search">${icon('search')}<input class="input" id="ans-q" aria-label="Search answers" placeholder="Search questions or answers" value="${esc(A.q)}"></div>
+      <div class="spacer"></div><span class="hint tnum">${fmt(all.length)} saved · ${fmt(all.reduce((s, a) => s + (a.usage_count || 0), 0))} auto-fills</span>
+      <button class="btn primary hv" data-act="ans-add">${icon('add')}New answer</button></div>
+      <div class="ans-layout"><nav class="cat-list" aria-label="Categories">${catBtn('all', 'All', all.length)}${cats.map(c => catBtn(c, catName(c), counts[c])).join('')}</nav>
       <div id="ans-body">${addForm}${body}</div></div>`;
   };
   function answerRow(a) {
     if (S.ans.editing === a.id) return `<div class="ans-row">${answerForm(a, a.id)}</div>`;
     const review = a.mode !== 'always_use';
-    return `<div class="ans-row"><div style="min-width:0"><div class="q">${esc(a.question_text)}</div><div class="a">${esc(a.answer) || '<span class="faint">(empty)</span>'}</div></div>
-      <div class="end"><div class="act"><button class="btn sm icon ghost" data-act="ans-edit" data-id="${a.id}" title="Edit">${icon('edit')}</button><button class="btn sm icon ghost danger" data-act="ans-del" data-id="${a.id}" title="Delete">${icon('delete')}</button></div>
+    return `<div class="ans-row hv"><div class="min0"><div class="q">${esc(a.question_text)}</div><div class="a">${esc(a.answer) || '<span class="faint">(empty)</span>'}</div></div>
+      <div class="end"><div class="act"><button class="btn sm icon ghost hv" data-act="ans-edit" data-id="${a.id}" title="Edit answer">${icon('edit')}</button><button class="btn sm icon ghost danger hv" data-act="ans-del" data-id="${a.id}" title="Delete answer">${icon('delete')}</button></div>
         ${a.source === 'gemini' ? '<span class="chip violet">AI</span>' : ''}<span class="chip ${review ? 'amber' : ''}">${review ? 'Review' : 'Always use'}</span>
-        <span class="faint tnum" style="font-size:11px;width:34px;text-align:right" title="Times auto-filled">${a.usage_count ? '×' + a.usage_count : ''}</span></div></div>`;
+        <span class="uses" title="Times auto-filled">${a.usage_count ? '×' + a.usage_count : ''}</span></div></div>`;
   }
   function answerForm(a, id) {
     const modes = MODES.includes(a.mode) ? MODES : [a.mode, ...MODES];
     const cats = Object.keys(CATS).includes(a.category) ? Object.keys(CATS) : [a.category, ...Object.keys(CATS)];
+    const fid = `af-${id}`;
     return `<form class="ans-edit" data-ans-form="${id}">
-      <div class="field"><label>Question</label><input class="input" name="question_text" value="${esc(a.question_text)}" required></div>
-      <div class="field"><label>Answer</label><textarea class="textarea" name="answer" required>${esc(a.answer)}</textarea></div>
-      <div class="row2"><div class="field"><label>Category</label><select class="select" name="category">${cats.map(c => `<option value="${esc(c)}" ${c === a.category ? 'selected' : ''}>${esc(catName(c))}</option>`).join('')}</select></div>
-        <div class="field"><label>When filling forms</label><select class="select" name="mode">${modes.map(m => `<option value="${esc(m)}" ${m === a.mode ? 'selected' : ''}>${m === 'always_use' ? 'Always use' : m === 'ask me to review' ? 'Ask me to review' : esc(m)}</option>`).join('')}</select></div></div>
-      <div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn ghost" data-act="ans-cancel">Cancel</button><button type="submit" class="btn primary">${id === 'new' ? 'Add answer' : 'Save'}</button></div></form>`;
+      <div class="field"><label for="${fid}-q">Question</label><input class="input" id="${fid}-q" name="question_text" value="${esc(a.question_text)}" required></div>
+      <div class="field"><label for="${fid}-a">Answer</label><textarea class="textarea" id="${fid}-a" name="answer" required>${esc(a.answer)}</textarea></div>
+      <div class="row2"><div class="field"><label for="${fid}-c">Category</label><select class="select" id="${fid}-c" name="category">${cats.map(c => `<option value="${esc(c)}" ${c === a.category ? 'selected' : ''}>${esc(catName(c))}</option>`).join('')}</select></div>
+        <div class="field"><label for="${fid}-m">When filling forms</label><select class="select" id="${fid}-m" name="mode">${modes.map(m => `<option value="${esc(m)}" ${m === a.mode ? 'selected' : ''}>${m === 'always_use' ? 'Always use' : m === 'ask me to review' ? 'Ask me to review' : esc(m)}</option>`).join('')}</select></div></div>
+      <div class="row-end"><button type="button" class="btn ghost hv" data-act="ans-cancel">Cancel</button><button type="submit" class="btn primary hv">${id === 'new' ? 'Add answer' : 'Save'}</button></div></form>`;
   }
   afterRender.answers = () => {
     const q = $('#ans-q');
     q && q.addEventListener('input', debounce(e => { S.ans.q = e.target.value; const pos = e.target.selectionStart; render(); const n = $('#ans-q'); n.focus(); n.setSelectionRange(pos, pos); }, 150));
-    const f = $('[data-ans-form] [name=answer]'); if (f && (S.ans.adding || S.ans.editing)) { const t = $('[data-ans-form] [name=question_text]'); (S.ans.adding ? t : f).focus(); }
+    if (S.ans.adding || S.ans.editing) { const t = $(S.ans.adding ? '[data-ans-form] [name=question_text]' : '[data-ans-form] [name=answer]'); t && t.focus(); }
   };
 
   // ───────────────────────── View: Activity ─────────────────────────
@@ -635,13 +701,13 @@
     const norm = (l) => l === 'warning' ? 'warn' : l;
     const counts = { all: S.logs.length }; S.logs.forEach(l => { const k = norm(l.level); counts[k] = (counts[k] || 0) + 1; });
     const list = S.logs.filter(l => (A.level === 'all' || norm(l.level) === A.level) && (!q || `${l.message} ${l.event_type} ${l.company}`.toLowerCase().includes(q)));
-    const rows = list.map(l => `<tr style="cursor:default"><td class="faint tnum mono">${esc(l.created_at)}</td><td><span class="lvl ${esc(l.level)}">${esc(l.level)}</span></td>
-      <td class="hide-m"><span class="chip">${esc(l.event_type)}</span></td><td class="msg"><span class="dot ${logColor(l)}" style="margin-right:8px"></span>${esc(l.message)}</td></tr>`).join('');
-    return `${mobileHead('Activity')}<div class="toolbar"><div class="search">${icon('search')}<input class="input" id="act-q" placeholder="Filter log" value="${esc(A.q)}"></div>
-      <div class="seg">${['all', 'info', 'warn', 'error'].map(l => `<button class="${A.level === l ? 'on' : ''}" data-level="${l}">${l[0].toUpperCase() + l.slice(1)} <span class="n">${counts[l] || 0}</span></button>`).join('')}</div>
-      <div class="spacer"></div><span class="faint" style="font-size:12px;display:flex;align-items:center;gap:6px"><span class="dot teal pulse"></span>Auto-refreshing</span>
-      <button class="btn" data-act="backup">${icon('backup')}Back up now</button></div>
-      <div class="card"><div class="table-wrap"><table class="tbl log-tbl"><thead><tr><th style="width:150px">Time</th><th style="width:70px">Level</th><th class="hide-m" style="width:150px">Event</th><th>Message</th></tr></thead>
+    const rows = list.map(l => `<tr><td class="faint tnum mono">${esc(l.created_at)}</td><td><span class="lvl ${esc(l.level)}">${esc(l.level)}</span></td>
+      <td class="hide-m"><span class="chip">${esc(l.event_type)}</span></td><td class="msg"><span class="dot ${logColor(l)}"></span> ${esc(l.message)}</td></tr>`).join('');
+    return `${pageHead()}<div class="toolbar"><div class="search">${icon('search')}<input class="input" id="act-q" aria-label="Filter log" placeholder="Filter log" value="${esc(A.q)}"></div>
+      <div class="seg" data-glide="level">${['all', 'info', 'warn', 'error'].map(l => `<button class="${A.level === l ? 'on' : ''}" data-level="${l}" aria-pressed="${A.level === l}">${l[0].toUpperCase() + l.slice(1)} <span class="n">${counts[l] || 0}</span></button>`).join('')}</div>
+      <div class="spacer"></div><span class="live-ind"><span class="dot teal pulse"></span>Live</span>
+      <button class="btn hv" data-act="backup">${icon('backup')}Back up now</button></div>
+      <div class="card"><div class="table-wrap"><table class="tbl log-tbl"><thead><tr><th class="w-time">Time</th><th class="w-lvl">Level</th><th class="hide-m w-ev">Event</th><th>Message</th></tr></thead>
       <tbody>${rows || `<tr><td colspan="4"><div class="empty">No log entries</div></td></tr>`}</tbody></table></div></div>`;
   };
   afterRender.activity = () => {
@@ -651,7 +717,7 @@
 
   // ───────────────────────── View: Profile & rules ─────────────────────────
   renderers.settings = () => {
-    const p = S.profile; if (!p) return errorView(new Error('Profile not available'));
+    const p = S.profile; if (!p) return emptyCard('person_off', 'Profile not available');
     const g = S.gemini || {}, st = S.stats || {}, au = S.automation || {};
     const f = (name, label, opts = {}) => {
       const v = p[name] ?? '';
@@ -659,36 +725,37 @@
       const val = Array.isArray(v) ? v.join(', ') : v;
       return `<div class="field ${opts.full ? 'full' : ''}"><label for="f-${name}">${label}</label><input class="input ${type === 'number' ? 'tnum' : ''}" id="f-${name}" name="${name}" type="${type}" ${opts.step ? `step="${opts.step}"` : ''} ${opts.min !== undefined ? `min="${opts.min}"` : ''} ${opts.max !== undefined ? `max="${opts.max}"` : ''} value="${esc(val)}" data-kind="${Array.isArray(v) ? 'list' : type}">${opts.hint ? `<span class="hint">${opts.hint}</span>` : ''}</div>`;
     };
-    const tg = (name, label, hint) => `<label class="set-row"><div class="grow">${label}${hint ? `<small>${hint}</small>` : ''}</div><span class="toggle"><input type="checkbox" name="${name}" ${p[name] ? 'checked' : ''}><i></i></span></label>`;
-    return `${mobileHead('Profile')}
+    const tg = (name, label, hint) => `<label class="set-row hv"><div class="grow">${label}${hint ? `<small>${hint}</small>` : ''}</div><span class="toggle"><input type="checkbox" name="${name}" ${p[name] ? 'checked' : ''}><i></i></span></label>`;
+    const save = (label) => `<div class="full row-end"><button class="btn primary hv" type="submit">${label}</button></div>`;
+    return `${pageHead()}
     <div class="settings">
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <div class="card"><div class="profile-hero"><div class="mono-av">${esc(initials(p.full_name))}</div><div style="min-width:0"><h2>${esc(p.full_name)}</h2><div class="muted" style="font-size:13px">${esc(p.education)} · CGPA ${esc(p.cgpa)}</div></div></div></div>
+      <div class="stack">
+        <div class="card"><div class="profile-hero">${art(p.full_name, 'lg')}<div class="min0"><h2>${esc(p.full_name)}</h2><div class="muted small">${esc(p.education)} · CGPA ${esc(p.cgpa)}</div></div></div></div>
 
-        <form class="card" data-profile-form="engine"><div class="card-h"><span class="card-t">Engine</span><span class="aside">${st.go_live ? '<span class="chip coral">Live submissions</span>' : '<span class="chip">Dry run</span>'}</span></div>
-          <div class="list" style="margin-top:8px">
-            <div class="set-row"><div class="grow">Live submissions<small>${st.go_live ? 'Applications are really submitted to employers.' : 'Forms are filled and screenshotted but never submitted.'}</small></div><button type="button" class="btn sm ${st.go_live ? 'danger' : ''}" data-act="${st.go_live ? 'mode-dry' : 'mode-live'}">${st.go_live ? 'Switch to dry run' : 'Go live…'}</button></div>
-            <div class="set-row"><div class="grow">Queue<small>${esc(engineLabel(st)[0])}${au.affected_queue_count ? ` · ${au.affected_queue_count} jobs waiting` : ''}</small></div><button type="button" class="btn sm" data-act="${st.is_paused ? 'resume' : 'pause'}">${st.is_paused ? 'Resume' : 'Pause'}</button></div>
+        <form class="card" data-profile-form="engine"><div class="card-h"><span class="card-t">Engine</span><span class="aside">${st.go_live ? '<span class="chip accent">Live submissions</span>' : '<span class="chip">Dry run</span>'}</span></div>
+          <div class="set-list">
+            <div class="set-row"><div class="grow">Live submissions<small>${st.go_live ? 'Applications are really submitted to employers.' : 'Forms are filled and screenshotted but never submitted.'}</small></div><button type="button" class="btn sm hv ${st.go_live ? 'danger' : ''}" data-act="${st.go_live ? 'mode-dry' : 'mode-live'}">${st.go_live ? 'Switch to dry run' : 'Go live…'}</button></div>
+            <div class="set-row"><div class="grow">Queue<small>${esc(engineLabel(st)[0])}${au.affected_queue_count ? ` · ${au.affected_queue_count} jobs waiting` : ''}</small></div><button type="button" class="btn sm hv" data-act="${st.is_paused ? 'resume' : 'pause'}">${st.is_paused ? 'Resume' : 'Pause'}</button></div>
           </div>
-          <div class="card-b form-grid" style="border-top:1px solid var(--line)">
+          <div class="card-b form-grid card-sep">
             ${f('daily_cap', 'Daily cap', { type: 'number', min: 0 })}${f('daily_target', 'Daily target', { type: 'number', min: 0 })}
             ${f('hourly_cap', 'Hourly cap', { type: 'number', min: 0 })}${f('timezone', 'Timezone')}
             ${f('active_hours_start', 'Active from (hour)', { type: 'number', min: 0, max: 23 })}${f('active_hours_end', 'Active until (hour)', { type: 'number', min: 0, max: 24 })}
             ${f('min_fit_score', 'Auto-queue at score ≥', { type: 'number', step: '0.1', min: 0, max: 5, hint: 'Jobs at or above this are queued automatically' })}${f('maybe_fit_score', 'Triage at score ≥', { type: 'number', step: '0.1', min: 0, max: 5, hint: 'Between the two lands in Needs you › Triage' })}
-            <div class="full" style="display:flex;justify-content:flex-end"><button class="btn primary" type="submit">Save engine rules</button></div>
+            ${save('Save engine rules')}
           </div></form>
 
         <form class="card" data-gemini-form><div class="card-h"><span class="card-t">Gemini auto-answer</span><span class="aside tnum">${fmt(g.gemini_answers_today || 0)} today · ~${fmt(g.saved_minutes || 0)} min saved</span></div>
-          <div class="list" style="margin-top:8px"><label class="set-row"><div class="grow">Draft answers for unknown questions<small>Grounded only in your locked facts. Drafts wait in Needs you › AI drafts.</small></div><span class="toggle"><input type="checkbox" name="gemini_auto_answer_enabled" ${g.gemini_auto_answer_enabled ? 'checked' : ''}><i></i></span></label></div>
-          <div class="card-b form-grid" style="border-top:1px solid var(--line)">
-            <div class="field"><label>Minimum confidence</label><div class="range-row"><input type="range" name="gemini_min_confidence" min="0.5" max="1" step="0.01" value="${g.gemini_min_confidence ?? 0.85}" oninput="this.nextElementSibling.value=Math.round(this.value*100)+'%'"><output>${Math.round((g.gemini_min_confidence ?? 0.85) * 100)}%</output></div></div>
-            <div class="field"><label>Daily answer cap</label><input class="input tnum" type="number" name="gemini_daily_cap" min="0" value="${g.gemini_daily_cap ?? 30}"></div>
+          <div class="set-list"><label class="set-row hv"><div class="grow">Draft answers for unknown questions<small>Grounded only in your locked facts. Drafts wait in Needs you › AI drafts.</small></div><span class="toggle"><input type="checkbox" name="gemini_auto_answer_enabled" ${g.gemini_auto_answer_enabled ? 'checked' : ''}><i></i></span></label></div>
+          <div class="card-b form-grid card-sep">
+            <div class="field"><label for="g-conf">Minimum confidence</label><div class="range-row"><input type="range" id="g-conf" name="gemini_min_confidence" min="0.5" max="1" step="0.01" value="${g.gemini_min_confidence ?? 0.85}"><output>${Math.round((g.gemini_min_confidence ?? 0.85) * 100)}%</output></div></div>
+            <div class="field"><label for="g-cap">Daily answer cap</label><input class="input tnum" id="g-cap" type="number" name="gemini_daily_cap" min="0" value="${g.gemini_daily_cap ?? 30}"></div>
             <div class="field full"><label>Always asks you about</label><div class="tags">${(g.gemini_sensitive_categories || []).map(c => `<span class="chip">${esc(c.replace(/_/g, ' '))}</span>`).join('')}</div></div>
-            <div class="full" style="display:flex;justify-content:space-between;align-items:center"><span class="faint" style="font-size:12px">${esc(g.model_name || '')}${g.circuit_breaker_active ? ' · <span class="bad">rate-limit breaker active</span>' : ''}</span><button class="btn primary" type="submit">Save</button></div>
+            <div class="full row-between"><span class="faint small">${esc(g.model_name || '')}${g.circuit_breaker_active ? ' · <span class="bad">rate-limit breaker active</span>' : ''}</span><button class="btn primary hv" type="submit">Save</button></div>
           </div></form>
       </div>
 
-      <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="stack">
         <form class="card" data-profile-form="targeting"><div class="card-h"><span class="card-t">Targeting</span></div>
           <div class="card-b form-grid">
             ${f('target_roles', 'Target roles', { full: true, hint: 'Comma separated' })}
@@ -697,8 +764,8 @@
             ${f('min_salary_inr', 'Minimum salary (₹ / year)', { type: 'number', min: 0 })}${f('min_stipend_inr', 'Minimum stipend (₹ / month)', { type: 'number', min: 0 })}
             ${f('preferred_work_mode', 'Work mode', { full: true })}
           </div>
-          <div class="list" style="border-top:1px solid var(--line)">${tg('allow_unknown_salary', 'Apply when pay is not listed')}${tg('allow_unpaid_internships', 'Allow unpaid internships')}</div>
-          <div class="card-b" style="display:flex;justify-content:flex-end;padding-top:0"><button class="btn primary" type="submit">Save targeting</button></div></form>
+          <div class="set-list card-sep">${tg('allow_unknown_salary', 'Apply when pay is not listed')}${tg('allow_unpaid_internships', 'Allow unpaid internships')}</div>
+          <div class="card-b row-end">${save('Save targeting')}</div></form>
 
         <form class="card" data-profile-form="contact"><div class="card-h"><span class="card-t">Contact & credentials</span><span class="aside">Used verbatim on forms</span></div>
           <div class="card-b form-grid">
@@ -708,16 +775,20 @@
             ${f('linkedin', 'LinkedIn', { full: true })}${f('github', 'GitHub', { full: true })}
             ${f('graduation_date', 'Graduation date')}${f('notice_period', 'Notice period')}
             ${f('work_authorization', 'Work authorization')}${f('relocation_preference', 'Relocation')}
-            <div class="full" style="display:flex;justify-content:flex-end"><button class="btn primary" type="submit">Save contact</button></div>
+            ${save('Save contact')}
           </div></form>
 
         <div class="card"><div class="card-h"><span class="card-t">Resume versions</span><span class="aside">${S.resumes.length}</span></div>
-          <div class="list" style="margin-top:8px">${S.resumes.map(r => `<div class="row"><div class="mono-av">${icon('description')}</div>
+          <div class="list">${S.resumes.map(r => `<div class="row"><span class="art plain">${icon('description')}</span>
             <div class="grow"><div class="main-t">${esc(r.version_name)}</div><div class="sub-t">${esc(r.target_role)} · ATS ${Math.round(r.ats_score)}</div></div>
-            <div class="end">${r.is_master ? '<span class="chip teal">Master</span>' : ''}${r.pdf_path ? `<a class="btn sm icon ghost" href="${esc(r.pdf_path)}" target="_blank" rel="noopener" title="Open PDF">${icon('open_in_new')}</a>` : ''}</div></div>`).join('') || '<div class="empty">No resume versions</div>'}</div></div>
-        ${IN_SHELL ? `<div class="card"><div class="list"><div class="set-row"><div class="grow">Phone app connection<small>${esc(location.host)}</small></div><button type="button" class="btn sm" data-act="shell-server">Change server</button></div></div></div>` : ''}
+            <div class="end">${r.is_master ? '<span class="chip teal">Master</span>' : ''}${r.pdf_path ? `<a class="btn sm icon ghost hv" href="${esc(r.pdf_path)}" target="_blank" rel="noopener" title="Open PDF">${icon('open_in_new')}</a>` : ''}</div></div>`).join('') || '<div class="empty">No resume versions</div>'}</div></div>
+        ${IN_SHELL ? `<div class="card"><div class="set-list"><div class="set-row"><div class="grow">Phone app connection<small>${esc(location.host)}</small></div><button type="button" class="btn sm hv" data-act="shell-server">Change server</button></div></div></div>` : ''}
       </div>
     </div>`;
+  };
+  afterRender.settings = () => {
+    const r = $('#g-conf');
+    r && r.addEventListener('input', () => { r.nextElementSibling.value = Math.round(r.value * 100) + '%'; });
   };
 
   const PROFILE_SECTIONS = {
@@ -859,8 +930,8 @@
       const card = btn.closest('[data-ai]'), id = Number(btn.dataset.id);
       const a = S.aiAnswers.find(x => x.id === id);
       const box = card.querySelector('.ai-answer');
-      box.outerHTML = `<textarea class="textarea ai-answer" style="margin-top:8px">${esc(a.answer)}</textarea>`;
-      card.querySelector('.qactions').innerHTML = `<button class="btn primary sm" data-act="ai-save" data-id="${id}">${icon('check')}Save & approve</button><button class="btn sm ghost" data-act="ai-cancel">Cancel</button>`;
+      box.outerHTML = `<textarea class="textarea mt-2" aria-label="Edit answer">${esc(a.answer)}</textarea>`;
+      card.querySelector('.qactions').innerHTML = `<button class="btn primary sm hv" data-act="ai-save" data-id="${id}">${icon('check')}Save & approve</button><button class="btn sm ghost hv" data-act="ai-cancel">Cancel</button>`;
       card.querySelector('textarea').focus();
     },
     'ai-cancel': () => render(),
@@ -1002,7 +1073,7 @@
     pal.flat = [...jobs, ...cmds];
     pal.sel = Math.min(pal.sel, Math.max(0, pal.flat.length - 1));
     let i = 0;
-    const sec = (title, items) => items.length ? `<div class="palette-sec">${title}</div>` + items.map(x => `<button class="palette-item ${i === pal.sel ? 'on' : ''}" data-pi="${i++}">${icon(x.icon)}<span class="grow">${esc(x.label)}</span>${x.hint ? `<span class="hint">${esc(x.hint)}</span>` : ''}</button>`).join('') : '';
+    const sec = (title, items) => items.length ? `<div class="palette-sec">${title}</div>` + items.map(x => `<button class="palette-item hv ${i === pal.sel ? 'on' : ''}" data-pi="${i++}" role="option" aria-selected="${i - 1 === pal.sel}">${icon(x.icon)}<span class="grow">${esc(x.label)}</span>${x.hint ? `<span class="hint">${esc(x.hint)}</span>` : ''}</button>`).join('') : '';
     $('#pal-list').innerHTML = sec('Jobs', jobs) + sec('Commands', cmds) || `<div class="empty">No matches</div>`;
     const on = $('#pal-list .on'); on && on.scrollIntoView({ block: 'nearest' });
   }
@@ -1026,6 +1097,8 @@
       else if (e.key === 'Enter') { e.preventDefault(); execPalette(pal.sel); }
       return;
     }
+    // Table rows open the job sheet from the keyboard like buttons do.
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('tr[data-job]')) { e.preventDefault(); openJob(e.target.dataset.job); return; }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openPalette(); return; }
     if (e.key === 'Escape') { if (S.jobId) closeJob(); else if (isTyping()) document.activeElement.blur(); return; }
     if (isTyping() || e.ctrlKey || e.metaKey || e.altKey || $('#overlay').innerHTML) return;
@@ -1057,8 +1130,9 @@
     await loadStats();
     const editing = isTyping() || $('#overlay').innerHTML || S.ans.editing || S.ans.adding;
     if (editing) return;
-    if (S.view === 'today') { try { await loaders.today(); if (S.view === 'today') render(); } catch (e) {} }
-    if (S.view === 'activity') { try { await loaders.activity(); if (S.view === 'activity') render(); } catch (e) {} }
+    // render({ poll: true }) skips the DOM entirely when nothing changed, so hovers are never interrupted.
+    if (S.view === 'today') { try { await loaders.today(); if (S.view === 'today') render({ poll: true }); } catch (e) {} }
+    if (S.view === 'activity') { try { await loaders.activity(); if (S.view === 'activity') render({ poll: true }); } catch (e) {} }
   }
 
   // ───────────────────────── Boot ─────────────────────────

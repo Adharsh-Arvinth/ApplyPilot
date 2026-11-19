@@ -4,7 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
-  <meta name="theme-color" content="#000000"/>
+  <meta name="theme-color" content="#0B0B0D"/>
   <title>ApplyPilot</title>
   <script>
     // Retire legacy Flutter service workers / caches from earlier builds.
@@ -15,36 +15,34 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"/>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..24,300..500,0..1,0&display=block"/>
-  <link rel="stylesheet" href="app.css?v=6"/>
+  <!-- Text: SF Pro on Apple devices, Inter elsewhere (swaps in, never blocks).
+       Icons: display=block on purpose, so icon names never flash as plain words. -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"/>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..24,400..500,0..1,0&display=block"/>
+  <link rel="stylesheet" href="app.css?v=8"/>
 </head>
 <body>
   <div class="shell">
     <aside class="sidebar" aria-label="Primary">
       <div class="brand">
-        <div class="brand-mark">AP</div>
+        <div class="brand-mark" aria-hidden="true">AP</div>
         <div>
           <div class="brand-name">ApplyPilot</div>
           <div class="brand-sub">Command center</div>
         </div>
       </div>
-      <nav class="nav" id="nav"></nav>
+      <nav class="nav" id="nav" aria-label="Sections"></nav>
       <div class="engine" id="engine"></div>
     </aside>
 
     <section class="main">
       <header class="topbar">
-        <div style="min-width:0">
-          <div class="page-title" id="page-title">Today</div>
-          <div class="page-sub" id="page-sub"></div>
-        </div>
-        <div class="spacer"></div>
-        <button class="search-trigger" id="search-trigger" aria-label="Search and commands">
-          <span class="ms">search</span><span>Search jobs, run commands…</span><span class="kbd">Ctrl K</span>
+        <button class="search-trigger hv" id="search-trigger" aria-label="Search jobs and run commands">
+          <span class="ms" aria-hidden="true">search</span><span class="lbl">Search jobs, run commands…</span><span class="kbd">Ctrl K</span>
         </button>
-        <div class="desk top-actions" id="top-actions"></div>
-        <button class="btn icon ghost" id="theme-btn" title="Toggle theme" aria-label="Toggle theme"><span class="ms">contrast</span></button>
+        <div class="lcd" id="lcd" role="status" aria-live="polite"></div>
+        <div class="top-actions" id="top-actions"></div>
+        <button class="btn icon ghost hv" id="theme-btn" aria-label="Toggle light and dark" title="Toggle light and dark"><span class="ms" aria-hidden="true">contrast</span></button>
       </header>
       <main class="content" id="content"></main>
     </section>
@@ -55,8 +53,8 @@
   <div class="scrim" id="scrim"></div>
   <aside class="inspector" id="inspector" aria-label="Job detail"></aside>
   <div id="overlay"></div>
-  <div class="toasts" id="toasts"></div>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
 
-  <script src="app.js?v=6"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>
