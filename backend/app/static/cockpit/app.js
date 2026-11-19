@@ -37,6 +37,9 @@
     return data;
   }
 
+  // Running inside the ApplyPilot Android app? (it injects this JavaScript channel)
+  const IN_SHELL = typeof window.ApplyPilotShell !== 'undefined' && !!window.ApplyPilotShell.postMessage;
+
   // ───────────────────────── Helpers ─────────────────────────
   const $ = (s, el = document) => el.querySelector(s);
   const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -712,6 +715,7 @@
           <div class="list" style="margin-top:8px">${S.resumes.map(r => `<div class="row"><div class="mono-av">${icon('description')}</div>
             <div class="grow"><div class="main-t">${esc(r.version_name)}</div><div class="sub-t">${esc(r.target_role)} · ATS ${Math.round(r.ats_score)}</div></div>
             <div class="end">${r.is_master ? '<span class="chip teal">Master</span>' : ''}${r.pdf_path ? `<a class="btn sm icon ghost" href="${esc(r.pdf_path)}" target="_blank" rel="noopener" title="Open PDF">${icon('open_in_new')}</a>` : ''}</div></div>`).join('') || '<div class="empty">No resume versions</div>'}</div></div>
+        ${IN_SHELL ? `<div class="card"><div class="list"><div class="set-row"><div class="grow">Phone app connection<small>${esc(location.host)}</small></div><button type="button" class="btn sm" data-act="shell-server">Change server</button></div></div></div>` : ''}
       </div>
     </div>`;
   };
@@ -882,6 +886,7 @@
       S.answers = S.answers.filter(x => x.id !== id); render();
     },
     async backup(btn) { await run(btn, () => api('/backup', { method: 'POST' }), 'Backup created'); },
+    'shell-server'() { if (IN_SHELL) window.ApplyPilotShell.postMessage('change-server'); },
   };
 
   // ───────────────────────── Events ─────────────────────────
@@ -969,6 +974,7 @@
       { icon: 'science', label: S.stats && S.stats.go_live ? 'Switch to dry run' : 'Go live…', run: () => setMode(!(S.stats && S.stats.go_live)) },
       { icon: 'backup', label: 'Back up database now', run: () => actions.backup() },
       { icon: 'contrast', label: 'Toggle light / dark', run: toggleTheme },
+      ...(IN_SHELL ? [{ icon: 'dns', label: 'Phone app: change server', run: () => actions['shell-server']() }] : []),
     ];
     const c = cmds.filter(x => !q || x.label.toLowerCase().includes(q));
     const jobs = q && S.jobs ? S.jobs.filter(j => `${j.company} ${j.title}`.toLowerCase().includes(q)).slice(0, 8)
@@ -1032,6 +1038,16 @@
       const b = $(`[data-tcard] [data-action="${e.key === 'q' ? 'queue' : 'dismiss'}"]`); b && actions.swipe(b);
     }
   });
+
+  // Android app (app/lib/shell): the hardware back button asks the page first.
+  // Returns true when it closed something or went back to Today; false lets the app exit.
+  window.__apBack = () => {
+    if ($('#overlay').innerHTML) { if (pal) closePalette(); else $('#overlay').innerHTML = ''; return true; }
+    if (S.jobId) { closeJob(); return true; }
+    if (S.ans.editing || S.ans.adding) { actions['ans-cancel'](); return true; }
+    if (S.view !== 'today') { go('today'); return true; }
+    return false;
+  };
 
   window.addEventListener('hashchange', () => { const v = location.hash.replace(/^#\/?/, ''); if (v && v !== S.view) go(v); });
 

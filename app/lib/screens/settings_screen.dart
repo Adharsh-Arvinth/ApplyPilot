@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
 import '../core/hallmark_tokens.dart';
-import '../main.dart';
+import '../core/theme_mode.dart';
 
 class SettingsScreen extends StatefulWidget {
   final VoidCallback? onNavigateToProfile;

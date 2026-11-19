@@ -2,35 +2,40 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:applypilot/main.dart';
+import 'package:applypilot/shell/connect_screen.dart';
+import 'package:applypilot/shell/shell_config.dart';
 import 'package:applypilot/core/theme.dart';
-import 'package:applypilot/ui_templates/layout/kite_app_shell.dart';
 import 'package:applypilot/widgets/smart_widgets.dart';
 import 'package:applypilot/widgets/interactive_charts.dart';
 import 'package:applypilot/screens/ai_assistant_screen.dart';
 import 'package:applypilot/core/motion.dart';
 
 void main() {
-  testWidgets('ApplyPilotApp boots to MainNavigationShell when onboarding is complete', (WidgetTester tester) async {
-    SharedPreferences.setMockInitialValues({"onboarding_complete": true});
-    await tester.pumpWidget(const ApplyPilotApp(initialOnboardingDone: true));
+  testWidgets('A fresh install opens the connect screen', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final cfg = await ShellConfig.load();
+    expect(cfg.ready, isFalse);
+
+    await tester.pumpWidget(ApplyPilotApp(initialConfig: cfg));
     await tester.pumpAndSettle();
 
-    expect(find.byType(ApplyPilotApp), findsOneWidget);
-    expect(find.byType(KiteAppShell), findsOneWidget);
-    expect(find.text("Dashboard"), findsOneWidget);
-    expect(find.text("Discover"), findsOneWidget);
-    expect(find.text("Tracker"), findsOneWidget);
-    expect(find.text("Needs You"), findsWidgets);
-    expect(find.text("Hub"), findsOneWidget);
+    expect(find.byType(ConnectScreen), findsOneWidget);
+    expect(find.text('Connect'), findsOneWidget);
+    expect(find.text('Cancel'), findsNothing); // nothing to go back to yet
   });
 
-  testWidgets('ApplyPilotApp boots to OnboardingScreen when onboarding is false', (WidgetTester tester) async {
-    SharedPreferences.setMockInitialValues({"onboarding_complete": false});
-    await tester.pumpWidget(const ApplyPilotApp(initialOnboardingDone: false));
-    await tester.pumpAndSettle();
+  test('Settings saved by the previous app carry over, so upgrades skip setup', () async {
+    SharedPreferences.setMockInitialValues({'server_url': 'http://100.1.2.3:8000/', 'auth_token': 'abc'});
+    final cfg = await ShellConfig.load();
+    expect(cfg.ready, isTrue);
+    expect(cfg.serverUrl, 'http://100.1.2.3:8000');
+    expect(cfg.cockpitUri().toString(), 'http://100.1.2.3:8000/app/?token=abc');
+  });
 
-    expect(find.byType(ApplyPilotApp), findsOneWidget);
-    expect(find.text("ApplyPilot"), findsWidgets);
+  test('Server addresses are normalized', () {
+    expect(ShellConfig.normalizeUrl(' 100.97.30.113:8000 '), 'http://100.97.30.113:8000');
+    expect(ShellConfig.normalizeUrl('https://pc.tail.net/app/'), 'https://pc.tail.net');
+    expect(ShellConfig.normalizeUrl('http://pc:8000//'), 'http://pc:8000');
   });
 
   testWidgets('AppTheme defines British Racing Green and Obsidian Dark themes', (WidgetTester tester) async {

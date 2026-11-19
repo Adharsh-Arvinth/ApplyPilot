@@ -31,4 +31,15 @@
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
+    <!-- Lets the app hand job postings and resume PDFs to the phone's browser (url_launcher). -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="http"/>
+        </intent>
+    </queries>
 </manifest>
