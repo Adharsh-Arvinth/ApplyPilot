@@ -39,7 +39,7 @@ CONFIRMATION = re.compile(
     r"|we('ve| have) received your application|received your application|your application to|application confirmation", re.I)
 ATS_SENDERS = ("greenhouse", "lever.co", "ashbyhq", "workday", "myworkday", "smartrecruiters", "icims", "jobvite",
                "bamboohr", "workable", "recruitee", "teamtailor", "successfactors", "taleo")
-TRACKED_STATUSES = ("applied", "submitted", "dry_run", "needs_review", "interview", "offer", "rejected")
+TRACKED_STATUSES = ("applied", "submitted", "unverified", "dry_run", "needs_review", "needs_attention", "interview", "offer", "rejected")
 
 
 # ───────────────────────── Connection settings ─────────────────────────
@@ -85,6 +85,68 @@ def test_login(address: str, app_password: str) -> Tuple[bool, str]:
         return False, "Gmail didn’t accept that. Check the address and use a 16-character app password, not your normal password."
     except Exception:  # network, DNS, timeout
         return False, "Couldn’t reach Gmail. Check your internet connection and try again."
+
+
+# ───────────────────────── Verification codes (OTP) ─────────────────────────
+CODE_PATTERNS = (
+    re.compile(r"<h1[^>]*>\s*([A-Za-z0-9]{4,10})\s*</h1>", re.I),
+    re.compile(r"(?:code|otp|passcode|pin)\b[^A-Za-z0-9]{1,40}([A-Za-z0-9]{4,10})\b", re.I),
+    re.compile(r"\b(\d{6,8})\b"),
+)
+CODE_HINT = re.compile(r"verif|security code|one[- ]time|\botp\b|passcode|confirm your email|access code", re.I)
+
+
+def find_verification_code(db: Session, since: datetime.datetime, company: str = "", length: Optional[int] = None) -> Optional[str]:
+    """Return the newest verification code mailed after `since` (by an ATS or the company), or None.
+
+    Read-only IMAP like `sync`: nothing is marked read, moved or deleted.
+    """
+    conn = get_connection(db)
+    if not (conn["address"] and conn["password"]):
+        return None
+    words = [w for w in _norm(company).split() if len(w) >= 3][:2]
+    try:
+        imap = imaplib.IMAP4_SSL(IMAP_HOST, 993, timeout=20)
+        imap.login(conn["address"], conn["password"])
+        imap.select("INBOX", readonly=True)
+        typ, data = imap.search(None, f'(SINCE "{since.strftime("%d-%b-%Y")}")')
+        ids = (data[0] or b"").split()[-15:]
+        for mid in reversed(ids):
+            typ, parts = imap.fetch(mid, f"(BODY.PEEK[]<0.{BODY_BYTES}>)")
+            raw = next((p[1] for p in parts if isinstance(p, tuple)), None)
+            if not raw:
+                continue
+            msg = email.message_from_bytes(raw)
+            try:
+                received = parsedate_to_datetime(msg.get("Date")).astimezone(datetime.timezone.utc)
+                if received < since - datetime.timedelta(seconds=90):
+                    continue
+            except Exception:
+                pass
+            subject = _decode(msg.get("Subject"))
+            sender = _decode(msg.get("From")).lower()
+            html_body = ""
+            for part in (msg.walk() if msg.is_multipart() else [msg]):
+                if part.get_content_type() == "text/html":
+                    try:
+                        html_body = (part.get_payload(decode=True) or b"").decode(part.get_content_charset() or "utf-8", errors="ignore")
+                    except Exception:
+                        pass
+            text = f"{subject}\n{_text_of(msg)}"
+            if not CODE_HINT.search(text):
+                continue
+            related = any(s in sender for s in ATS_SENDERS) or any(w in _norm(f"{sender} {text}") for w in words)
+            if not related:
+                continue
+            for pattern in CODE_PATTERNS:
+                for code in pattern.findall(html_body + "\n" + text):
+                    if (length is None or len(code) == length) and not code.isalpha():
+                        imap.logout()
+                        return code
+        imap.logout()
+    except Exception as e:
+        logger.warning(f"Verification code lookup failed: {e}")
+    return None
 
 
 # ───────────────────────── Parsing & classification ─────────────────────────
@@ -236,7 +298,16 @@ def _apply_to_job(db: Session, job: Job, proof: EmailProof) -> None:
                 app.submission_evidence_json = json.dumps(evidence)
         except Exception:
             pass
-    if proof.kind == "interview" and job.status not in ("offer",):
+    if proof.kind == "confirmation":
+        # The employer confirmed it: this is the proof an application really went in.
+        if job.status in ("unverified", "needs_review", "applying", "dry_run", "queued", "needs_attention"):
+            job.status = "applied"
+        if app is not None and app.status in ("unverified", "needs_review", "dry_run"):
+            app.status = "submitted"
+            app.evidence_level = max(int(app.evidence_level or 0), 4)
+            app.confirmation_text = (app.confirmation_text or proof.subject or "")[:400]
+            app.evidence_notes = f"Confirmed by email from {proof.sender}"[:500]
+    elif proof.kind == "interview" and job.status not in ("offer",):
         job.status = "interview"
     elif proof.kind == "rejection" and job.status not in ("offer",):
         job.status = "rejected"

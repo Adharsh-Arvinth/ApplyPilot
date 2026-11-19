@@ -908,6 +908,74 @@ Provide a direct, helpful, and motivating response formatted in markdown. Includ
             ]
         }
 
+    # ── Troubleshooting during an application ──
+    @staticmethod
+    def _json(text: Optional[str]) -> Optional[Any]:
+        if not text:
+            return None
+        t = text.strip()
+        t = re.sub(r"^```(?:json)?|```$", "", t).strip()
+        try:
+            return json.loads(t, strict=False)
+        except Exception:
+            m = re.search(r"\{.*\}", t, re.S)
+            try:
+                return json.loads(m.group(0), strict=False) if m else None
+            except Exception:
+                return None
+
+    @classmethod
+    def diagnose_form_problem(cls, errors: List[str], fields: List[Dict[str, Any]], company: str = "", role: str = "") -> Dict[str, Any]:
+        """A job form refused to submit. Read its error messages and propose values for the broken fields.
+
+        Returns {"fixes": [{"label", "value"}], "ask_user": str|None, "reason": str}. Values must come from the
+        candidate's verified facts or be a choice listed for the field; anything else becomes a question for the user.
+        """
+        system = (
+            "You help an application assistant recover when a job application form shows validation errors. "
+            f"Candidate facts (the only truth you may use):\n{CANDIDATE_FACTS}\n"
+            "Rules: never invent employers, degrees, dates, numbers or legal answers. For a choice field, reply with one of "
+            "its listed options exactly. Never accept consent, legal, background-check or attestation items. If a value "
+            "cannot be grounded in the facts, leave it out and put a short plain-English question for the candidate in ask_user."
+        )
+        prompt = json.dumps({"company": company, "role": role, "page_errors": errors[:20], "fields": fields[:25]}, ensure_ascii=False)
+        prompt += ('\nReply only with JSON: {"fixes": [{"label": "<field label exactly as given>", "value": "<value>"}], '
+                   '"ask_user": "<question or null>", "reason": "<one sentence on what went wrong>"}')
+        data = cls._json(cls._call_model(prompt, system, json_mode=True)) if cls.get_client() else None
+        if not isinstance(data, dict):
+            missing = [f["label"] for f in fields if f.get("required") and not f.get("current")]
+            return {"fixes": [], "ask_user": (f"The form needs: {', '.join(missing[:3])}" if missing else None),
+                    "reason": "Gemini unavailable; listed the fields the form still needs."}
+        fixes = [f for f in data.get("fixes", []) if isinstance(f, dict) and f.get("label") and f.get("value")]
+        valid = {f["label"]: f for f in fields}
+        clean = []
+        for fx in fixes:
+            field = valid.get(fx["label"])
+            if not field:
+                continue
+            opts = field.get("options") or []
+            if opts and str(fx["value"]).strip().lower() not in [o.lower() for o in opts]:
+                continue  # a choice field must get one of its own choices
+            clean.append({"label": fx["label"], "value": str(fx["value"])[:2000]})
+        return {"fixes": clean, "ask_user": data.get("ask_user") or None, "reason": str(data.get("reason") or "")[:300]}
+
+    @classmethod
+    def choose_page_action(cls, actions: List[Dict[str, Any]], page_title: str = "", company: str = "") -> Optional[int]:
+        """The page is not an application form yet. Pick the one button/link that leads to the form (or None)."""
+        if not cls.get_client() or not actions:
+            return None
+        system = ("You guide a browser toward a company's own job application form. Pick the single button or link that "
+                  "opens or continues the application on this site (e.g. 'Apply', 'Apply for this job', 'Accept cookies' "
+                  "only if it blocks the page). Never pick sign-in with Google/LinkedIn, social links, or other jobs.")
+        prompt = json.dumps({"page_title": page_title, "company": company, "actions": actions[:60]}, ensure_ascii=False)
+        prompt += '\nReply only with JSON: {"i": <index from actions or null>, "why": "<short>"}'
+        data = cls._json(cls._call_model(prompt, system, json_mode=True))
+        try:
+            i = data.get("i") if isinstance(data, dict) else None
+            return int(i) if i is not None and any(a["i"] == int(i) for a in actions) else None
+        except (TypeError, ValueError):
+            return None
+
     @classmethod
     def get_model_status(cls) -> Dict[str, Any]:
         """Check live Gemini model connectivity and latency."""

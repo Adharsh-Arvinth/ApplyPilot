@@ -19,6 +19,7 @@ from backend.app.services.tailoring_service import ResumeTailoringService
 from backend.app.services.fcm_service import PushNotificationService
 from backend.app.services.gemini_service import GeminiService
 from backend.app.core.facts import LOCKED_FACTS
+from backend.app.services.form_filler import FormFiller, options_json, summarize_unresolved
 
 logger = logging.getLogger(__name__)
 
@@ -295,83 +296,130 @@ class AutoApplyEngine:
             await page.fill(selector, text)
 
     @staticmethod
-    def _get_latest_email_id(query: str = "from:greenhouse") -> Optional[str]:
-        """Fetch latest message ID from connected Gmail matching query."""
+    def _get_matching_otp_from_email(company_name: str, submit_clicked_utc: datetime.datetime, num_digits: Optional[int] = 8) -> Optional[str]:
+        """Newest verification code mailed after the submit click (connected inbox, read-only)."""
+        from backend.app.core.database import SessionLocal
+        from backend.app.services import email_proof
+        db = SessionLocal()
         try:
-            cmd = f'gmail readonly search "{query}" --max 1 --json'
-            out = subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.DEVNULL)
-            data = json.loads(out)
-            if data and len(data) > 0:
-                return data[0].get("id")
-        except Exception as e:
-            logger.warning(f"Error checking Gmail query [{query}]: {e}")
-        return None
+            return email_proof.find_verification_code(db, submit_clicked_utc, company_name, num_digits)
+        finally:
+            db.close()
+
+    SUBMIT_SELECTORS = (
+        "#btn-submit, .template-btn-submit, #submit_app, button[type='submit']:not(#hcaptchaSubmitBtn), input[type='submit'], "
+        "button:has-text('Submit Application'), button:has-text('SUBMIT APPLICATION'), button:has-text('Submit application')"
+    )
 
     @staticmethod
-    def _fetch_otp_from_email(msg_id: str, num_digits: int = 8) -> Optional[str]:
-        """Fetch email content and extract verification code matching required length."""
+    async def _click_submit(page: Page) -> bool:
+        btn = await page.query_selector(AutoApplyEngine.SUBMIT_SELECTORS)
+        if not btn:
+            return False
         try:
-            cmd = f'gmail readonly get {msg_id}'
-            msg_out = subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.DEVNULL)
-            # 1. <h1>CODE</h1>
-            m = re.search(r'<h1>\s*([A-Za-z0-9]{' + str(num_digits) + r'})\s*</h1>', msg_out)
-            if m:
-                return m.group(1).strip()
-            # 2. Standalone numeric code
-            m = re.search(r'\b([0-9]{' + str(num_digits) + r'})\b', msg_out)
-            if m:
-                return m.group(1).strip()
-            # 3. Any 6 to 8 digit code
-            m = re.search(r'\b([0-9]{6,8})\b', msg_out)
-            if m:
-                return m.group(1).strip()
-        except Exception as e:
-            logger.warning(f"Error fetching code from email {msg_id}: {e}")
-        return None
+            await btn.scroll_into_view_if_needed()
+            await asyncio.sleep(0.5)
+        except Exception:
+            pass
+        await btn.click()
+        return True
 
     @staticmethod
-    def _get_matching_otp_from_email(company_name: str, submit_clicked_utc: datetime.datetime, num_digits: int = 8) -> Optional[str]:
-        """
-        Fetch verification code strictly matching sender, company name, and arriving AFTER submit clicked.
-        Never takes generic latest message so concurrent/overlapping jobs cannot mix codes.
-        """
+    async def _complete_email_code(page: Page, company: str, clicked_at: datetime.datetime) -> str:
+        """If the ATS asks for a code it emailed (Greenhouse security code, one-time code), fetch and enter it.
+        Returns "entered", "timeout" or "none"."""
+        boxes = await page.query_selector_all("input[id^='security-input-']")
+        single = None
+        if not boxes:
+            single = await page.query_selector(
+                "input[autocomplete='one-time-code'], input[name*='otp' i], input[id*='otp' i], "
+                "input[name*='verification' i], input[id*='verification' i], input[name*='security_code' i]")
+        if not boxes and not single:
+            return "none"
+        length = len(boxes) if boxes else None
+        logger.info(f"{company}: the form asks for an emailed code. Checking your inbox…")
+        code = None
+        for _ in range(45):  # ~3 minutes
+            await asyncio.sleep(4)
+            code = await asyncio.to_thread(AutoApplyEngine._get_matching_otp_from_email, company, clicked_at, length)
+            if code:
+                break
+        if not code:
+            return "timeout"
+        if boxes:
+            for i, ch in enumerate(code):
+                inp = await page.query_selector(f"#security-input-{i}")
+                if inp:
+                    await inp.fill(ch)
+                    await asyncio.sleep(0.1)
+        else:
+            await single.fill(code)
+        await asyncio.sleep(0.8)
+        await AutoApplyEngine._click_submit(page)
+        return "entered"
+
+    @staticmethod
+    async def _wait_for_outcome(page: Page) -> None:
+        for _ in range(7):
+            await asyncio.sleep(2.0)
+            url = page.url.lower()
+            if "confirmation" in url or "thanks" in url or "thank-you" in url:
+                return
+            if await page.query_selector("input[id^='security-input-'], input[autocomplete='one-time-code']"):
+                return
+            try:
+                body = (await page.inner_text("body")).lower()
+                if any(k in body for k in ("thank you for applying", "thanks for applying", "received your application", "application submitted", "this field is required")):
+                    return
+            except Exception:
+                pass
         try:
-            cmd = 'gmail readonly search "from:greenhouse" --max 5 --json'
-            out = subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.DEVNULL)
-            data = json.loads(out)
-            if not data:
-                return None
+            await page.wait_for_load_state("networkidle", timeout=10000)
+        except Exception:
+            pass
 
-            clean_co = re.sub(r'\W+', ' ', company_name).strip().lower()
-            first_word = clean_co.split()[0] if clean_co else ""
+    @staticmethod
+    async def _outcome(page: Page) -> Tuple[bool, bool, str]:
+        """(has_validation_errors, is_confirmed, page_text)"""
+        has_errors = False
+        try:
+            has_errors = await page.evaluate("""() => {
+                const errs = Array.from(document.querySelectorAll(
+                    '.field-error, .error, .error-message, [aria-invalid="true"], .has-error, .invalid-feedback, ul.errors, .validation-error'
+                )).filter(el => el.offsetParent !== null && (el.innerText || '').trim().length > 0);
+                const body = document.body ? document.body.innerText.toLowerCase() : '';
+                return errs.length > 0 || body.includes('this field is required') || body.includes('please fill out this field');
+            }""")
+        except Exception:
+            pass
+        text = ""
+        try:
+            text = (await page.inner_text("body")).lower()
+        except Exception:
+            pass
+        url = page.url.lower()
+        confirmed = any(k in url for k in ("confirmation", "thanks", "thank-you")) or any(k in text for k in (
+            "thank you for applying", "thanks for applying", "application submitted", "application received",
+            "we have received your application", "we've received your application", "thanks for your application",
+            "your application has been submitted", "application has been received"))
+        return bool(has_errors) and not confirmed, confirmed, text
 
-            for msg_meta in data:
-                msg_id = msg_meta.get("id")
-                if not msg_id:
-                    continue
-                detail_cmd = f'gmail readonly get {msg_id}'
-                msg_out = subprocess.check_output(detail_cmd, shell=True, text=True, stderr=subprocess.DEVNULL)
-                body_lower = msg_out.lower()
-
-                # Verify company relevance or verification subject
-                if first_word and first_word not in body_lower and "verification" not in body_lower:
-                    continue
-
-                # 1. <h1>CODE</h1>
-                m = re.search(r'<h1>\s*([A-Za-z0-9]{' + str(num_digits) + r'})\s*</h1>', msg_out)
-                if m:
-                    return m.group(1).strip()
-                # 2. Standalone numeric code
-                m = re.search(r'\b([0-9]{' + str(num_digits) + r'})\b', msg_out)
-                if m:
-                    return m.group(1).strip()
-                # 3. Any 6 to 8 digit code
-                m = re.search(r'\b([0-9]{6,8})\b', msg_out)
-                if m:
-                    return m.group(1).strip()
-        except Exception as e:
-            logger.warning(f"Error retrieving scoped OTP from Gmail for {company_name}: {e}")
-        return None
+    @staticmethod
+    def _ask_user(db: Session, job: Job, items, reason_prefix: str = "") -> None:
+        """One Needs-you card per open question (no duplicates), so you can answer them all at once."""
+        pending = {n.question_text for n in db.query(NeedsInput).filter(NeedsInput.job_id == job.id, NeedsInput.status == "pending").all()}
+        kinds = {"select": "select", "combobox": "select", "radio": "radio", "checkboxes": "checkbox", "checkbox": "checkbox", "textarea": "textarea"}
+        for it in items[:6]:
+            label = (it.get("label") or "A required question").strip()[:500]
+            if label in pending:
+                continue
+            opts = [o["text"] for o in it.get("options", [])] if isinstance(it.get("options"), list) and it.get("options") and isinstance(it["options"][0], dict) else (it.get("options") or [])
+            db.add(NeedsInput(
+                job_id=job.id, question_text=label, field_type=kinds.get(it.get("kind"), "text"),
+                options_json=json.dumps(opts), suggested_answer=opts[0] if opts and it.get("kind") != "checkbox" else "",
+                gemini_reason=(reason_prefix + (it.get("reason") or ""))[:500], status="pending"))
+            pending.add(label)
+        db.commit()
 
     @staticmethod
     async def process_job_application(
@@ -650,6 +698,37 @@ class AutoApplyEngine:
                     db.commit()
                     return {"status": "needs_input", "reason": "captcha_detected", "screenshot": str(captcha_shot)}
 
+                # 3b. Not a form yet (job description, cookie wall, "Apply" button)? Let Gemini find the way in.
+                filler = FormFiller(page, db, profile, gemini=lambda q, t, o: AutoApplyEngine._resolve_or_gemini(
+                    db=db, profile=profile, q_text=q, field_type=t, options=o, job=job))
+                for _ in range(2):
+                    if any(f["kind"] in ("text", "textarea", "select", "file") for f in await filler.scan()):
+                        break
+                    if not await filler.next_step(job):
+                        break
+
+                # 3c. Resume first. ATS resume parsers (Lever, Greenhouse) rewrite the form when a file lands,
+                # which used to wipe answers typed earlier (e.g. location, current company).
+                resume_uploaded = False
+                if Path(pdf_path).exists():
+                    for sel in ("input[type='file'][name='resume']", "#resume", "#_systemfield_resume",
+                                "input[type='file'][id*='resume' i]", "input[type='file'][name*='resume' i]", "input[type='file']"):
+                        file_input = await page.query_selector(sel)
+                        if not file_input:
+                            continue
+                        try:
+                            await file_input.set_input_files(pdf_path)
+                            resume_uploaded = True
+                            logger.info(f"Attached tailored resume first: {pdf_path}")
+                            await asyncio.sleep(3.0)
+                            try:
+                                await page.wait_for_load_state("networkidle", timeout=8000)
+                            except Exception:
+                                pass
+                        except Exception as up_err:
+                            logger.warning(f"Resume upload failed via {sel}: {up_err}")
+                        break
+
                 # 4. Fill standard Greenhouse / Lever / Ashby fields
                 # First Name
                 if await page.query_selector("#first_name, input[name='first_name']"):
@@ -749,538 +828,29 @@ class AutoApplyEngine:
                     except Exception:
                         pass
 
-                # Lever custom card questions (e.g. screening prompts, language skills, AI consent)
-                lever_questions = await page.query_selector_all(".application-question")
-                for lq in lever_questions:
-                    label_el = await lq.query_selector(".text")
-                    if not label_el:
-                        continue
-                    q_text = (await label_el.inner_text()).strip()
-                    if not q_text:
-                        continue
-                    
-                    if "language skill" in q_text.lower():
-                        eng_lbl = await lq.query_selector('label:has-text("English")')
-                        if eng_lbl:
-                            await eng_lbl.click()
-                        continue
-                        
-                    # Consent / AI notetaker / terms: Check if remembered in AnswerBank; NEVER auto-tick without remembered preference
-                    is_consent_q = any(term in q_text.lower() for term in ["consent", "notetaker", "data processing", "terms"])
-                    ans_res = AnswerService.resolve_answer(db, q_text)
-                    ans = ans_res[0] if ans_res else None
-
-                    if is_consent_q and not ans:
-                        logger.info(f"Consent question '{q_text[:40]}' not remembered; skipping auto-tick.")
-                        continue
-                    
-                    # Fill text / textarea
-                    txt_el = await lq.query_selector("input[type='text'], textarea")
-                    if txt_el and ans:
-                        await txt_el.fill(ans)
-                        
-                    # Select option from dropdown with confidence gate
-                    sel_el = await lq.query_selector("select")
-                    if sel_el and ans:
-                        opts = await sel_el.query_selector_all("option")
-                        opt_texts = []
-                        val_map = {}
-                        for opt in opts:
-                            ot = (await opt.inner_text()).strip()
-                            val = await opt.get_attribute("value")
-                            if val:
-                                opt_texts.append(ot)
-                                val_map[ot] = val
-                        matched_opt, conf = match_option_with_confidence(ans, opt_texts)
-                        if matched_opt and conf >= 0.88:
-                            await sel_el.select_option(value=val_map[matched_opt])
-                            logger.info(f"Selected option '{matched_opt}' (confidence: {conf:.2f})")
-                                    
-                    # Click radio label with confidence gate
-                    radio_labels = await lq.query_selector_all("label")
-                    if radio_labels and ans:
-                        lbl_texts = [(await r.inner_text()).strip() for r in radio_labels]
-                        matched_lbl, conf = match_option_with_confidence(ans, lbl_texts)
-                        if matched_lbl and conf >= 0.88:
-                            idx = lbl_texts.index(matched_lbl)
-                            await radio_labels[idx].click()
-                            logger.info(f"Selected radio '{matched_lbl}' (confidence: {conf:.2f})")
-                                
-                prev_emp_labels = await page.query_selector_all(".application-question label:has-text('No'), .custom-question label:has-text('No')")
-                for lbl in prev_emp_labels:
-                    t = (await lbl.inner_text()).strip()
-                    if t == "No":
-                        try:
-                            await lbl.click()
-                        except Exception:
-                            pass
-
-                # 4b. Consent, Legal & AI-Notetaker Checkbox Verification
-                # Per safety rules: NEVER auto-tick consent, privacy, terms, background check, or Lever AI-notetaker checkboxes.
-                all_checkboxes = await page.query_selector_all("input[type='checkbox']")
-                for cbox in all_checkboxes:
-                    lbl_t = ""
-                    try:
-                        lbl_t = await page.evaluate("""(el) => {
-                            const container = el.closest('label, .field, .form-group, .application-question, div');
-                            return container ? container.innerText.trim() : (el.getAttribute('aria-label') || el.name || '');
-                        }""", cbox)
-                    except Exception:
-                        pass
-                    
-                    lower_lbl = lbl_t.lower()
-                    is_consent = any(term in lower_lbl for term in [
-                        "consent", "privacy", "data processing", "terms", "agree", "notetaker", 
-                        "ai note", "recording", "background check", "non-compete", "gdpr", 
-                        "certify", "attest", "declaration", "policy", "legal"
-                    ])
-                    is_required = await cbox.get_attribute("required") is not None or "required" in lower_lbl or "*" in lower_lbl
-                    
-                    if is_consent or is_required:
-                        is_checked = await cbox.is_checked()
-                        if not is_checked:
-                            logger.warning(f"Consent / Legal agreement checkbox requires human input: '{lbl_t[:60]}...' (never auto-ticked). Routing to Needs You.")
-                            needs = NeedsInput(
-                                job_id=job.id,
-                                question_text=f"Legal / Consent Checkbox: {lbl_t[:300]}",
-                                field_type="checkbox",
-                                options_json=json.dumps(["I agree", "I decline"]),
-                                gemini_reason="Consent, legal, or AI notetaker agreement requires manual candidate approval (never auto-ticked)",
-                                status="pending"
-                            )
-                            db.add(needs)
-                            db.commit()
-                            
-                            AutoApplyEngine._record_transition(
-                                db, job, "needs_attention",
-                                f"Legal / Consent agreement requires candidate approval: {lbl_t[:50]}",
-                                "needs_human_input"
-                            )
-                            job.status = "needs_attention"
-                            db.commit()
-                            
-                            return {
-                                "status": "needs_input",
-                                "reason": "legal_consent_checkbox_requires_candidate_action",
-                                "field": lbl_t
-                            }
-
-                # Resume File Upload
-                file_input = await page.query_selector("input[type='file'], #_systemfield_resume, input[id*='resume']")
-                if file_input and Path(pdf_path).exists():
-                    await file_input.set_input_files(pdf_path)
-                    logger.info(f"Attached tailored resume: {pdf_path}")
-                    # Wait for ATS resume parser to finish DOM updates
-                    await asyncio.sleep(2.5)
-                    try:
-                        await page.wait_for_load_state("domcontentloaded", timeout=5000)
-                    except Exception:
-                        pass
-
-                    # Re-verify & re-fill name, email, phone if ATS parser overwrote or cleared them
-                    cand_first = profile.full_name.split()[0] if profile.full_name else "Candidate"
-                    cand_last = profile.full_name.split()[-1] if profile.full_name and len(profile.full_name.split()) > 1 else ""
-                    fn_el = await page.query_selector("#first_name, input[name='first_name']")
-                    if fn_el and not (await fn_el.input_value()):
-                        await fn_el.fill(cand_first)
-                    ln_el = await page.query_selector("#last_name, input[name='last_name']")
-                    if ln_el and not (await ln_el.input_value()):
-                        await ln_el.fill(cand_last)
-                    full_el = await page.query_selector("input[name='name'], #_systemfield_name")
-                    if full_el and not (await full_el.input_value()):
-                        await full_el.fill(profile.full_name)
-                    em_el = await page.query_selector("#email, input[name='email'], input[type='email']")
-                    if em_el and not (await em_el.input_value()):
-                        await em_el.fill(profile.email)
-                    ph_el = await page.query_selector("#phone, input[name='phone'], input[type='tel']")
-                    if ph_el and not (await ph_el.input_value()):
-                        await ph_el.fill(profile.phone)
-
-                # Voluntary Demographics (Greenhouse / Ashby React-Select)
-                for dem_id, dem_val in [
-                    ("#gender", "Male"),
-                    ("#hispanic_ethnicity", "No"),
-                    ("#veteran_status", "I am not a protected veteran"),
-                    ("#disability_status", "No, I do not have a disability")
-                ]:
-                    try:
-                        el = await page.query_selector(dem_id)
-                        if el:
-                            await el.click()
-                            await asyncio.sleep(0.3)
-                            for o in await page.query_selector_all(".select__option"):
-                                ot = (await o.inner_text()).strip()
-                                if dem_val.lower() in ot.lower() or ot.lower() in dem_val.lower():
-                                    await o.click()
-                                    break
-                            await page.keyboard.press("Escape")
-                            await asyncio.sleep(0.2)
-                    except Exception:
-                        pass
-
-                # 5. Dynamic Form Label Scanning & Answer Bank Resolution
-                inputs = await page.query_selector_all("input:not([type='hidden']):not([type='submit']):not([type='button']):not([type='checkbox']):not([type='radio']):not([type='file']), textarea, select")
-                unresolved_fields = []
-                ai_answer_ids = []
-
-                for inp in inputs:
-                    input_id = await inp.get_attribute("id")
-                    if input_id in ["first_name", "last_name", "email", "phone", "country", "candidate-location", "iti-0__search-input"]:
-                        continue
-                    label_text = ""
-                    if input_id:
-                        lbl = await page.query_selector(f"label[for='{input_id}']")
-                        if lbl:
-                            label_text = (await lbl.inner_text()).strip()
-                    if not label_text:
-                        aria = await inp.get_attribute("aria-label")
-                        if aria:
-                            label_text = aria.strip()
-                    if not label_text:
-                        # Extract label from ancestor field container (Greenhouse / Lever custom questions)
-                        try:
-                            label_text = await inp.evaluate("""el => {
-                                const container = el.closest('.field, .form-group, .application-question, .custom-question, div');
-                                if (container) {
-                                    const l = container.querySelector('label, .legend, .label, [id*="label"]');
-                                    if (l) return l.innerText.trim();
-                                }
-                                return '';
-                            }""")
-                        except Exception:
-                            label_text = ""
-
-                    if not label_text:
-                        continue
-
-                    # Determine if required
-                    try:
-                        is_required = (
-                            "*" in label_text or 
-                            await inp.get_attribute("required") is not None or 
-                            await inp.get_attribute("aria-required") == "true" or
-                            await inp.evaluate("el => el.closest('.required, [data-required=\"true\"]') !== null")
-                        )
-                    except Exception:
-                        is_required = "*" in label_text
-
-                    tag = await inp.evaluate("el => el.tagName.toLowerCase()")
-
-                    # Skip if already filled with valid input
-                    if tag in ["input", "textarea"]:
-                        try:
-                            curr_val = (await inp.input_value()).strip()
-                            if curr_val:
-                                continue
-                        except Exception:
-                            pass
-
-                    resolved = AnswerService.resolve_answer(db, label_text)
-
-                    is_react_select = False
-                    if tag == "input":
-                        try:
-                            is_react_select = await inp.evaluate("el => el.closest('.select-shell, [class*=\"select__control\"], [id*=\"react-select\"]') !== null")
-                        except Exception:
-                            is_react_select = False
-
-                    if is_react_select:
-                        ans_val = resolved[0] if resolved else None
-                        try:
-                            await inp.click()
-                            await asyncio.sleep(0.2)
-                            if ans_val:
-                                for char in str(ans_val):
-                                    await page.keyboard.press(char)
-                                    await asyncio.sleep(0.04)
-                                await asyncio.sleep(0.6)
-                            opts = await page.query_selector_all(".select__option, [class*='select__option']")
-                            opt_texts = [(await o.inner_text()).strip() for o in opts if (await o.inner_text()).strip()]
-
-                            # Check if question is sensitive (work auth, legal consent, salary, demographics, etc.)
-                            is_sens, _ = GeminiService.is_sensitive_question(label_text)
-                            if is_sens and not ans_val:
-                                # Sensitive question without explicit candidate Answer Bank entry -> NEVER auto-guess
-                                ans_val = None
-                            elif not ans_val and opt_texts:
-                                lbl_l = label_text.lower()
-                                if "country" in lbl_l:
-                                    if any("india" in x.lower() for x in opt_texts):
-                                        ans_val = "India"
-                                elif any(k in lbl_l for k in ["mathematics", "language", "school", "high school", "grade", "performance"]):
-                                    top_opts = [x for x in opt_texts if "top 10" in x.lower() or "top 20" in x.lower() or "first" in x.lower() or "excellent" in x.lower()]
-                                    if top_opts:
-                                        ans_val = top_opts[0]
-                                elif "companies" in lbl_l:
-                                    zero_opts = [x for x in opt_texts if x in ["0", "1", "0-1", "0 - 1"]]
-                                    if zero_opts:
-                                        ans_val = zero_opts[0]
-
-                            clicked = False
-                            if ans_val:
-                                for o in opts:
-                                    ot = (await o.inner_text()).strip()
-                                    if ans_val.lower() == ot.lower() or ans_val.lower() in ot.lower() or ot.lower() in ans_val.lower():
-                                        await o.click()
-                                        clicked = True
-                                        await page.keyboard.press("Escape")
-                                        await asyncio.sleep(0.2)
-                                        logger.info(f"Clicked React-Select option [{ot}] for [{label_text[:30]}]")
-                                        break
-                                if not clicked:
-                                    await page.keyboard.press("Enter")
-                                    await page.keyboard.press("Escape")
-                                    logger.info(f"Pressed Enter on React-Select [{ans_val}] for [{label_text[:30]}]")
-                            elif is_required:
-                                await page.keyboard.press("Escape")
-                                unresolved_fields.append({
-                                    "label": label_text,
-                                    "type": "select",
-                                    "options": opt_texts,
-                                    "element": inp
-                                })
-                        except Exception as sel_err:
-                            logger.warning(f"Failed to process React-Select option: {sel_err}")
-                    elif tag == "select":
-                        # Extract all available options from the dropdown
-                        options_data = await inp.evaluate("""el => {
-                            return Array.from(el.options || []).map(o => ({
-                                text: o.text.trim(),
-                                value: o.value.trim()
-                            })).filter(o => o.text.length > 0 && !o.text.toLowerCase().startsWith('select') && !o.text.toLowerCase().startsWith('choose') && !o.text.toLowerCase().startsWith('--'));
-                        }""")
-                        opt_texts = [o["text"] for o in options_data]
-
-                        if not resolved and opt_texts:
-                            lbl_l = label_text.lower()
-                            if any(k in lbl_l for k in ["country", "location", "reside", "citizenship"]) and any("india" in o["text"].lower() for o in options_data):
-                                resolved = ("India", "smart_match")
-                            elif any(k in lbl_l for k in ["agree", "confirm", "able to", "willing", "authorized"]) and any(o["text"].lower() == "yes" for o in options_data):
-                                resolved = ("Yes", "smart_match")
-
-                        if resolved:
-                            ans_val, _ = resolved
-                            matched_val = None
-                            for opt in options_data:
-                                ot = opt["text"].lower()
-                                av = ans_val.lower()
-                                if av == ot or av in ot or ot in av:
-                                    matched_val = opt["value"]
-                                    break
-                            
-                            if matched_val:
-                                try:
-                                    await inp.select_option(value=matched_val)
-                                except Exception:
-                                    try:
-                                        await inp.select_option(label=ans_val)
-                                    except Exception:
-                                        pass
-                                # Trigger DOM and jQuery Select2 change events
-                                try:
-                                    await inp.evaluate("""(el, v) => {
-                                        el.value = v;
-                                        el.dispatchEvent(new Event('change', {bubbles: true}));
-                                        el.dispatchEvent(new Event('input', {bubbles: true}));
-                                        if (window.$ && $(el).select2) {
-                                            $(el).val(v).trigger('change');
-                                        }
-                                    }""", matched_val)
-                                except Exception:
-                                    pass
-                                logger.info(f"Selected dropdown option [{matched_val}] for [{label_text[:30]}]")
-                            elif is_required and opt_texts:
-                                unresolved_fields.append({
-                                    "label": label_text,
-                                    "type": "select",
-                                    "options": opt_texts,
-                                    "element": inp
-                                })
-                        elif is_required and opt_texts:
-                            unresolved_fields.append({
-                                "label": label_text,
-                                "type": "select",
-                                "options": opt_texts,
-                                "element": inp
-                            })
-                    else:
-                        # Text / URL / Textarea inputs
-                        if resolved:
-                            ans_val, _ = resolved
-                            await inp.fill(ans_val)
-                            logger.info(f"Filled text field [{label_text[:30]}]: {ans_val[:30]}")
-                        elif is_required:
-                            lbl_l = label_text.lower()
-                            if any(k in lbl_l for k in ["school", "university", "college", "institution", "degree", "result", "grade", "gpa", "rationale", "evidence"]):
-                                fallback_ans = f"{LOCKED_FACTS['education'].get('institution_full') or LOCKED_FACTS['education']['institution']} - CGPA {LOCKED_FACTS['education'].get('cgpa', '')}"
-                                await inp.fill(fallback_ans)
-                                logger.info(f"Filled education fallback for [{label_text[:30]}]: {fallback_ans}")
-                            elif any(k in lbl_l for k in ["experience", "linux", "python", "describe", "summary", "project"]):
-                                fallback_ans = "Experience in Linux system administration, bash scripting, Python automation, and distributed systems."
-                                await inp.fill(fallback_ans)
-                                logger.info(f"Filled technical fallback for [{label_text[:30]}]")
-                            else:
-                                unresolved_fields.append({
-                                    "label": label_text,
-                                    "type": "textarea" if tag == "textarea" else "text",
-                                    "options": [],
-                                    "element": inp
-                                })
-
-                # 5b. Radio Button Groups (Yes/No choices, multiple choice)
-                radio_inputs = await page.query_selector_all("input[type='radio']")
-                radio_groups = {}
-                for r in radio_inputs:
-                    r_name = await r.get_attribute("name")
-                    if r_name:
-                        radio_groups.setdefault(r_name, []).append(r)
-
-                for r_name, r_items in radio_groups.items():
-                    first_r = r_items[0]
-                    try:
-                        r_label = await first_r.evaluate("""el => {
-                            const container = el.closest('.field, .form-group, fieldset, .application-question, div');
-                            if (container) {
-                                const l = container.querySelector('legend, label, .label, [id*="label"]');
-                                if (l) return l.innerText.trim();
-                            }
-                            return '';
-                        }""")
-                    except Exception:
-                        r_label = ""
-
-                    if not r_label:
-                        continue
-
-                    # Extract options for each radio item
-                    r_opts = []
-                    for r_el in r_items:
-                        r_id = await r_el.get_attribute("id")
-                        r_text = ""
-                        if r_id:
-                            lbl = await page.query_selector(f"label[for='{r_id}']")
-                            if lbl:
-                                r_text = (await lbl.inner_text()).strip()
-                        if not r_text:
-                            r_text = (await r_el.get_attribute("value") or "").strip()
-                        if r_text:
-                            r_opts.append((r_text, r_el))
-
-                    resolved = AnswerService.resolve_answer(db, r_label)
-                    if resolved:
-                        ans_val, _ = resolved
-                        for opt_text, r_el in r_opts:
-                            if ans_val.lower() == opt_text.lower() or ans_val.lower() in opt_text.lower() or opt_text.lower() in ans_val.lower():
-                                try:
-                                    await r_el.check(force=True)
-                                except Exception:
-                                    try:
-                                        p_lbl = await r_el.evaluate_handle("el => el.closest('label')")
-                                        if p_lbl:
-                                            await p_lbl.click()
-                                    except Exception:
-                                        pass
-                                try:
-                                    await r_el.evaluate("el => el.dispatchEvent(new Event('change', {bubbles: true}))")
-                                except Exception:
-                                    pass
-                                logger.info(f"Checked radio [{opt_text}] for [{r_label[:30]}]")
-                                break
-                    else:
-                        is_req = "*" in r_label
-                        if is_req and r_opts:
-                            unresolved_fields.append({
-                                "label": r_label,
-                                "type": "radio",
-                                "options": [o[0] for o in r_opts],
-                                "element": first_r
-                            })
-
-                # 6. Check for unanswerable required fields -> Run Gemini Auto-Answer Step before Needs You!
-                remaining_unresolved = []
-                for field in unresolved_fields:
-                    f_lbl = field["label"] if isinstance(field, dict) else field[0]
-                    f_type = field["type"] if isinstance(field, dict) else "text"
-                    f_opts = field["options"] if isinstance(field, dict) else []
-                    f_el = field.get("element") if isinstance(field, dict) else None
-
-                    # Attempt resolution via Answer Bank or Gemini Auto-Answer
-                    gem_ans, gem_src, b_id = await AutoApplyEngine._resolve_or_gemini(
-                        db=db,
-                        profile=profile,
-                        q_text=f_lbl,
-                        field_type=f_type,
-                        options=f_opts,
-                        job=job
-                    )
-
-                    if gem_ans:
-                        if b_id:
-                            ai_answer_ids.append(b_id)
-                        logger.info(f"Resolved field [{f_lbl[:30]}] via {gem_src} with [{gem_ans[:30]}]")
-
-                        # Fill DOM element
-                        if f_el:
-                            try:
-                                if f_type in ["select", "dropdown"] and f_opts:
-                                    matched = None
-                                    for opt in f_opts:
-                                        if gem_ans.lower() == opt.lower() or gem_ans.lower() in opt.lower():
-                                            matched = opt
-                                            break
-                                    if matched:
-                                        try:
-                                            await f_el.select_option(label=matched)
-                                        except Exception:
-                                            await f_el.select_option(value=matched)
-                                elif f_type == "radio":
-                                    try:
-                                        await f_el.check(force=True)
-                                    except Exception:
-                                        pass
-                                else:
-                                    await f_el.fill(gem_ans)
-                            except Exception as fill_err:
-                                logger.warning(f"Could not fill DOM element for [{f_lbl[:30]}]: {fill_err}")
-                    else:
-                        field["gemini_reason"] = gem_src
-                        remaining_unresolved.append(field)
+                # 5. Every other question on the form, in one universal pass:
+                #    your profile → Answer Bank → Gemini (required fields) → you (Needs you).
+                #    A second pass catches questions revealed by earlier answers.
+                await asyncio.sleep(0.5)
+                await filler.fill(skip_ids=("iti-0__search-input",))
+                report = await filler.fill(skip_ids=("iti-0__search-input",))
+                ai_answer_ids = filler.ai_answer_ids
+                remaining_unresolved = report["unresolved"]
 
                 if remaining_unresolved:
-                    unresolved = remaining_unresolved[0]
-                    first_unresolved_label = unresolved["label"] if isinstance(unresolved, dict) else unresolved[0]
-                    unresolved_type = unresolved["type"] if isinstance(unresolved, dict) else "text"
-                    unresolved_opts = unresolved["options"] if isinstance(unresolved, dict) else []
-                    gem_reason = unresolved.get("gemini_reason", "")
-
-                    logger.warning(f"Field '{first_unresolved_label}' requires human input for {job.company} (Gemini reason: {gem_reason}).")
-                    
-                    # Dispatch push notification to user's phone
-                    PushNotificationService.send_needs_you_alert(
-                        company=job.company,
-                        role=job.title,
-                        question=first_unresolved_label
-                    )
-
-                    # Create NeedsInput record and halt this application
+                    first = remaining_unresolved[0]
+                    logger.warning(f"{job.company}: {len(remaining_unresolved)} required question(s) need you: {summarize_unresolved(remaining_unresolved)}")
+                    PushNotificationService.send_needs_you_alert(company=job.company, role=job.title, question=first["label"])
                     AutoApplyEngine._record_transition(
-                        db, job, "needs_attention", 
-                        f"Required choice unresolved: {first_unresolved_label[:60]} ({gem_reason})", 
-                        "needs_input"
-                    )
-                    needs = NeedsInput(
-                        job_id=job.id,
-                        question_text=first_unresolved_label,
-                        field_type=unresolved_type,
-                        options_json=json.dumps(unresolved_opts),
-                        suggested_answer=unresolved_opts[0] if unresolved_opts else "",
-                        gemini_reason=gem_reason,
-                        status="pending"
-                    )
-                    db.add(needs)
+                        db, job, "needs_attention",
+                        f"{len(remaining_unresolved)} required question(s) need your answer: {summarize_unresolved(remaining_unresolved)[:200]}",
+                        "needs_input")
+                    AutoApplyEngine._ask_user(db, job, remaining_unresolved)
+                    job.status = "needs_attention"
                     db.commit()
                     await browser.close()
-                    return {"status": "needs_input", "question": first_unresolved_label, "options": unresolved_opts, "gemini_reason": gem_reason}
+                    return {"status": "needs_input", "question": first["label"], "options": json.loads(options_json(first)),
+                            "gemini_reason": first.get("reason", ""), "open_questions": len(remaining_unresolved)}
 
                 # 7. Pre-submit screenshot of the real ATS form
                 form_el = await page.query_selector("form, #application_form, .application-form, #app")
@@ -1297,140 +867,47 @@ class AutoApplyEngine:
                 if is_live:
                     submit_clicked_time = datetime.datetime.now(datetime.timezone.utc)
 
-                    # Visible submit buttons across Greenhouse, Lever, Ashby, Workable
-                    submit_btn = await page.query_selector(
-                        "#btn-submit, .template-btn-submit, #submit_app, "
-                        "button[type='submit']:not(#hcaptchaSubmitBtn), input[type='submit'], "
-                        "button:has-text('Submit Application'), button:has-text('SUBMIT APPLICATION'), "
-                        "button:has-text('Submit application')"
-                    )
-                    if submit_btn:
-                        try:
-                            await submit_btn.scroll_into_view_if_needed()
-                            await asyncio.sleep(0.5)
-                        except Exception:
-                            pass
-                        await submit_btn.click()
-                        logger.info(f"Clicked initial submit button for {job.company}. Awaiting response...")
+                    await AutoApplyEngine._click_submit(page)
+                    logger.info(f"Clicked submit for {job.company}. Waiting for the result…")
+                    await AutoApplyEngine._wait_for_outcome(page)
+                    code_state = await AutoApplyEngine._complete_email_code(page, job.company, submit_clicked_time)
+                    if code_state == "entered":
+                        await AutoApplyEngine._wait_for_outcome(page)
+                    has_validation_errors, is_confirmed, page_text = await AutoApplyEngine._outcome(page)
 
-                    # Wait up to 14 seconds for either confirmation redirect or Greenhouse security input boxes
-                    sec_boxes = []
-                    for wait_tick in range(7):
-                        await asyncio.sleep(2.0)
-                        sec_boxes = await page.query_selector_all("input[id^='security-input-']")
-                        if sec_boxes:
-                            break
-                        cur_url = page.url.lower()
-                        if "confirmation" in cur_url or "thanks" in cur_url:
-                            break
+                    # The form refused it: let Gemini read the errors, fix what it can, and try once more.
+                    gemini_note = ""
+                    if has_validation_errors:
+                        fix = await filler.diagnose_and_fix(job)
+                        gemini_note = fix.get("reason", "")
+                        if fix.get("fixed"):
+                            db.add(RunLog(event_type="automation", level="info", outcome="success",
+                                          message=f"Gemini fixed {fix['fixed']} field(s) after {job.company}'s form refused the first submit: {gemini_note[:160]}"))
+                            db.commit()
+                            await AutoApplyEngine._click_submit(page)
+                            await AutoApplyEngine._wait_for_outcome(page)
+                            if (await AutoApplyEngine._complete_email_code(page, job.company, submit_clicked_time)) == "entered":
+                                await AutoApplyEngine._wait_for_outcome(page)
+                            has_validation_errors, is_confirmed, page_text = await AutoApplyEngine._outcome(page)
 
-                    if sec_boxes:
-                        num_boxes = len(sec_boxes)
-                        logger.info(f"Greenhouse verification screen detected ({num_boxes} inputs). Polling Gmail for scoped verification code...")
-                        code = None
-                        for attempt in range(40):
-                            await asyncio.sleep(2)
-                            extracted = AutoApplyEngine._get_matching_otp_from_email(job.company, submit_clicked_time, num_digits=num_boxes)
-                            if extracted and len(extracted) == num_boxes:
-                                code = extracted
-                                logger.info(f"Successfully extracted {len(code)}-character code from Gmail for {job.company}: {code}")
-                                break
-                            else:
-                                logger.info(f"Waiting for Greenhouse security code in Gmail for {job.company}... ({attempt+1}/40)")
-
-                        if code:
-                            logger.info(f"Entering verification code into Greenhouse inputs...")
-                            for i, ch in enumerate(code):
-                                inp = await page.query_selector(f"#security-input-{i}")
-                                if inp:
-                                    await inp.fill(ch)
-                                    await asyncio.sleep(0.12)
-                            await asyncio.sleep(1.0)
-                            final_submit = await page.query_selector("button:has-text('Submit application'), button[type='submit']")
-                            if final_submit:
-                                logger.info("Clicking final Submit application button after entering OTP...")
-                                await final_submit.click()
-                                try:
-                                    await page.wait_for_load_state("networkidle", timeout=30000)
-                                except Exception:
-                                    pass
-                                for _ in range(6):
-                                    await asyncio.sleep(2.0)
-                                    if "confirmation" in page.url.lower() or "thanks" in page.url.lower():
-                                        break
-                        else:
-                            logger.warning(f"Could not retrieve verification code from Gmail within timeout for {job.company}.")
-
-                    try:
-                        await page.wait_for_load_state("networkidle", timeout=15000)
-                    except Exception:
-                        pass
-                    await asyncio.sleep(2.0)
                     await page.screenshot(path=str(confirm_screenshot), full_page=True)
 
-                    # Strictly verify whether the ATS accepted or rejected the submission
-                    has_validation_errors = False
-                    try:
-                        has_validation_errors = await page.evaluate("""() => {
-                            const errs = Array.from(document.querySelectorAll(
-                                '.field-error, .error, .error-message, [aria-invalid="true"], .has-error, .invalid-feedback, ul.errors, .validation-error'
-                            )).filter(el => el.offsetParent !== null && el.innerText.trim().length > 0);
-                            const body = document.body ? document.body.innerText.toLowerCase() : '';
-                            return errs.length > 0 || body.includes('this field is required') || body.includes('please fill out this field');
-                        }""")
-                    except Exception:
-                        pass
-
-                    current_url = page.url.lower()
-                    page_text = ""
-                    try:
-                        page_text = (await page.inner_text("body")).lower()
-                    except Exception:
-                        pass
-
-                    is_confirmed = (
-                        "confirmation" in current_url or 
-                        "thanks" in current_url or
-                        "thank you for applying" in page_text or 
-                        "application submitted" in page_text or 
-                        "application received" in page_text or
-                        "we have received your application" in page_text or
-                        "thanks for applying" in page_text
-                    )
-
                     if has_validation_errors:
-                        logger.warning(f"Submission rejected by ATS validation for {job.company}.")
-                        unanswered_q = "Custom ATS Screening Questions"
-                        try:
-                            unanswered_q = await page.evaluate("""() => {
-                                const err = document.querySelector('.field-error, .error, [aria-invalid="true"]');
-                                if (err) {
-                                    const lbl = err.closest('.field, div')?.querySelector('label');
-                                    if (lbl && lbl.innerText.trim()) return lbl.innerText.trim();
-                                }
-                                return 'Custom ATS Screening Questions';
-                            }""")
-                        except Exception:
-                            pass
-
+                        still = await filler.missing_required()
+                        errs = await filler.errors()
+                        items = [{**f, "reason": f.get("error") or "The form says this is required"} for f in still] or \
+                                [{"label": fix.get("question") or (errs[0] if errs else "The form shows an error"), "kind": "text", "reason": gemini_note}]
+                        if fix.get("question") and items and items[0].get("label") != fix["question"]:
+                            items.insert(0, {"label": fix["question"], "kind": "text", "reason": gemini_note})
                         AutoApplyEngine._record_transition(
-                            db, job, "needs_attention", 
-                            f"ATS form rejected: required fields missing ({unanswered_q[:60]})", 
-                            "validation_failed"
-                        )
-                        job.skip_reason = f"ATS form rejected: {unanswered_q[:60]}"
-                        needs = NeedsInput(
-                            job_id=job.id,
-                            question_text=unanswered_q,
-                            field_type="text",
-                            options_json="[]",
-                            suggested_answer="",
-                            status="pending"
-                        )
-                        db.add(needs)
-                        db.commit()
+                            db, job, "needs_attention", f"Form refused the submission: {(gemini_note or (errs[0] if errs else ''))[:120]}", "validation_failed")
+                        job.skip_reason = f"Form refused the submission: {(errs[0] if errs else gemini_note)[:80]}"
+                        AutoApplyEngine._ask_user(db, job, items, reason_prefix="Gemini: " if gemini_note else "")
                         await browser.close()
-                        return {"status": "needs_input", "question": unanswered_q, "screenshot": str(confirm_screenshot)}
+                        return {"status": "needs_input", "question": items[0]["label"], "screenshot": str(confirm_screenshot), "gemini_reason": gemini_note}
+
+                    if code_state == "timeout" and not is_confirmed:
+                        AutoApplyEngine._ask_user(db, job, [{"label": f"{job.company} emailed a verification code. Connect your inbox in Settings › Email proof, or enter the code yourself.", "kind": "text", "reason": "No code arrived within 3 minutes"}])
 
                     has_proof = is_confirmed and confirm_screenshot.exists() and confirm_screenshot.stat().st_size > 1000
                     final_app_status = "submitted" if has_proof else "unverified"

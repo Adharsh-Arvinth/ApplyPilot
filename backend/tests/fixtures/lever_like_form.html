@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AcmeCo – Apply (test fixture)</title>
+<style>
+  body { font-family: sans-serif; max-width: 720px; margin: 24px auto; }
+  li { list-style: none; margin: 12px 0; }
+  .required { color: #c00; margin-left: 2px; }
+  .error { color: #c00; font-size: 12px; }
+  .dropdown-results div { padding: 4px; cursor: pointer; border: 1px solid #ddd; }
+</style>
+</head>
+<body>
+<!-- Mimics a Lever application form: labels wrap inputs, ✱ marks required fields, the resume parser
+     rewrites the form after upload, location is an autocomplete, and the server rejects bad input. -->
+<form id="application-form" novalidate>
+<ul>
+  <li class="application-question"><label><div class="application-label">Resume/CV<span class="required">✱</span></div>
+    <div class="application-field"><input type="file" name="resume" id="resume-upload-input"></div></label></li>
+  <li class="application-question"><label><div class="application-label">Full name<span class="required">✱</span></div>
+    <div class="application-field"><input type="text" name="name"></div></label></li>
+  <li class="application-question"><label><div class="application-label">Email<span class="required">✱</span></div>
+    <div class="application-field"><input type="email" name="email"></div></label></li>
+  <li class="application-question"><label><div class="application-label">Phone<span class="required">✱</span></div>
+    <div class="application-field"><input type="text" name="phone"></div></label></li>
+  <li class="application-question"><label><div class="application-label">Current location<span class="required">✱</span></div>
+    <div class="application-field"><input type="text" name="location" id="location-input" class="location-input" autocomplete="off">
+      <div class="dropdown-results"></div><input type="hidden" name="selectedLocation"></div></label></li>
+  <li class="application-question"><label><div class="application-label">Current company<span class="required">✱</span></div>
+    <div class="application-field"><input type="text" name="org"></div></label></li>
+  <li class="application-question"><div class="application-label">Pronouns</div>
+    <div class="application-field">
+      <label><input type="checkbox" name="pronouns" value="He/him">He/him</label>
+      <label><input type="checkbox" name="pronouns" value="She/her">She/her</label>
+      <label><input type="checkbox" name="pronouns" value="They/them">They/them</label>
+    </div></li>
+  <li class="application-question custom-question"><div class="application-label"><div class="text">Are you legally authorized to work in India?<span class="required">✱</span></div></div>
+    <ul>
+      <li><label><input type="radio" name="cards[q1]" value="Yes">Yes</label></li>
+      <li><label><input type="radio" name="cards[q1]" value="No">No</label></li>
+    </ul></li>
+  <li class="application-question"><label><div class="application-label">Which team interests you most?<span class="required">✱</span></div>
+    <select name="cards[q2]"><option value="">Select...</option><option value="ml">Machine Learning Platform</option>
+      <option value="data">Data Infrastructure</option><option value="web">Web Frontend</option></select></label></li>
+  <li class="application-question"><label><div class="application-label">Why do you want to work at AcmeCo?<span class="required">✱</span></div>
+    <textarea name="cards[q3]"></textarea></label></li>
+  <li class="application-question"><label><input type="checkbox" name="consent" value="1">
+    I consent to AcmeCo storing my application data<span class="required">✱</span></label></li>
+  <li class="application-question"><label><div class="application-label">Additional information</div>
+    <textarea name="comments"></textarea></label></li>
+</ul>
+<div id="otp" hidden></div>
+<button type="submit" id="btn-submit">Submit application</button>
+</form>
+<div id="done" hidden><h2>Thanks for applying! We have received your application.</h2></div>
+<script>
+  const q = new URLSearchParams(location.search);
+  const form = document.getElementById('application-form');
+  // Resume parser: like Lever, it rewrites contact fields and wipes location/company shortly after upload
+  document.getElementById('resume-upload-input').addEventListener('change', () => setTimeout(() => {
+    form.location.value = ''; form.org.value = ''; form.selectedLocation.value = '';
+  }, 300));
+  // Location autocomplete
+  const loc = document.getElementById('location-input'), results = document.querySelector('.dropdown-results');
+  loc.addEventListener('input', () => {
+    results.innerHTML = loc.value.length < 2 ? '' : [loc.value + ', India', loc.value + ' Rural, India']
+      .map((t) => `<div role="option">${t}</div>`).join('');
+  });
+  results.addEventListener('click', (e) => { if (e.target.dataset !== undefined && e.target.getAttribute('role') === 'option') {
+    loc.value = e.target.textContent; form.selectedLocation.value = e.target.textContent; results.innerHTML = ''; } });
+
+  let otpShown = false;
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    document.querySelectorAll('.error').forEach((n) => n.parentNode.removeChild(n));
+    const bad = [];
+    const need = (el, msg) => { bad.push(el); const li = el.closest('li.application-question') || el.parentNode;
+      const d = document.createElement('div'); d.className = 'error'; d.textContent = msg || 'This field is required'; li.appendChild(d); };
+    ['name', 'email', 'phone', 'location', 'org', 'cards[q3]'].forEach((n) => { if (!form[n].value.trim()) need(form[n]); });
+    if (!form.resume.files.length) need(form.resume);
+    if (!form.querySelector('input[name="cards[q1]"]:checked')) need(form.querySelector('input[name="cards[q1]"]'));
+    if (!form['cards[q2]'].value) need(form['cards[q2]']);
+    if (!form.consent.checked) need(form.consent);
+    if (q.get('strictphone') && form.phone.value && !form.phone.value.trim().startsWith('+')) need(form.phone, 'Phone number must start with a country code, e.g. +91');
+    if (bad.length) return;
+    if (q.get('otp') && !otpShown) {
+      otpShown = true;
+      const box = document.getElementById('otp'); box.hidden = false;
+      box.innerHTML = '<p>We emailed you a security code.</p>' + Array.from({ length: 8 }, (_, i) => `<input id="security-input-${i}" maxlength="1" size="1">`).join('');
+      return;
+    }
+    if (otpShown) {
+      const code = Array.from({ length: 8 }, (_, i) => document.getElementById('security-input-' + i).value).join('');
+      if (code !== q.get('otp')) { const d = document.createElement('div'); d.className = 'error'; d.textContent = 'Incorrect code'; document.getElementById('otp').appendChild(d); return; }
+    }
+    form.hidden = true; document.getElementById('done').hidden = false;
+  });
+</script>
+</body>
+</html>

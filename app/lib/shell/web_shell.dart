@@ -73,7 +73,11 @@ class _WebShellState extends State<WebShell> {
   }
 
   Future<List<String>> _pickFiles(FileSelectorParams params) async {
-    final files = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: const ['pdf', 'docx', 'txt']);
+    // Profile picture → the photo picker; resume → documents.
+    final wantsImage = params.acceptTypes.any((t) => t.toLowerCase().contains('image'));
+    final files = wantsImage
+        ? await FilePicker.pickFiles(type: FileType.image)
+        : await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: const ['pdf', 'docx', 'txt']);
     final path = files.isEmpty ? null : files.first.path;
     return path == null ? const <String>[] : <String>[Uri.file(path).toString()];
   }

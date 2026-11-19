@@ -50,6 +50,10 @@
   // Stable hue per company name -> generated "album art" tiles.
   const hue = (s) => { let h = 7; for (const ch of String(s || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h % 360; };
   const art = (name, size = '') => `<span class="art ${size}" style="--h:${hue(name)}" aria-hidden="true">${esc(initials(name))}</span>`;
+  // Your photo (Settings › Profile), or your initials until you add one
+  const me = (size = '') => (S.avatar && S.avatar.has_avatar)
+    ? `<img class="avatar ${size}" src="/api/v1/profile/avatar?v=${S.avatar.version}" alt="" decoding="async">`
+    : art((S.profile && S.profile.full_name) || 'You', size);
   const toDate = (iso) => { if (!iso) return null; const s = /[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : iso + 'Z'; const d = new Date(s); return isNaN(d) ? null : d; };
   function rel(iso) {
     const d = toDate(iso); if (!d) return '';
@@ -149,7 +153,8 @@
     { id: 'triage', label: 'Triage', color: 'amber', statuses: ['maybe', 'evaluated', 'needs_verification'] },
     { id: 'queued', label: 'Queued', color: 'indigo', statuses: ['queued', 'approved'] },
     { id: 'active', label: 'In flight', color: 'violet', statuses: ['applying', 'needs_review', 'needs_attention', 'needs_input'] },
-    { id: 'submitted', label: 'Submitted', color: 'teal', statuses: ['dry_run', 'applied', 'submitted'] },
+    { id: 'submitted', label: 'Submitted', color: 'teal', statuses: ['applied', 'submitted', 'unverified'] },
+    { id: 'practice', label: 'Dry runs', color: 'indigo', statuses: ['dry_run'] },
     { id: 'interview', label: 'Interview', color: 'sky', statuses: ['interview', 'offer'] },
     { id: 'new', label: 'Discovered', color: 'slate', statuses: ['discovered'] },
     { id: 'closed', label: 'Closed', color: 'coral', statuses: ['skipped', 'rejected', 'failed', 'dismissed', 'blocked', 'expired'] },
@@ -158,10 +163,10 @@
   const STATUS_LABEL = {
     maybe: 'Maybe', evaluated: 'Evaluated', needs_verification: 'Verify', queued: 'Queued', approved: 'Queued',
     applying: 'Applying', needs_review: 'Needs review', needs_attention: 'Attention', needs_input: 'Needs you',
-    dry_run: 'Dry run', applied: 'Applied', submitted: 'Submitted', interview: 'Interview', offer: 'Offer',
+    dry_run: 'Dry run · not sent', unverified: 'Sent · unconfirmed', applied: 'Applied', submitted: 'Submitted', interview: 'Interview', offer: 'Offer',
     discovered: 'Discovered', skipped: 'Skipped', rejected: 'Rejected', failed: 'Failed', dismissed: 'Dismissed', blocked: 'Blocked', expired: 'Expired',
   };
-  const statusColor = (s) => ({ needs_review: 'violet', needs_attention: 'amber', needs_input: 'amber', failed: 'coral', rejected: 'coral', blocked: 'coral', skipped: 'slate', dismissed: 'slate', dry_run: 'indigo', offer: 'teal', interview: 'sky' }[s] || stageOf(s).color);
+  const statusColor = (s) => ({ needs_review: 'violet', needs_attention: 'amber', needs_input: 'amber', failed: 'coral', rejected: 'coral', blocked: 'coral', skipped: 'slate', dismissed: 'slate', dry_run: 'indigo', unverified: 'amber', offer: 'teal', interview: 'sky' }[s] || stageOf(s).color);
   const statusChip = (s) => `<span class="chip ${statusColor(s)}">${esc(STATUS_LABEL[s] || s)}</span>`;
   const scoreColor = (s) => s >= 4 ? 'var(--teal)' : s >= 3 ? 'var(--indigo)' : s >= 2 ? 'var(--amber)' : 'var(--coral)';
   const scoreTag = (s) => s > 0 ? `<span class="score"><span class="dot" style="background:${scoreColor(s)}"></span>${Number(s).toFixed(1)}</span>` : `<span class="faint">—</span>`;
@@ -254,7 +259,8 @@
   // (Chrome, Edge, Android WebView); elsewhere the CSS falls back to frosted blur.
   function initLiquidGlass() {
     const ok = !!window.chrome && CSS.supports('backdrop-filter', 'url(#lg-lens) blur(2px)')
-      && !matchMedia('(prefers-reduced-transparency: reduce)').matches;
+      && !matchMedia('(prefers-reduced-transparency: reduce)').matches
+      && !document.documentElement.classList.contains('lite'); // the displacement filter is too heavy for phones
     if (!ok) return;
     const map = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100" viewBox="0 0 200 100" preserveAspectRatio="none">
       <defs><linearGradient id="r" x1="0" x2="1"><stop offset="0" stop-color="#000"/><stop offset="1" stop-color="#f00"/></linearGradient>
@@ -273,7 +279,7 @@
 
   // Specular highlight that follows the pointer across glass controls (one rAF per frame,
   // touches only the hovered element's custom properties).
-  const SPEC = '.btn, .search-trigger, .lcd, .filter-chip, .nav-item, .seg button, .mode-switch button';
+  const SPEC = '.btn, .search-trigger, .lcd, .filter-chip, .nav-item, .set-link, .seg button, .mode-switch button';
   let specEvt = null, specRaf = 0;
   document.addEventListener('pointermove', (e) => {
     if (e.pointerType !== 'mouse') return;
@@ -289,9 +295,99 @@
     });
   }, { passive: true });
 
+  // ── Horizontal scrollers: mouse wheel, mouse drag and soft edge fades ──
+  // Tab-like rows turn a vertical wheel into a smooth sideways glide (until they reach an end,
+  // then the page scrolls as usual). Every scroller can be dragged with the mouse, and fades
+  // its edges while more content is hidden there.
+  const HSCROLL = '.set-nav, .chips-scroll, .cat-list, .shelf, .board';
+  const WHEEL_X = '.set-nav, .chips-scroll, .cat-list';
+  const reduceMotion = () => document.documentElement.dataset.motion === 'reduce' || matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let setNavLeft = 0;
+  function edgeFade(el) {
+    const max = el.scrollWidth - el.clientWidth;
+    const f = max > 1 ? [el.scrollLeft > 1 ? 'l' : '', el.scrollLeft < max - 1 ? 'r' : ''].filter(Boolean).join(' ') : '';
+    if ((el.dataset.fade || '') !== f) { if (f) el.dataset.fade = f; else delete el.dataset.fade; }
+  }
+  function hscroll(root) { $$(HSCROLL, root || document).forEach(edgeFade); }
+  document.addEventListener('scroll', (e) => {
+    const el = e.target;
+    if (!(el instanceof Element) || !el.matches(HSCROLL)) return;
+    edgeFade(el);
+    if (el.classList.contains('set-nav')) setNavLeft = el.scrollLeft;
+  }, { capture: true, passive: true });
+  let fadeRaf = 0;
+  window.addEventListener('resize', () => { cancelAnimationFrame(fadeRaf); fadeRaf = requestAnimationFrame(() => hscroll(document)); }, { passive: true });
+
+  const wheelGoal = new WeakMap();
+  document.addEventListener('wheel', (e) => {
+    if (e.ctrlKey || Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;
+    const el = e.target.closest && e.target.closest(WHEEL_X);
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    if (max <= 1) return;
+    const dy = e.deltaY * (e.deltaMode === 1 ? 32 : e.deltaMode === 2 ? el.clientWidth : 1);
+    const from = wheelGoal.has(el) ? wheelGoal.get(el) : el.scrollLeft;
+    if ((dy < 0 && from <= 0) || (dy > 0 && from >= max - 1)) return; // at an end: let the page scroll
+    e.preventDefault();
+    const goal = Math.max(0, Math.min(max, from + dy));
+    if (reduceMotion()) { el.scrollLeft = goal; return; }
+    const running = wheelGoal.has(el);
+    wheelGoal.set(el, goal);
+    if (running) return;
+    const step = () => {
+      if (!wheelGoal.has(el)) return;
+      const g = wheelGoal.get(el), d = g - el.scrollLeft;
+      if (Math.abs(d) < 0.5) { el.scrollLeft = g; wheelGoal.delete(el); return; }
+      el.scrollLeft += d * 0.2;
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }, { passive: false });
+
+  let hdrag = null;
+  document.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return;
+    const el = e.target.closest && e.target.closest(HSCROLL);
+    if (!el || el.scrollWidth - el.clientWidth <= 1 || e.target.closest('input, textarea, select, [draggable="true"]')) return;
+    hdrag = { el, x: e.clientX, left: el.scrollLeft, moved: false };
+  });
+  document.addEventListener('pointermove', (e) => {
+    if (!hdrag) return;
+    const dx = e.clientX - hdrag.x;
+    if (!hdrag.moved) {
+      if (Math.abs(dx) < 6) return;
+      hdrag.moved = true; hdrag.el.classList.add('hdrag'); wheelGoal.delete(hdrag.el);
+    }
+    hdrag.el.scrollLeft = hdrag.left - dx;
+  });
+  const endDrag = () => {
+    if (!hdrag) return;
+    const { el, moved } = hdrag; hdrag = null;
+    el.classList.toggle('hdrag', false);
+    if (moved) { // a drag is not a click on whatever was under the pointer
+      const swallow = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+      document.addEventListener('click', swallow, { capture: true, once: true });
+      setTimeout(() => document.removeEventListener('click', swallow, true), 0);
+    }
+  };
+  document.addEventListener('pointerup', endDrag);
+  document.addEventListener('pointercancel', endDrag);
+
   // After every render: sliding pills + accessible names for icon-only controls.
   function enhance(root) {
     $$('.seg', root).forEach((el, i) => glide(el, `${S.view}:${el.dataset.glide || i}`));
+    const setNav = $('.set-nav', root);
+    if (setNav) {
+      glide(setNav, 'settings', '.set-link.on');
+      // Horizontal on narrow screens: keep where you were, then bring the chosen tab into view
+      const on = $('.set-link.on', setNav), max = setNav.scrollWidth - setNav.clientWidth;
+      if (on && max > 1) {
+        setNav.scrollLeft = setNavLeft;
+        const want = Math.max(0, Math.min(max, on.offsetLeft - (setNav.clientWidth - on.offsetWidth) / 2));
+        if (Math.abs(want - setNav.scrollLeft) > 1) setNav.scrollTo({ left: want, behavior: reduceMotion() ? 'auto' : 'smooth' });
+      }
+    }
+    hscroll(root);
     $$('button[title]:not([aria-label]), a[title]:not([aria-label])', root).forEach(b => {
       const text = Array.from(b.childNodes).filter(n => !(n.classList && n.classList.contains('ms'))).map(n => n.textContent).join('').trim();
       if (!text) b.setAttribute('aria-label', b.title);
@@ -364,7 +460,7 @@
   const loaders = {
     async home() {
       await settle({ autopilot: api('/autopilot'), proofStatus: api('/proofs/status'), proofs: api('/proofs', { query: { limit: 5 } }),
-        resume: api('/profile/resume'), profile: api('/profile'), analytics: api('/analytics'), jobs: api('/jobs') });
+        resume: api('/profile/resume'), profile: api('/profile'), analytics: api('/analytics'), jobs: api('/jobs'), avatar: api('/profile/avatar/meta') });
     },
     async proof() {
       await settle({ proofStatus: api('/proofs/status'), proofs: api('/proofs', { query: { limit: 300 } }), stats: api('/stats') });
@@ -382,7 +478,7 @@
     async settings() {
       await settle({ profile: api('/profile'), gemini: api('/profile/gemini-settings'), resumes: api('/resumes'),
         automation: api('/automation/status'), autopilot: api('/autopilot'), proofStatus: api('/proofs/status'),
-        resume: api('/profile/resume'), answers: api('/answer-bank') });
+        resume: api('/profile/resume'), answers: api('/answer-bank'), avatar: api('/profile/avatar/meta') });
     },
   };
 
@@ -446,7 +542,7 @@
       ${kpi('data-nav="pipeline" data-stage="queued"', 'indigo', 'Queued', fmt(st.queue_count), 'ready to apply')}
       ${kpi('data-nav="inbox"', 'amber', 'Needs you', fmt(nyCount), `${fmt(st.needs_you_count || 0)} questions · ${fmt(S.aiAnswers.length)} AI drafts`, nyCount > 0)}
       ${kpi('data-nav="inbox" data-tab="triage"', 'violet', 'To triage', fmt(st.maybe_count), 'borderline fits')}
-      ${kpi('data-nav="pipeline" data-stage="submitted"', 'teal', 'Submitted', fmt((st.total_submitted_real || 0) + (st.total_dry_run || 0)), `${fmt(st.total_submitted_real || 0)} live · ${fmt(st.total_dry_run || 0)} dry run`)}
+      ${kpi('data-nav="pipeline" data-stage="submitted"', 'teal', 'Submitted', fmt(st.total_submitted_real || 0), `sent to employers · ${fmt(st.total_dry_run || 0)} dry runs not sent`)}
       ${kpi('data-nav="pipeline" data-stage="interview"', 'teal', 'Interviews', fmt(st.interview_count), an.offers_count ? `${fmt(an.offers_count)} offers` : 'no offers yet')}
     </div>`;
 
@@ -489,6 +585,74 @@
       ${card('span-6', 'Sources', `${src.length} boards`, `<div class="card-b">${srcHtml || '<div class="empty">No sources yet</div>'}</div>`)}
     </div>`;
   }
+
+
+  // Calm dashboard: two small charts, numbers on demand (hover / tap), nothing shouting.
+  function weekChart() {
+    const week = ((S.analytics && S.analytics.weekly_trend) || []).map(w => ({
+      ...w, sent: w.sent ?? w.count ?? 0, dry: w.dry_run ?? 0,
+    }));
+    if (!week.length) return '';
+    const total = week.reduce((a, w) => a + w.sent + w.dry, 0);
+    const sent = week.reduce((a, w) => a + w.sent, 0);
+    const max = Math.max(1, ...week.map(w => w.sent + w.dry));
+    const peak = week.reduce((b, w, i) => (w.sent + w.dry > week[b].sent + week[b].dry ? i : b), 0);
+    const cols = week.map((w, i) => {
+      const t = w.sent + w.dry, today = i === week.length - 1;
+      const showV = t > 0 && (today || i === peak);
+      const tip = `${w.day} ${w.date} · ${w.sent} sent · ${w.dry} dry run${w.dry === 1 ? '' : 's'}`;
+      return `<div class="wk-col ${today ? 'today' : ''}" data-tip="${esc(tip)}" role="img" aria-label="${esc(tip)}">
+        <span class="wk-v tnum">${showV ? t : ''}</span>
+        <div class="wk-stack" style="height:${t ? Math.max(4, t / max * 100) : 0}%">
+          ${w.dry ? `<i class="seg-dry" style="flex:${w.dry}"></i>` : ''}${w.sent ? `<i class="seg-sent" style="flex:${w.sent}"></i>` : ''}
+        </div>
+        <span class="wk-d">${esc(today ? 'Today' : w.day)}</span></div>`;
+    }).join('');
+    return `<div class="dash-pane">
+      <div class="dash-h"><span class="dash-t">Applications</span><span class="dash-sub">last 7 days</span></div>
+      <div class="dash-big tnum">${fmt(sent)}<span class="dash-of"> sent${total - sent ? ` · ${fmt(total - sent)} dry run${total - sent === 1 ? '' : 's'}` : ''}</span></div>
+      <div class="wk">${cols}</div>
+      <div class="legend"><span><i class="sw sent"></i>Sent</span><span><i class="sw dry"></i>Dry run</span></div>
+    </div>`;
+  }
+  function stageChart() {
+    const st = S.stats || {};
+    const rows = [
+      ['Waiting in queue', st.queue_count || 0, 'pipeline', 'queued'],
+      ['Needs you', st.needs_you_count || 0, 'inbox', ''],
+      ['Dry runs', st.total_dry_run || 0, 'pipeline', 'practice'],
+      ['Sent to employers', st.total_submitted_real || 0, 'pipeline', 'submitted'],
+      ['Interviews', st.interview_count || 0, 'pipeline', 'interview'],
+    ];
+    const max = Math.max(1, ...rows.map(r => r[1]));
+    return `<div class="dash-pane">
+      <div class="dash-h"><span class="dash-t">Where things stand</span><span class="dash-sub">all time</span></div>
+      <div class="st-rows">${rows.map(([label, n, nav, stage]) => `<button class="st-row hv" data-nav="${nav}" ${stage ? `data-stage="${stage}"` : ''} data-tip="${esc(label)}: ${fmt(n)}">
+        <span class="st-l">${label}</span><span class="st-bar"><i style="width:${n ? Math.max(2, n / max * 100) : 0}%"></i></span><span class="st-n tnum">${fmt(n)}</span></button>`).join('')}</div>
+    </div>`;
+  }
+  const dashboard = () => {
+    const w = weekChart();
+    return `<section class="block"><h2 class="section-t">Your week</h2><div class="card dash">${w}${w ? '<div class="dash-rule" aria-hidden="true"></div>' : ''}${stageChart()}</div></section>`;
+  };
+
+  // One shared tooltip for anything with data-tip (charts). Pointer on desktop, tap on phones.
+  const tipEl = document.createElement('div');
+  tipEl.className = 'tip'; tipEl.setAttribute('role', 'tooltip');
+  document.body.appendChild(tipEl);
+  let tipFor = null;
+  const showTip = (el) => {
+    tipFor = el; tipEl.textContent = el.dataset.tip;
+    const r = el.getBoundingClientRect();
+    tipEl.classList.add('on');
+    const w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+    const x = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2));
+    const y = r.top - h - 8 < 8 ? r.bottom + 8 : r.top - h - 8;
+    tipEl.style.translate = `${Math.round(x)}px ${Math.round(y)}px`;
+  };
+  const hideTip = () => { tipFor = null; tipEl.classList.remove('on'); };
+  document.addEventListener('pointerover', (e) => { const el = e.target.closest && e.target.closest('[data-tip]'); if (el && el !== tipFor) showTip(el); else if (!el && tipFor) hideTip(); }, { passive: true });
+  document.addEventListener('scroll', hideTip, { capture: true, passive: true });
 
   // ───────────────────────── View: Home ─────────────────────────
   // One glance: who you are, what the autopilot is doing, and only what needs you.
@@ -600,8 +764,9 @@
     const recent = (S.proofs || []).slice(0, 3);
     const recentHtml = recent.length ? `<section class="block"><h2 class="section-t">Latest from employers <button class="btn sm ghost hv ml-auto" data-nav="proof">All proof ${icon('chevron_right')}</button></h2>
       <div class="card list">${recent.map(proofRow).join('')}</div></section>` : '';
-    return `<header class="view-head greet"><div class="min0"><div class="eyebrow">${esc(today())}</div><h1>${esc(greeting())}</h1><p class="sub">${esc(summary)}</p></div></header>
-      ${hero}${checklist()}${forYou}${recentHtml}${topShelf(8)}`;
+    return `<header class="view-head greet"><div class="min0"><div class="eyebrow">${esc(today())}</div><h1>${esc(greeting())}</h1><p class="sub">${esc(summary)}</p></div>
+      <button class="greet-me" data-nav="settings/profile" title="Your profile">${me('lg')}</button></header>
+      ${hero}${checklist()}${forYou}${dashboard()}${recentHtml}${topShelf(8)}`;
   };
 
   // ───────────────────────── View: Proof ─────────────────────────
@@ -777,7 +942,7 @@
   }
 
   afterRender.pipeline = () => {
-    const rerender = () => { $('#pipe-body').innerHTML = S.pipe.mode === 'table' ? pipeTable() : pipeBoard(); enhance($('#pipe-body')); };
+    const rerender = () => { $('#pipe-body').innerHTML = S.pipe.mode === 'table' ? pipeTable() : pipeBoard(); enhance($('#pipe-body')); hscroll(); };
     const q = $('#pipe-q');
     q && q.addEventListener('input', debounce(e => { S.pipe.q = e.target.value; S.pipe.limit = 100; rerender(); }, 120));
     $('#pipe-src') && $('#pipe-src').addEventListener('change', e => { S.pipe.source = e.target.value; rerender(); });
@@ -981,13 +1146,13 @@
   function setFont(patch) {
     const p = { ...fontPrefs(), ...patch };
     try { localStorage.setItem(FONT_KEY, JSON.stringify(p)); } catch (e) {}
-    const swap = () => applyFont(p);
+    // Re-render inside the same step as the size change, so sliding pills measure the new layout
+    const swap = () => { applyFont(p); S.lastHtml = ''; render(); };
     if (document.startViewTransition && p.motion !== 'reduce') document.startViewTransition(swap); else swap();
-    S.lastHtml = ''; render();
   }
-  function appearancePanel() {
+  function appearancePanel(standalone = false) {
     const fp = fontPrefs();
-    let open = true; try { open = localStorage.getItem('ap_appearance_open') !== '0'; } catch (e) {}
+    let open = true; try { open = standalone || localStorage.getItem('ap_appearance_open') !== '0'; } catch (e) {}
     return `<details class="card collapse" data-collapse="appearance" ${open ? 'open' : ''}>
       <summary class="card-h"><span class="card-t">Appearance</span><span class="aside">Theme, text size and font</span>${icon('expand_more', 'chev')}</summary>
       <div class="card-b stack">
@@ -1058,7 +1223,7 @@
 
   // ───────────────────────── View: Settings ─────────────────────────
   const SETTINGS_SECTIONS = [
-    ['profile', 'person', 'Profile'], ['resume', 'description', 'Resume'], ['preferences', 'tune', 'Job preferences'],
+    ['profile', 'person', 'Profile'], ['appearance', 'palette', 'Appearance'], ['resume', 'description', 'Resume'], ['preferences', 'tune', 'Job preferences'],
     ['autopilot', 'smart_toy', 'Autopilot'], ['email', 'mail', 'Email proof'], ['ai', 'auto_awesome', 'AI answers'],
     ['answers', 'forum', 'Answer bank'], ['help', 'help', 'Help & tutorials'], ['data', 'shield_lock', 'Data & privacy'],
   ];
@@ -1081,8 +1246,14 @@
     const save = (label) => `<div class="full row-end"><button class="btn primary hv" type="submit">${label}</button></div>`;
     const card = (title, aside, body) => `<section class="card"><div class="card-h"><span class="card-t">${title}</span><span class="aside">${aside || ''}</span></div>${body}</section>`;
 
+    if (sec === 'appearance') return `<div class="stack">${appearancePanel(true)}</div>`;
     if (sec === 'profile') return `<div class="stack">
-      <div class="card"><div class="profile-hero">${art(p.full_name, 'lg')}<div class="min0"><h2>${esc(p.full_name)}</h2><div class="muted small">${esc(p.education)}${p.cgpa ? ` · CGPA ${esc(p.cgpa)}` : ''}</div></div></div></div>
+      <div class="card"><div class="profile-hero">
+        <label class="avatar-pick" title="Change profile picture">${me('lg')}<span class="avatar-edit">${icon('photo_camera')}</span>
+          <input type="file" id="avatar-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden></label>
+        <div class="min0 grow"><h2>${esc(p.full_name)}</h2><div class="muted small">${esc(p.education)}${p.cgpa ? ` · CGPA ${esc(p.cgpa)}` : ''}</div>
+          <div class="row-start mt-2"><label class="btn sm hv" for="avatar-file">${icon('add_a_photo')}${S.avatar && S.avatar.has_avatar ? 'Change photo' : 'Add photo'}</label>
+          ${S.avatar && S.avatar.has_avatar ? `<button class="btn sm ghost hv" data-act="avatar-remove">Remove</button>` : ''}</div></div></div></div>
       ${appearancePanel()}
       <form class="card" data-profile-form="contact"><div class="card-h"><span class="card-t">Contact & credentials</span><span class="aside">Used exactly as written on forms</span></div>
         <div class="card-b form-grid">
@@ -1200,6 +1371,8 @@
     const r = $('#g-conf');
     r && r.addEventListener('input', () => { r.nextElementSibling.value = Math.round(r.value * 100) + '%'; });
     if (S.set.section === 'answers') afterRender.answers();
+    const pic = $('#avatar-file');
+    if (pic) pic.addEventListener('change', () => pic.files[0] && uploadAvatar(pic.files[0]));
     const input = $('#resume-file'), zone = $('[data-dropzone]');
     if (input) input.addEventListener('change', () => input.files[0] && uploadResume(input.files[0]));
     if (zone) {
@@ -1209,6 +1382,18 @@
     }
     $$('details[data-collapse]').forEach(d => d.addEventListener('toggle', () => { try { localStorage.setItem(`ap_${d.dataset.collapse}_open`, d.open ? '1' : '0'); } catch (e) {} }));
   };
+
+  async function uploadAvatar(file) {
+    if (file.size > 5 * 1024 * 1024) { toast('Choose an image smaller than 5 MB', true); return; }
+    const fd = new FormData(); fd.append('file', file);
+    const headers = TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {};
+    try {
+      const r = await fetch('/api/v1/profile/avatar', { method: 'POST', headers, body: fd });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.detail || `Upload failed (${r.status})`);
+      S.avatar = data; toast('Profile picture updated'); S.lastHtml = ''; render();
+    } catch (e) { toast(e.message, true); }
+  }
 
   async function uploadResume(file) {
     const zone = $('[data-dropzone]');
@@ -1233,16 +1418,30 @@
     { icon: 'shield', title: 'You stay in control', text: 'It starts in dry run: forms are filled but not sent. Turn on Live submissions in Settings › Autopilot when you’re ready.' },
     { icon: 'palette', title: 'Make it yours', text: 'Pick a theme, text size and font in Settings › Profile › Appearance. Replay this tour any time from Help & tutorials.' },
   ];
-  function openTour(step = 0) {
-    const s = TOUR[step], last = step === TOUR.length - 1;
-    $('#overlay').innerHTML = `<div class="modal-wrap" data-tour-wrap><div class="modal tour" role="dialog" aria-modal="true" aria-labelledby="tour-t">
-      <div class="tour-ic">${icon(s.icon, 'fill')}</div>
-      <h3 id="tour-t">${esc(s.title)}</h3><p>${esc(s.text)}</p>
-      <div class="tour-dots" aria-label="Step ${step + 1} of ${TOUR.length}">${TOUR.map((_, i) => `<i class="${i === step ? 'on' : ''}"></i>`).join('')}</div>
-      <div class="acts"><button class="btn ghost hv" data-tour="skip">${last ? '' : 'Skip'}</button><span class="grow"></span>
+  // The backdrop and card stay put between steps; only the content slides, so nothing blinks.
+  const tourBody = (st) => `<div class="tour-ic">${icon(st.icon, 'fill')}</div><h3 id="tour-t">${esc(st.title)}</h3><p>${esc(st.text)}</p>`;
+  const tourActs = (step, last) => `<button class="btn ghost hv" data-tour="skip">${last ? '' : 'Skip'}</button><span class="grow"></span>
         ${step ? `<button class="btn hv" data-tour="back">Back</button>` : ''}
-        <button class="btn primary hv" data-tour="${last ? 'done' : 'next'}" data-step="${step}">${last ? 'Get started' : 'Next'}</button></div></div></div>`;
-    $('#overlay [data-tour="' + (last ? 'done' : 'next') + '"]').focus();
+        <button class="btn primary hv" data-tour="${last ? 'done' : 'next'}" data-step="${step}">${last ? 'Get started' : 'Next'}</button>`;
+  function openTour(step = 0, dir = 1) {
+    const st = TOUR[step], last = step === TOUR.length - 1;
+    const card = $('#overlay .tour');
+    if (!card) {
+      $('#overlay').innerHTML = `<div class="modal-wrap" data-tour-wrap><div class="modal tour" role="dialog" aria-modal="true" aria-labelledby="tour-t">
+      <div class="tour-body" aria-live="polite">${tourBody(st)}</div>
+      <div class="tour-dots" aria-label="Step ${step + 1} of ${TOUR.length}">${TOUR.map((_, i) => `<i class="${i === step ? 'on' : ''}"></i>`).join('')}</div>
+      <div class="acts">${tourActs(step, last)}</div></div></div>`;
+    } else {
+      const body = $('.tour-body', card);
+      body.style.setProperty('--dir', dir);
+      body.classList.remove('swap'); void body.offsetWidth; // restart the slide
+      body.innerHTML = tourBody(st);
+      body.classList.add('swap');
+      $$('.tour-dots i', card).forEach((d, i) => d.classList.toggle('on', i === step));
+      $('.tour-dots', card).setAttribute('aria-label', `Step ${step + 1} of ${TOUR.length}`);
+      $('.acts', card).innerHTML = tourActs(step, last);
+    }
+    $('#overlay [data-tour="' + (last ? 'done' : 'next') + '"]').focus({ preventScroll: true });
   }
   function closeTour(goStart) {
     try { localStorage.setItem(TOUR_KEY, '1'); } catch (e) {}
@@ -1253,14 +1452,14 @@
     const b = e.target.closest('[data-tour]'); if (!b) return;
     const cur = Number(($('#overlay [data-step]') || {}).dataset?.step || 0);
     const a = b.dataset.tour;
-    if (a === 'next') openTour(cur + 1); else if (a === 'back') openTour(Math.max(0, cur - 1)); else closeTour(a === 'done');
+    if (a === 'next') openTour(cur + 1, 1); else if (a === 'back') openTour(Math.max(0, cur - 1), -1); else closeTour(a === 'done');
   });
   document.addEventListener('keydown', (e) => {
     if (!$('#overlay .tour')) return;
     const cur = Number(($('#overlay [data-step]') || {}).dataset?.step || 0);
     if (e.key === 'Escape') { e.stopImmediatePropagation(); closeTour(false); }
-    else if (e.key === 'ArrowRight' && cur < TOUR.length - 1) openTour(cur + 1);
-    else if (e.key === 'ArrowLeft' && cur > 0) openTour(cur - 1);
+    else if (e.key === 'ArrowRight' && cur < TOUR.length - 1) openTour(cur + 1, 1);
+    else if (e.key === 'ArrowLeft' && cur > 0) openTour(cur - 1, -1);
   }, true);
 
   const PROFILE_SECTIONS = {
@@ -1430,6 +1629,10 @@
       S.answers = S.answers.filter(x => x.id !== id); render();
     },
     async backup(btn) { await run(btn, () => api('/backup', { method: 'POST' }), 'Backup created'); },
+    async 'avatar-remove'() {
+      try { S.avatar = await api('/profile/avatar', { method: 'DELETE' }); toast('Profile picture removed'); S.lastHtml = ''; render(); }
+      catch (e) { toast(e.message, true); }
+    },
     'hide-checklist'() { try { localStorage.setItem(CHECK_KEY, '1'); } catch (e) {} S.lastHtml = ''; render(); },
     tour() { openTour(0); },
     async 'ap-run'(btn) {
@@ -1515,7 +1718,12 @@
     const pr = t.closest('[data-proof]');
     if (pr) { openProof(Number(pr.dataset.proof)); return; }
     const fs = t.closest('[data-font-size]');
-    if (fs) { setFont({ size: fs.dataset.fontSize }); return; }
+    if (fs) {
+      setFont({ size: fs.dataset.fontSize });
+      $$('[data-font-size]').forEach(b => { const on = b.dataset.fontSize === fs.dataset.fontSize; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
+      const ps = $('#theme-pop .seg'); if (ps) requestAnimationFrame(() => glide(ps, 'pop-size'));
+      return;
+    }
     const fst = t.closest('[data-font-style]');
     if (fst) { setFont({ style: fst.dataset.fontStyle }); return; }
     if (t.id === 'scrim') closeJob();
@@ -1690,7 +1898,11 @@
   function openThemePop() {
     if ($('#theme-pop')) { closeThemePop(); return; }
     document.body.insertAdjacentHTML('beforeend', `<div class="theme-pop" id="theme-pop" role="dialog" aria-label="Appearance">
-      <h3>Appearance</h3><p>Saved on this device.</p>${themeSwatches()}</div>`);
+      <h3>Appearance</h3><p>Saved on this device.</p>${themeSwatches()}
+      <div class="eyebrow mt-3 mb-2">Text size</div>
+      <div class="seg wide" data-glide="pop-size" role="radiogroup" aria-label="Text size">${FONT_SIZES.map(([id, label]) => `<button role="radio" aria-checked="${fontPrefs().size === id}" class="${fontPrefs().size === id ? 'on' : ''}" data-font-size="${id}" title="${label}"><span class="size-a size-${id}" aria-hidden="true">A</span></button>`).join('')}</div>
+      <button class="btn sm ghost hv pop-more" data-nav="settings/appearance">${icon('text_fields')}Fonts and more ${icon('chevron_right')}</button></div>`);
+    glide($('#theme-pop .seg'), 'pop-size');
     $('#theme-btn').setAttribute('aria-expanded', 'true');
     const first = $('#theme-pop .swatch.on') || $('#theme-pop .swatch'); first && first.focus({ preventScroll: true });
   }
@@ -1704,6 +1916,7 @@
   document.addEventListener('click', (e) => {
     const choice = e.target.closest('[data-theme-choice]');
     if (choice) { setTheme(choice.dataset.themeChoice); return; }
+    if (e.target.closest('#theme-pop [data-nav]')) { closeThemePop(); return; }
     if ($('#theme-pop') && !e.target.closest('#theme-pop')) closeThemePop();
   });
   document.addEventListener('change', (e) => {

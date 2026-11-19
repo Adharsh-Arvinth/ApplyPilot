@@ -267,6 +267,74 @@ async def upload_resume(file: UploadFile = File(...), db: Session = Depends(get_
     db.commit()
     return {"status": "success", "message": "Resume uploaded. The previous one was deleted.", "uploaded": True, **meta}
 
+
+# ── Profile picture: one image, kept on your PC, served only to signed-in devices ──
+AVATAR_TYPES = {  # magic bytes → extension (the browser-supplied content type is not trusted)
+    b"\x89PNG\r\n\x1a\n": ".png", b"\xff\xd8\xff": ".jpg", b"RIFF": ".webp", b"GIF8": ".gif",
+}
+AVATAR_MEDIA = {".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif"}
+MAX_AVATAR_BYTES = 5 * 1024 * 1024
+
+
+def _avatar_dir() -> Path:
+    return settings.OUTPUT_DIR / "profile"
+
+
+def _current_avatar() -> Optional[Path]:
+    return next(iter(sorted(_avatar_dir().glob("avatar.*"))), None) if _avatar_dir().exists() else None
+
+
+@router.get("/avatar/meta", summary="Whether a profile picture is set (and its version for caching)")
+def avatar_meta():
+    f = _current_avatar()
+    return {"has_avatar": bool(f), "version": int(f.stat().st_mtime) if f else 0}
+
+
+@router.get("/avatar", summary="Your profile picture")
+def get_avatar():
+    from fastapi.responses import FileResponse
+    f = _current_avatar()
+    if not f:
+        raise HTTPException(status_code=404, detail="No profile picture yet.")
+    return FileResponse(f, media_type=AVATAR_MEDIA.get(f.suffix, "application/octet-stream"),
+                        headers={"Cache-Control": "private, max-age=31536000"})
+
+
+@router.post("/avatar", summary="Set your profile picture (replaces the previous one)")
+async def upload_avatar(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="That image is empty.")
+    if len(content) > MAX_AVATAR_BYTES:
+        raise HTTPException(status_code=400, detail="Choose an image smaller than 5 MB.")
+    ext = next((e for sig, e in AVATAR_TYPES.items() if content.startswith(sig)), None)
+    if ext == ".webp" and content[8:12] != b"WEBP":
+        ext = None
+    if not ext:
+        raise HTTPException(status_code=400, detail="Use a PNG, JPG, WebP or GIF image.")
+    d = _avatar_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    for old in d.glob("avatar.*"):
+        try:
+            old.unlink()
+        except OSError:
+            pass
+    target = d / f"avatar{ext}"
+    target.write_bytes(content)
+    db.add(RunLog(event_type="profile_update", level="info", outcome="success", message="Profile picture updated."))
+    db.commit()
+    return {"status": "success", "has_avatar": True, "version": int(target.stat().st_mtime)}
+
+
+@router.delete("/avatar", summary="Remove your profile picture")
+def delete_avatar():
+    for old in (_avatar_dir().glob("avatar.*") if _avatar_dir().exists() else []):
+        try:
+            old.unlink()
+        except OSError:
+            pass
+    return {"status": "success", "has_avatar": False, "version": 0}
+
 # -------------------------------------------------------------
 # Structured Candidate Intelligence Records (Verifiable Truth)
 # -------------------------------------------------------------

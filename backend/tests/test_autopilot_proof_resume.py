@@ -143,3 +143,20 @@ def test_autopilot_skips_assist_only_sites(monkeypatch):
         profile.is_paused, profile.active_hours_start, profile.active_hours_end = saved
         db.commit()
         db.close()
+
+
+# ── Profile picture: one image, replaced on each upload, private to signed-in devices ──
+def test_avatar_upload_replace_and_remove(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "OUTPUT_DIR", tmp_path)
+    png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
+    jpg = b"\xff\xd8\xff\xe0" + b"\x00" * 32
+    assert client.post("/api/v1/profile/avatar", headers=AUTH, files={"file": ("a.txt", b"text", "text/plain")}).status_code == 400
+    assert client.post("/api/v1/profile/avatar", headers=AUTH, files={"file": ("a.png", png, "image/png")}).json()["has_avatar"]
+    assert client.post("/api/v1/profile/avatar", headers=AUTH, files={"file": ("b.jpg", jpg, "image/jpeg")}).status_code == 200
+    assert sorted(p.name for p in (tmp_path / "profile").iterdir()) == ["avatar.jpg"]
+    res = client.get("/api/v1/profile/avatar", headers=AUTH)
+    assert res.status_code == 200 and res.headers["content-type"] == "image/jpeg"
+    client.cookies.clear()
+    assert client.get("/api/v1/profile/avatar").status_code == 401
+    client.delete("/api/v1/profile/avatar", headers=AUTH)
+    assert client.get("/api/v1/profile/avatar/meta", headers=AUTH).json()["has_avatar"] is False

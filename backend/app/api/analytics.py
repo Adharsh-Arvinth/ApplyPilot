@@ -39,10 +39,24 @@ def get_analytics(db: Session = Depends(get_db)):
             Application.submitted_at <= day_end
         ).count()
 
+        dry_day = db.query(Application).filter(
+            Application.submitted_at >= day_start,
+            Application.submitted_at <= day_end,
+            Application.status == "dry_run"
+        ).count()
+
+        sent_day = db.query(Application).filter(
+            Application.submitted_at >= day_start,
+            Application.submitted_at <= day_end,
+            Application.status.in_(["submitted", "unverified", "applied"])
+        ).count()
+
         weekly_trend.append({
             "day": day_date.strftime("%a"),
             "date": day_date.strftime("%b %d"),
-            "count": apps_day
+            "count": apps_day,
+            "sent": sent_day,  # really sent to the employer (confirmed or awaiting confirmation)
+            "dry_run": dry_day,          # practice runs: filled, never sent
         })
 
     # 2. Monthly trend (Last 4 weeks)

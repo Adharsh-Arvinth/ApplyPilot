@@ -73,3 +73,6 @@ output/resumes/*
 output/screenshots/*
 !output/screenshots/.gitkeep
 .cockpit-dev/
+
+# Profile picture (personal)
+output/profile/
