@@ -5,7 +5,7 @@ cd /d "%~dp0"
 
 echo ======================================================================
 echo    APPLYPILOT: 24/7 BACKGROUND BACKEND ENGINE
-echo    Host: Windows PC | Port: 8000 | Auth: Single-User Bearer
+echo    Host: Windows PC ^| Port: 8000 ^| Auth: Single-User Bearer
 echo ======================================================================
 echo.
 
