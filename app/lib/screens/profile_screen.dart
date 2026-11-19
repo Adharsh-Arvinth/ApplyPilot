@@ -1,10 +1,8 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
-import '../core/hallmark_tokens.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -69,8 +67,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final factsFuture = _api.getLockedFacts();
       final results = await Future.wait([pFuture, factsFuture]);
 
-      final p = results[0] as Map<String, dynamic>;
-      final facts = results[1] as Map<String, dynamic>;
+      final p = results[0];
+      final facts = results[1];
 
       if (mounted) {
         setState(() {

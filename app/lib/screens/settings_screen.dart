@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
-import '../core/hallmark_tokens.dart';
 import '../core/theme_mode.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -27,7 +26,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _tokenController = TextEditingController();
   bool _testing = false;
   String? _testResult;
-  bool _syncingCloud = false;
+  final bool _syncingCloud = false;
 
   bool _loadingProfile = true;
   bool _goLive = false;
@@ -473,7 +472,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          "Gemini answered $_geminiAnswersToday questions today (saved ~${_savedMinutes} mins)",
+                          "Gemini answered $_geminiAnswersToday questions today (saved ~$_savedMinutes mins)",
                           style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: primaryTextColor),
                         ),
                       ),

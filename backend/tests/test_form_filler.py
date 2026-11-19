@@ -69,6 +69,7 @@ def test_filler_fills_everything_after_resume_parser_wipes_fields(tmp_path):
                     why: document.querySelector('[name="cards[q3]"]').value,
                     consent: document.querySelector('[name=consent]').checked,
                     comments: document.querySelector('[name=comments]').value,
+                    country: window.countryValue(),
                 })""")
                 await browser.close()
                 return report, values
@@ -79,6 +80,7 @@ def test_filler_fills_everything_after_resume_parser_wipes_fields(tmp_path):
     assert v["name"] and v["email"] and v["location"] and v["org"], v
     assert v["auth"] == "Yes" and v["team"] == "ml" and v["why"], v
     assert v["consent"] is False and v["comments"] == ""  # never auto-consent; optional free text left alone
+    assert v["country"] == "India", v  # hidden react-select input driven from the keyboard
     labels = [u["label"] for u in report["unresolved"]]
     assert labels == [CONSENT_LABEL], report["unresolved"]
 
@@ -198,3 +200,68 @@ def test_confirmation_email_promotes_unverified_application():
         assert job.status == "applied" and app.status == "submitted" and app.evidence_level >= 4
     finally:
         db.close()
+
+
+# ── Lessons from real employer forms ──
+def test_questions_are_never_answered_by_field_rules():
+    from types import SimpleNamespace
+    from backend.app.services.answer_service import AnswerService
+    from backend.app.services.form_filler import profile_answer
+    p = SimpleNamespace(github="https://example.com/gh", linkedin="https://example.com/li")
+    assert profile_answer("Current company", p) and profile_answer("Website", p)
+    assert profile_answer("Are you subject to any employment agreements with your current employer?", p) is None
+    assert profile_answer("Will you now or in the future require sponsorship in your current location?", p) is None
+    assert profile_answer("Language Skill(s) (Check all that apply)", p) == "English"
+    db = SessionLocal()
+    try:
+        assert AnswerService.resolve_answer(db, "School")
+        assert AnswerService.resolve_answer(db, "What is your email address?")
+        assert AnswerService.resolve_answer(db, "How did you perform in mathematics at high school?") is None
+        assert AnswerService.resolve_answer(db, "Which languages have you used at work, in an internship or in school?") is None
+    finally:
+        db.close()
+
+
+def test_page_without_a_form_is_never_reported_as_a_run(live_profile):
+    db, profile = live_profile
+    job = _job(db, (Path(__file__).parent / "fixtures" / "no_form.html").resolve().as_uri(), "NoForm")
+    res = asyncio.run(AutoApplyEngine.process_job_application(db, job, profile, force_dry_run=True))
+    assert res["status"] == "needs_input" and res["reason"] == "no_form_found", res
+    db.refresh(job)
+    assert job.status == "needs_attention" and not db.query(Application).filter(Application.job_id == job.id).first()
+
+
+def test_closed_posting_is_expired_not_a_failure(live_profile):
+    import http.server, threading
+    from backend.app.services import apply_engine as eng
+
+    class Gone(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(404); self.end_headers(); self.wfile.write(b"gone")
+        def log_message(self, *a):
+            pass
+
+    srv = http.server.HTTPServer(("127.0.0.1", 0), Gone)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    db, profile = live_profile
+    before = eng._consecutive_failures
+    try:
+        job = _job(db, f"http://127.0.0.1:{srv.server_port}/jobs/closed", "Closed")
+        res = asyncio.run(AutoApplyEngine.process_job_application(db, job, profile, force_dry_run=True))
+        db.refresh(job)
+        assert res["status"] == "expired" and job.status == "expired"
+        assert eng._consecutive_failures == before  # the safety breaker is not tripped by closed postings
+    finally:
+        srv.shutdown()
+
+
+def test_objective_questions_answer_themselves():
+    from backend.app.core.facts import LOCKED_FACTS
+    from backend.app.services.form_filler import universal_choice, _pick_option
+    opts = ["Agency or Recruiter", "Friend or Family", "Job Board (Indeed, Monster, etc.)", "LinkedIn", "Other"]
+    assert universal_choice("Please tell us how you heard about this opportunity.", opts) == "Job Board (Indeed, Monster, etc.)"
+    home = LOCKED_FACTS["personal"].get("location", "")
+    if home:
+        assert universal_choice("Are you a resident of Atlantis?", ["Yes", "No"]) == "No"
+    assert universal_choice("What is your name?", []) is None
+    assert _pick_option("English", ["English (ENG)", "Spanish (SPA)"]) == "English (ENG)"

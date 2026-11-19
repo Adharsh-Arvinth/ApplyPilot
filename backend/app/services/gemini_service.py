@@ -12,6 +12,10 @@ from backend.app.services.answer_service import normalize_question_key
 
 logger = logging.getLogger(__name__)
 
+import concurrent.futures
+# Gemini requests run here so each call can be bounded by a deadline (a stuck request can't block the app)
+_GEMINI_POOL = concurrent.futures.ThreadPoolExecutor(max_workers=8, thread_name_prefix="gemini")
+
 # Verified candidate ground truth (Strictly bounded truth source - zero fabrication permitted)
 CANDIDATE_FACTS = candidate_summary()
 
@@ -147,39 +151,44 @@ class GeminiService:
         include_contact = any(term in q_lower for term in ["email", "phone", "contact number", "mobile"])
         include_links = any(term in q_lower for term in ["linkedin", "github", "portfolio", "profile url", "website"])
 
-        facts_lines = [
-            "CANDIDATE FACTS (STRICT SOURCE OF TRUTH):",
-            f"- Full Name: {LOCKED_FACTS['personal']['name']}",
-        ]
+        f, p, e = LOCKED_FACTS, LOCKED_FACTS.get("personal", {}), LOCKED_FACTS.get("education", {})
+        facts_lines = ["CANDIDATE FACTS (STRICT SOURCE OF TRUTH):", f"- Full Name: {p.get('name', '')}"]
         if include_contact:
-            facts_lines.append(f"- Email Address: {LOCKED_FACTS['personal']['email']}")
-            facts_lines.append(f"- Phone Number: {LOCKED_FACTS['personal']['phone']}")
+            facts_lines.append(f"- Email Address: {p.get('email', '')}")
+            facts_lines.append(f"- Phone Number: {p.get('phone', '')}")
         if include_links:
-            facts_lines.append(f"- LinkedIn: {LOCKED_FACTS['personal']['linkedin']}")
-            facts_lines.append(f"- GitHub: {LOCKED_FACTS['personal']['github']}")
-
-        facts_lines.extend([
-            f"- Institution: {LOCKED_FACTS['education']['institution']} ({LOCKED_FACTS['education']['institution_full']})",
-            f"- Degree: {LOCKED_FACTS['education']['degree']}",
-            f"- Academic Start: {LOCKED_FACTS['education']['start_date']}",
-            f"- CGPA: {LOCKED_FACTS['education']['cgpa']}",
-            "- Expected Graduation: Unconfirmed (do NOT guess; candidate will confirm in app)",
-            "- Published Patents (exact titles only):",
-            f'  1. "{LOCKED_FACTS["patents"][0]}"',
-            f'  2. "{LOCKED_FACTS["patents"][1]}"',
-            "- Key Project:",
-            f"  * Name: {LOCKED_FACTS['projects'][0]['name']}",
-            f"  * Tech Stack: {', '.join(LOCKED_FACTS['projects'][0]['technologies'])}",
-            f"  * Corpus: {LOCKED_FACTS['projects'][0]['corpus']}",
-            f"  * Metrics: {LOCKED_FACTS['projects'][0]['metrics']}",
-            f"  * Description: {LOCKED_FACTS['projects'][0]['description']}",
-            "- Certifications:",
-            f"  1. {LOCKED_FACTS['certifications'][0]}",
-            f"  2. {LOCKED_FACTS['certifications'][1]}",
-            "- Technical Skills:",
-            f"  {', '.join(LOCKED_FACTS['skills'])}",
-            "- Work Authorization, Notice Period, Relocation: [empty - do NOT guess]"
-        ])
+            facts_lines.append(f"- LinkedIn: {p.get('linkedin', '')}")
+            facts_lines.append(f"- GitHub: {p.get('github', '')}")
+        if p.get("location"):
+            facts_lines.append(f"- Current location: {p['location']}")
+        inst = e.get("institution", "")
+        if e.get("institution_full") and e.get("institution_full") != inst:
+            inst = f"{inst} ({e['institution_full']})" if inst else e["institution_full"]
+        facts_lines += [
+            f"- Institution: {inst}",
+            f"- Degree: {e.get('degree', '')}",
+            f"- Academic Start: {e.get('start_date', '') or 'not provided'}",
+            f"- CGPA: {e.get('cgpa', '') or 'not provided'}",
+            f"- Expected Graduation: {e.get('expected_graduation') or 'Unconfirmed (do NOT guess; candidate will confirm in app)'}",
+        ]
+        if f.get("patents"):
+            facts_lines.append("- Published Patents (exact titles only):")
+            facts_lines += [f'  {i}. "{t}"' for i, t in enumerate(f["patents"], 1)]
+        for pr in f.get("projects", ()):
+            facts_lines.append(f"- Project: {pr.get('name', '')}")
+            if pr.get("technologies"):
+                facts_lines.append(f"  * Tech Stack: {', '.join(pr['technologies'])}")
+            for key, label in (("corpus", "Corpus"), ("metrics", "Metrics"), ("description", "Description")):
+                if pr.get(key):
+                    facts_lines.append(f"  * {label}: {pr[key]}")
+        if f.get("certifications"):
+            facts_lines.append("- Certifications:")
+            facts_lines += [f"  {i}. {c}" for i, c in enumerate(f["certifications"], 1)]
+        if f.get("skills"):
+            facts_lines += ["- Technical Skills:", f"  {', '.join(f['skills'])}"]
+        for key, label in (("work_authorization", "Work Authorization"), ("notice_period", "Notice Period / Earliest Start"),
+                           ("relocation_preference", "Relocation")):
+            facts_lines.append(f"- {label}: {f.get(key) or '[not provided - do NOT guess]'}")
         return "\n".join(facts_lines)
 
     @classmethod
@@ -418,19 +427,70 @@ Respond ONLY with a JSON object matching this schema:
     
     @classmethod
     def get_client(cls) -> Optional[genai.Client]:
-        """Lazy-initialize official Google GenAI Client with existing API key."""
-        if cls._client is None and settings.GEMINI_API_KEY:
+        """Google GenAI client for the active key: the user's own key from Settings, else the server's .env key."""
+        key = cls.active_key()
+        if not key:
+            cls._client, cls._client_key = None, None
+            return None
+        if cls._client is None or getattr(cls, "_client_key", None) != key:
             try:
-                cls._client = genai.Client(api_key=settings.GEMINI_API_KEY)
+                cls._client, cls._client_key = genai.Client(api_key=key), key
+                cls._cache.clear()
                 logger.info("Google GenAI client successfully initialized.")
             except Exception as e:
                 logger.error(f"Failed to initialize Google GenAI Client: {e}")
                 cls._client = None
         return cls._client
 
+    _user_key: Optional[str] = None
+    _user_key_loaded: bool = False
+
     @classmethod
-    def _call_model(cls, prompt: str, system_instruction: Optional[str] = None, json_mode: bool = False) -> Optional[str]:
-        """Call Gemini model with automatic primary/fallback handling and error recovery."""
+    def active_key(cls) -> Optional[str]:
+        if not cls._user_key_loaded:
+            cls.reload_user_key()
+        return cls._user_key or settings.GEMINI_API_KEY or None
+
+    @classmethod
+    def key_source(cls) -> str:
+        if not cls._user_key_loaded:
+            cls.reload_user_key()
+        return "yours" if cls._user_key else ("server" if settings.GEMINI_API_KEY else "none")
+
+    @classmethod
+    def reload_user_key(cls) -> None:
+        """Read the key saved in Settings (Fernet-encrypted in app_settings)."""
+        from backend.app.core.app_settings import get_setting
+        from backend.app.core.database import SessionLocal
+        from backend.app.core.security import decrypt_value
+        db = SessionLocal()
+        try:
+            enc = (get_setting(db, "gemini_key", {}) or {}).get("enc")
+            cls._user_key = decrypt_value(enc) if enc else None
+        except Exception:
+            cls._user_key = None
+        finally:
+            db.close()
+            cls._user_key_loaded = True
+
+    @staticmethod
+    def test_key(key: str) -> Tuple[bool, str]:
+        """Check a key with one tiny request before saving it."""
+        try:
+            client = genai.Client(api_key=key)
+            next(iter(client.models.list()), None)
+            return True, "Key works"
+        except Exception as e:
+            msg = str(e)
+            if "API_KEY_INVALID" in msg or "API key not valid" in msg or "PERMISSION_DENIED" in msg or "401" in msg or "400" in msg:
+                return False, "Google didn't accept that key. Copy it again from Google AI Studio."
+            return False, "Couldn't reach Google to check the key. Check your internet connection and try again."
+
+    @classmethod
+    def _call_model(cls, prompt: str, system_instruction: Optional[str] = None, json_mode: bool = False,
+                    timeout: float = 30.0) -> Optional[str]:
+        """Call Gemini (primary, then fallback model) within one overall deadline, so a slow or overloaded
+        model never leaves the user waiting; callers fall back to their templates on None."""
         client = cls.get_client()
         if not client:
             return None
@@ -453,13 +513,20 @@ Respond ONLY with a JSON object matching this schema:
 
         config = types.GenerateContentConfig(**config_args)
 
+        deadline = time.time() + timeout
         for model_name in models_to_try:
+            remaining = deadline - time.time()
+            if remaining <= 1:
+                last_error = last_error or TimeoutError(f"no time left ({timeout:.0f} s budget)")
+                break
             try:
-                response = client.models.generate_content(
-                    model=model_name,
-                    contents=prompt,
-                    config=config,
-                )
+                fut = _GEMINI_POOL.submit(client.models.generate_content, model=model_name, contents=prompt, config=config)
+                try:
+                    response = fut.result(timeout=remaining)
+                except concurrent.futures.TimeoutError:
+                    last_error = TimeoutError(f"{model_name} took longer than {timeout:.0f} s")
+                    logger.warning(f"Gemini {model_name} exceeded the {timeout:.0f} s budget; using the fallback answer.")
+                    break
                 if response and response.text:
                     result = response.text.strip()
                     cls._cache[cache_key] = result
@@ -765,7 +832,7 @@ Respond ONLY with a JSON object:
   "candidate_edge": "What sets the candidate apart, using verified facts only"
 }}
 """
-        response_text = cls._call_model(prompt, system_instruction, json_mode=True)
+        response_text = cls._call_model(prompt, system_instruction, json_mode=True, timeout=40)
         if response_text:
             try:
                 clean_text = response_text

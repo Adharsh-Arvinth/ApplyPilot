@@ -30,7 +30,8 @@ SCAN_JS = r"""
   const textOf = (el) => {
     if (!el) return '';
     const c = el.cloneNode(true);
-    c.querySelectorAll('input, select, textarea, option, script, style, button, .hidden').forEach((n) => n.parentNode && n.parentNode.removeChild(n));
+    c.querySelectorAll('input, select, textarea, option, script, style, button, .hidden, [role="listbox"], [role="option"], .dropdown-results, .dropdown-container, [aria-live], .location-results')
+      .forEach((n) => n.parentNode && n.parentNode.removeChild(n));
     return clean(c.innerText || c.textContent);
   };
   const visible = (el) => {
@@ -47,10 +48,12 @@ SCAN_JS = r"""
     const by = el.getAttribute('aria-labelledby');
     if (by) { const t = clean(by.split(/\s+/).map((id) => textOf(document.getElementById(id))).join(' ')); if (t) return t; }
     if (el.getAttribute('aria-label')) return clean(el.getAttribute('aria-label'));
-    const box = boxOf(el);
-    if (box) {
-      const l = box.querySelector('legend, .application-label, label, .text, [class*="label"], [class*="Label"], h3, h4');
-      const t = textOf(l); if (t) return t;
+    // Walk outwards: the first ancestor holding a label-like element that is not the field itself
+    let a = el.parentElement;
+    for (let i = 0; i < 6 && a && a !== document.body; i++, a = a.parentElement) {
+      const l = [...a.querySelectorAll('legend, .application-label, label, .text, [class*="label"], [class*="Label"], h3, h4')]
+        .find((x) => !x.contains(el) && !x.querySelector('input, select, textarea') && textOf(x));
+      if (l) return textOf(l);
     }
     return clean(el.getAttribute('placeholder') || '');
   };
@@ -72,7 +75,7 @@ SCAN_JS = r"""
     const e = box && box.querySelector('.error, .field-error, .error-message, [class*="error"], [role="alert"], .invalid-feedback');
     return e && e.offsetParent ? clean(e.innerText).slice(0, 200) : '';
   };
-  const stripReq = (t) => clean(t.replace(/[*✱]/g, '').replace(/\(required\)/i, ''));
+  const stripReq = (t) => clean(t.replace(/[*✱]/g, '').replace(/\(required\)/i, '').replace(/No location found.*$/i, '').replace(/Loading\.*$/i, ''));
 
   const out = []; let n = 0; const groups = {};
   const els = document.querySelectorAll('input, select, textarea');
@@ -107,7 +110,12 @@ SCAN_JS = r"""
       const sel = el.options[el.selectedIndex];
       f.value = sel && sel.value && f.options.some((o) => o.value === sel.value) ? clean(sel.text) : '';
     }
-    if (f.kind === 'text' && (el.getAttribute('role') === 'combobox' || el.closest('[class*="select__control"], .select-shell, [class*="combobox"]'))) f.kind = 'combobox';
+    if (f.kind === 'text' && (el.getAttribute('role') === 'combobox' || el.closest('[class*="select__control"], .select-shell, [class*="combobox"]'))) {
+      f.kind = 'combobox';
+      const ctl = el.closest('[class*="select__control"], [class*="control"], .select-shell') || el.parentElement;
+      const chosen = ctl && ctl.querySelector('[class*="single-value"], [class*="singleValue"], [class*="multi-value__label"], [class*="multiValue"]');
+      if (chosen && clean(chosen.innerText)) f.value = clean(chosen.innerText);
+    }
     if (f.kind === 'text' && (el.id === 'location-input' || el.classList.contains('location-input'))) f.kind = 'location';
     out.push(f);
   }
@@ -135,6 +143,7 @@ ACTIONS_JS = r"""
 
 CONSENT = re.compile(r"consent|privacy|data processing|terms|i agree|agree to|notetaker|ai note|recording|background check|non-compete"
                      r"|gdpr|certify|attest|declaration|acknowledge", re.I)
+QUESTION = re.compile(r"\?|^(are|do|did|does|will|would|have|has|had|is|was|can|could|should|may|please|tell|describe|explain|why|how|what|which|when|where)\b", re.I)
 SKIP_OPTIONAL = re.compile(r"cover letter|additional information|anything else|message to the hiring", re.I)
 
 
@@ -150,8 +159,8 @@ def _facts(*path: str, default: str = "") -> str:
 def profile_answer(label: str, profile) -> Optional[str]:
     """Deterministic answers from your profile/facts for common fields the Answer Bank may miss."""
     low = re.sub(r"\s+", " ", (label or "").lower()).strip()
-    if not low:
-        return None
+    if not low or QUESTION.search(low) or len(low.split()) > 6:
+        return None  # "Are you subject to agreements with your current employer?" is a question, not a field
     institution = _facts("education", "institution_full") or _facts("education", "institution")
     rules: List[Tuple[str, Optional[str]]] = [
         (r"\b(current|present|most recent) (company|employer|organi[sz]ation)\b|^(company|employer|organi[sz]ation)$|current workplace", institution),
@@ -159,10 +168,35 @@ def profile_answer(label: str, profile) -> Optional[str]:
         (r"^(current )?location$|current location|where are you (currently )?(based|located)|city,? (state|country)", _facts("personal", "location")),
         (r"\bwebsite\b|portfolio|personal (site|url)|other (website|link)", getattr(profile, "github", "") or getattr(profile, "linkedin", "")),
         (r"\btwitter\b|\bx\.com\b", None),
+        (r"language skill|spoken language|languages? (you )?speak|^languages?$", "English"),
     ]
     for pattern, value in rules:
         if re.search(pattern, low):
             return value or None
+    return None
+
+
+HEARD = re.compile(r"hear(d)? about|how did you (find|learn|discover)|source of (this )?application|where did you (see|find)", re.I)
+HEARD_PREFS = (r"company (web)?site|career(s)? (page|site)|website", r"job board|indeed|monster", r"linkedin", r"^other\b")
+RESIDENT = re.compile(r"^(are you )?(a |currently )?(a )?resident of (the )?(state of )?([a-z .'-]+?)\??$", re.I)
+
+
+def universal_choice(label: str, options: List[str]) -> Optional[str]:
+    """Questions with an objectively right answer that needs no AI: pick it directly from the choices."""
+    low = (label or "").strip().lower()
+    if options and HEARD.search(low):
+        for pref in HEARD_PREFS:
+            hit = next((o for o in options if re.search(pref, o, re.I)), None)
+            if hit:
+                return hit
+    m = RESIDENT.match(low)
+    if m:
+        place = m.group(6).strip()
+        home = _facts("personal", "location").lower()
+        if place and home:
+            yes = place in home
+            want = "yes" if yes else "no"
+            return next((o for o in options if o.strip().lower().startswith(want)), "Yes" if yes else "No")
     return None
 
 
@@ -172,6 +206,10 @@ def _pick_option(answer: str, options: List[str], threshold: float = 0.72) -> Op
     exact = next((o for o in options if o.strip().lower() == answer.strip().lower()), None)
     if exact:
         return exact
+    lead = re.compile(rf"^\s*{re.escape(answer.strip())}\b", re.I)
+    starts = [o for o in options if lead.match(o)]
+    if len(starts) == 1:  # "English" → "English (ENG)"
+        return starts[0]
     choice, conf = match_option_with_confidence(answer, options)
     return choice if choice and conf >= threshold else None
 
@@ -188,6 +226,7 @@ class FormFiller:
         self.unresolved: List[Dict[str, Any]] = []
         self.ai_answer_ids: List[int] = []
         self._gemini_tried: Dict[str, str] = {}
+        self.gemini_budget = 15  # per form: long questionnaires send the rest to you instead of stalling
 
     async def scan(self) -> List[Dict[str, Any]]:
         try:
@@ -211,8 +250,11 @@ class FormFiller:
             return str(res[0]), "answer_bank"
         if label in self._gemini_tried:  # asked once already on this page; don't spend another call
             return None, self._gemini_tried[label]
+        if allow_gemini and self.gemini and self.gemini_budget <= 0:
+            return None, "Many open questions on this form — answer once and they're remembered"
         if allow_gemini and self.gemini:
-            ftype ={"textarea": "textarea", "select": "select", "radio": "radio", "checkboxes": "checkbox",
+            self.gemini_budget -= 1
+            ftype = {"textarea": "textarea", "select": "select", "radio": "radio", "checkboxes": "checkbox",
                      "checkbox": "checkbox", "combobox": "select"}.get(kind, "text")
             try:
                 g_ans, src, bank_id = await self.gemini(label, ftype, options)
@@ -258,10 +300,14 @@ class FormFiller:
                     await self._check(field["options"][0]["idx"] if field.get("options") else field["idx"])
                     return True
                 return False
-            if kind in ("combobox", "location"):
+            if kind == "combobox":
+                return await self._write_combo(field, el, str(value))
+            if kind == "location":
+                # Location pickers (Lever) only accept a suggestion; search by city, then pick the best match
+                city = str(value).split(",")[0].strip() or str(value)
                 await el.click()
                 await el.fill("")
-                await el.type(str(value)[:60], delay=35)
+                await el.type(city[:40], delay=35)
                 await asyncio.sleep(1.2)
                 opts = self.page.locator('[role="option"], .select__option, .dropdown-results > div, .pac-item, [class*="option"]:visible')
                 count = min(await opts.count(), 30)
@@ -281,6 +327,86 @@ class FormFiller:
         except Exception as e:
             logger.info(f"Could not write '{field['label'][:40]}': {e}")
         return False
+
+    # ── React-select style dropdowns (Greenhouse, Ashby): the real input is hidden under a styled box,
+    #    so they are driven from the keyboard, the way they are designed to be used. ──
+    OPTION_SEL = '[role="option"], .select__option, [class*="select__option"]'
+
+    async def _open_combo(self, el) -> None:
+        try:
+            await self.page.keyboard.press("Escape")  # close a menu another question left open
+        except Exception:
+            pass
+        try:
+            await el.focus()
+        except Exception:
+            pass
+        try:
+            await el.click(force=True, timeout=2000)
+        except Exception:
+            pass
+        await self.page.keyboard.press("ArrowDown")
+
+    async def _options_for(self, el):
+        """Only the menu this dropdown opened (other widgets, e.g. a phone-country list, keep options in the page too)."""
+        lb = None
+        try:
+            lb = await el.get_attribute("aria-controls") or await el.get_attribute("aria-owns")
+        except Exception:
+            pass
+        if lb:
+            return self.page.locator(f'[id="{lb}"] [role="option"], [id="{lb}"] .select__option')
+        return self.page.locator('[role="option"]:visible, .select__option:visible')
+
+    async def _option_texts(self, el=None) -> List[str]:
+        opts = await self._options_for(el) if el is not None else self.page.locator(self.OPTION_SEL)
+        out = []
+        for i in range(min(await opts.count(), 60)):
+            try:
+                out.append((await opts.nth(i).inner_text()).strip())
+            except Exception:
+                out.append("")
+        return out
+
+    async def _write_combo(self, field: Dict[str, Any], el, value: str) -> bool:
+        await self._open_combo(el)
+        await asyncio.sleep(0.6)
+        texts = await self._option_texts(el)
+        choice = _pick_option(value, [t for t in texts if t], threshold=0.5)
+        if not choice:  # long lists (countries…): narrow by typing, then pick
+            await self.page.keyboard.type(value[:24], delay=30)
+            await asyncio.sleep(0.8)
+            texts = await self._option_texts(el)
+            choice = _pick_option(value, [t for t in texts if t], threshold=0.5)
+        if not choice:
+            await self.page.keyboard.press("Escape")
+            return False
+        await (await self._options_for(el)).nth(texts.index(choice)).click(force=True, timeout=3000)
+        await asyncio.sleep(0.3)
+        try:  # did it stick? (the chosen value is shown next to the hidden input)
+            shown = await el.evaluate("""(e) => { const c = e.closest('[class*="select__control"], [class*="control"], .select-shell') || e.parentElement;
+                const v = c && c.querySelector('[class*="single-value"], [class*="singleValue"], [class*="multi-value__label"]'); return v ? v.innerText.trim() : null; }""")
+            return shown is None or bool(shown)
+        except Exception:
+            return True
+
+    async def _combo_options(self, field: Dict[str, Any]) -> List[Dict[str, Any]]:
+        el = self._el(field["idx"])
+        try:
+            await self._open_combo(el)
+            await asyncio.sleep(0.7)
+            opts = await self._options_for(el)
+            n = min(await opts.count(), 40)
+            texts = []
+            for i in range(n):
+                t = (await opts.nth(i).inner_text()).strip()
+                if t and t not in texts:
+                    texts.append(t)
+            await self.page.keyboard.press("Escape")
+            await asyncio.sleep(0.2)
+            return [{"text": t} for t in texts]
+        except Exception:
+            return []
 
     async def _check(self, idx: str) -> None:
         el = self._el(idx)
@@ -314,6 +440,13 @@ class FormFiller:
                     self.unresolved.append({**field, "reason": "Consent or legal agreement — only you can accept this"})
                 continue
             if not field["required"] and SKIP_OPTIONAL.search(label):
+                continue
+            if field["kind"] == "combobox" and not field.get("options"):
+                field["options"] = await self._combo_options(field)
+            direct = universal_choice(label, [o["text"] for o in field.get("options", [])])
+            if direct and await self.write(field, direct):
+                self.filled.append({"label": label, "source": "profile"})
+                logger.info(f"Filled [{label[:40]}] from profile")
                 continue
             value, source = await self.answer_for(field, allow_gemini=allow_gemini and field["required"])
             written = bool(value) and await self.write(field, value)

@@ -215,3 +215,20 @@ def test_facts_are_editable_kept_and_backed_up(tmp_path, monkeypatch):
         f.reload_facts()
         gemini_service.CANDIDATE_FACTS = f.candidate_summary()
     assert src.read_text(encoding="utf-8").count("Test City") == 0  # your real file was never touched
+
+
+# ── Bring your own Gemini key: tested first, stored encrypted, used ahead of the server's key, removable ──
+def test_own_gemini_key_flow(monkeypatch):
+    monkeypatch.setattr(GeminiService, "test_key", staticmethod(lambda k: (k.startswith("AIza-good"), "Key works" if k.startswith("AIza-good") else "Google didn't accept that key.")))
+    try:
+        bad = client.put("/api/v1/profile/gemini-key", headers=AUTH, json={"api_key": "AIza-bad-key-0000000000000000"})
+        assert bad.status_code == 400 and "didn't accept" in bad.json()["detail"]
+        assert client.put("/api/v1/profile/gemini-key", headers=AUTH, json={"api_key": "short"}).status_code == 400
+        ok = client.put("/api/v1/profile/gemini-key", headers=AUTH, json={"api_key": "AIza-good-key-1234567890abcdWXYZ"})
+        assert ok.status_code == 200 and ok.json()["key_source"] == "yours" and ok.json()["key_hint"] == "…WXYZ"
+        assert GeminiService.active_key().endswith("WXYZ")
+        s = client.get("/api/v1/profile/gemini-settings", headers=AUTH).json()
+        assert s["key_source"] == "yours" and "1234567890" not in str(s)  # never sent back in full
+    finally:
+        client.delete("/api/v1/profile/gemini-key", headers=AUTH)
+    assert GeminiService.key_source() != "yours"

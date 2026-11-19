@@ -86,7 +86,8 @@ def test_phase5_needs_you_flow_and_auto_resume():
 
         updated_job = db.query(Job).filter(Job.id == job.id).first()
         # Either queued, actively executed by background task, or routed by lifecycle
-        assert updated_job.status in ["queued", "applied", "blocked", "skipped", "failed"]
+        # the test URL returns 404, which is now treated as a closed posting ("expired"), not an engine failure
+        assert updated_job.status in ["queued", "applied", "blocked", "skipped", "failed", "expired", "needs_attention"]
 
         # 5. "Never Ask Twice" Test: Verify newly saved answer is in Answer Bank and auto-resolves
         norm_key = normalize_question_key(q_text)

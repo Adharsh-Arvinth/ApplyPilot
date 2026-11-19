@@ -3,14 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
-import '../core/motion.dart';
 import '../core/apple_music_theme.dart';
-import '../ui_templates/theme/design_tokens.dart';
-import '../ui_templates/components/shadcn_card.dart';
-import '../ui_templates/components/shadcn_badge.dart';
-import '../ui_templates/components/shadcn_button.dart';
-import '../ui_templates/components/shadcn_sheet.dart';
-import '../ui_templates/components/reborn_card_tile.dart';
 
 class ApplicationTrackerScreen extends StatefulWidget {
   const ApplicationTrackerScreen({super.key});
@@ -22,7 +15,7 @@ class ApplicationTrackerScreen extends StatefulWidget {
 class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> with SingleTickerProviderStateMixin {
   final ApiClient _api = ApiClient();
   bool _loading = true;
-  bool _isKanban = false;
+  final bool _isKanban = false;
   String _searchQuery = "";
   String _selectedStage = "queue"; // queue, maybe, applied, skipped, blocked
 
@@ -419,7 +412,7 @@ class _ApplicationTrackerScreenState extends State<ApplicationTrackerScreen> wit
                               const Text("TAILORED RESUME", style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF636366))),
                               const SizedBox(height: 2),
                               Text(
-                                "Candidate_${company}.pdf",
+                                "Candidate_$company.pdf",
                                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF30D158)),
                                 overflow: TextOverflow.ellipsis,
                               ),

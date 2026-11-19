@@ -1342,6 +1342,21 @@
       <div class="row-end sticky-save"><button class="btn primary hv" type="submit">${icon('check')}Save background</button></div>
     </form>`;
   }
+
+  // ── Gemini key: everyone uses their own (free from Google AI Studio); the PC's .env key is only a fallback ──
+  function geminiKeyCard() {
+    const g = S.gemini || {}, src = g.key_source || 'none';
+    const state = src === 'yours' ? ['teal', `Using your key ${esc(g.key_hint || '')}`]
+      : src === 'server' ? ['amber', `Using this computer's key ${esc(g.key_hint || '')}`]
+      : ['coral', 'No key — AI features use simple built-in fallbacks'];
+    return `<form class="card" data-gemini-key-form><div class="card-h"><span class="card-t">Gemini API key</span><span class="aside"><span class="dot ${state[0]}"></span>${state[1]}</span></div>
+      <div class="card-b stack">
+        <p class="muted small">Answers, cover letters, form fixes and the assistant run on Google Gemini. Use your own free key so your usage is yours alone. It's checked with Google before saving and stored encrypted on this computer.</p>
+        <div class="field"><label for="gk">Your key</label><input class="input" id="gk" name="api_key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste a key from Google AI Studio"></div>
+        <div class="row-between wrap"><a class="btn ghost sm hv" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">${icon('open_in_new')}Get a free key</a>
+          <span class="row-start">${src === 'yours' ? `<button type="button" class="btn sm ghost hv" data-act="gemini-key-remove">Remove my key</button>` : ''}<button class="btn primary hv" type="submit">${icon('key')}Save key</button></span></div>
+      </div></form>`;
+  }
   function settingsPanel(sec) {
     const p = S.profile, g = S.gemini || {}, st = S.stats || {}, au = S.automation || {};
     const f = (name, label, opts = {}) => {
@@ -1452,14 +1467,14 @@
           <div class="card-b"><ol class="steps">${TUTORIALS.find(t => t.id === 'email').steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol></div></details></div>`;
     }
 
-    if (sec === 'ai') return `<form class="card" data-gemini-form><div class="card-h"><span class="card-t">AI answers</span><span class="aside tnum">${fmt(g.gemini_answers_today || 0)} today · ~${fmt(g.saved_minutes || 0)} min saved</span></div>
+    if (sec === 'ai') return `<div class="stack">${geminiKeyCard()}<form class="card" data-gemini-form><div class="card-h"><span class="card-t">AI answers</span><span class="aside tnum">${fmt(g.gemini_answers_today || 0)} today · ~${fmt(g.saved_minutes || 0)} min saved</span></div>
         <div class="set-list"><label class="set-row hv"><div class="grow">Draft answers for new questions<small>Grounded only in your verified facts. Drafts wait in Needs you › AI drafts.</small></div><span class="toggle"><input type="checkbox" name="gemini_auto_answer_enabled" ${g.gemini_auto_answer_enabled ? 'checked' : ''}><i></i></span></label></div>
         <div class="card-b form-grid card-sep">
           <div class="field"><label for="g-conf">Minimum confidence</label><div class="range-row"><input type="range" id="g-conf" name="gemini_min_confidence" min="0.5" max="1" step="0.01" value="${g.gemini_min_confidence ?? 0.85}"><output>${Math.round((g.gemini_min_confidence ?? 0.85) * 100)}%</output></div></div>
           <div class="field"><label for="g-cap">Daily answer limit</label><input class="input tnum" id="g-cap" type="number" name="gemini_daily_cap" min="0" value="${g.gemini_daily_cap ?? 30}"></div>
           <div class="field full"><label>Always asks you about</label><div class="tags">${(g.gemini_sensitive_categories || []).map(c => `<span class="chip">${esc(c.replace(/_/g, ' '))}</span>`).join('')}</div></div>
           <div class="full row-between"><span class="faint small">${esc(g.model_name || '')}${g.circuit_breaker_active ? ' · <span class="bad">rate-limit pause active</span>' : ''}</span><button class="btn primary hv" type="submit">Save</button></div>
-        </div></form>`;
+        </div></form></div>`;
 
     if (sec === 'answers') return answersBody();
     if (sec === 'help') return helpPanel();
@@ -1738,6 +1753,12 @@
       S.answers = S.answers.filter(x => x.id !== id); render();
     },
     async backup(btn) { await run(btn, () => api('/backup', { method: 'POST' }), 'Backup created'); },
+    async 'gemini-key-remove'() {
+      const ok = await confirmModal({ title: 'Stop using your key?', body: "AI features will use this computer's key if it has one, otherwise simple built-in fallbacks.", ok: 'Remove key', danger: true });
+      if (!ok) return;
+      try { await api('/profile/gemini-key', { method: 'DELETE' }); S.gemini = await api('/profile/gemini-settings'); toast('Your key was removed'); S.lastHtml = ''; render(); }
+      catch (e) { toast(e.message, true); }
+    },
     'proj-add'() { const l = $('#proj-list'); if (l) { l.insertAdjacentHTML('beforeend', projRow()); $('.proj-row:last-child input', l).focus(); } },
     'proj-del'(btn) { const row = btn.closest('.proj-row'); if (row) row.remove(); },
     async 'avatar-remove'() {
@@ -1856,6 +1877,13 @@
         const r = await run(btn, () => api(`/answer-bank/${id}`, { method: 'PUT', body: fd }), 'Answer saved');
         if (r) { S.answers = S.answers.map(a => a.id === r.id ? r : a); S.ans.editing = null; render(); }
       }
+      return;
+    }
+    if (form.hasAttribute('data-gemini-key-form')) {
+      const key = form.elements.api_key.value.trim();
+      if (!key) { toast('Paste your key first', true); return; }
+      const r = await run(btn, () => api('/profile/gemini-key', { method: 'PUT', body: { api_key: key } }), 'Key saved · AI features now use your key');
+      if (r) { form.elements.api_key.value = ''; S.gemini = await api('/profile/gemini-settings'); S.lastHtml = ''; render(); }
       return;
     }
     if (form.hasAttribute('data-facts-form')) {

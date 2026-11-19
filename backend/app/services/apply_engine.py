@@ -110,17 +110,22 @@ class AutoApplyEngine:
 
         # 6. Call Gemini Auto-Answer
         min_conf = getattr(profile, "gemini_min_confidence", 0.85) or 0.85
-        res = GeminiService.auto_answer_question(
-            question_text=q_text,
-            field_type=field_type,
-            options=options,
-            company=job.company if job else "",
-            role=job.title if job else "",
-            jd_excerpt=getattr(job, "description", "")[:500] if job and hasattr(job, "description") else "",
-            min_confidence=min_conf,
-            max_length=max_length,
-            custom_sensitive_categories=sens_cats
-        )
+        # At most 20 s per question: a slow or overloaded Gemini must never stall the queue.
+        try:
+            res = await asyncio.wait_for(asyncio.to_thread(
+                GeminiService.auto_answer_question,
+                question_text=q_text,
+                field_type=field_type,
+                options=options,
+                company=job.company if job else "",
+                role=job.title if job else "",
+                jd_excerpt=getattr(job, "description", "")[:500] if job and hasattr(job, "description") else "",
+                min_confidence=min_conf,
+                max_length=max_length,
+                custom_sensitive_categories=sens_cats
+            ), timeout=20)
+        except asyncio.TimeoutError:
+            return None, "Gemini took too long to answer (over 20 s)", None
 
         if res.get("success"):
             ans = res["answer"]
@@ -620,6 +625,7 @@ class AutoApplyEngine:
                 viewport={"width": 1280, "height": 900}
             )
             page = await context.new_page()
+            page.set_default_timeout(8000)  # a stuck element fails fast instead of waiting 30 s
 
             try:
                 # Authentically navigate to live job posting
@@ -639,8 +645,24 @@ class AutoApplyEngine:
                             await page.wait_for_selector("#_systemfield_name, input[name='_systemfield_name']", timeout=8000)
                         except Exception:
                             pass
+                    if resp and resp.status in (404, 410):
+                        # The employer took the posting down: close it quietly (not an engine failure)
+                        AutoApplyEngine._record_transition(db, job, "expired", f"Posting closed (HTTP {resp.status})", "expired")
+                        job.status, job.is_expired, job.skip_reason = "expired", True, "Posting closed by the employer"
+                        db.commit()
+                        await browser.close()
+                        return {"status": "expired", "reason": "posting_closed"}
                     if resp and resp.status >= 400:
                         raise RuntimeError(f"Live ATS endpoint returned HTTP {resp.status}")
+                    # Company careers pages often embed the real form (Greenhouse/Lever/Ashby) in an iframe: open it directly
+                    for fr in page.frames:
+                        fu = (fr.url or "").lower()
+                        if fr != page.main_frame and any(h in fu for h in ("greenhouse.io", "lever.co", "ashbyhq.com", "workable.com")) \
+                                and ("job_app" in fu or "/apply" in fu or "embed" in fu or "/jobs/" in fu or "application" in fu):
+                            logger.info(f"Opening the embedded application form directly: {fr.url}")
+                            await page.goto(fr.url, wait_until="domcontentloaded", timeout=25000)
+                            await asyncio.sleep(2.0)
+                            break
                 except Exception as net_err:
                     logger.error(f"Live navigation to {target_url} failed: {net_err}")
                     AutoApplyEngine._record_transition(db, job, "failed", f"ATS URL unreachable: {str(net_err)[:100]}", "url_error")
@@ -851,6 +873,22 @@ class AutoApplyEngine:
                     await browser.close()
                     return {"status": "needs_input", "question": first["label"], "options": json.loads(options_json(first)),
                             "gemini_reason": first.get("reason", ""), "open_questions": len(remaining_unresolved)}
+
+                # 6b. Sanity check: never report a run on a page that isn't really the application form
+                has_form = await page.evaluate("""() => !!document.querySelector(
+                    'input[type=email], input[name*=email i], input[id*=email i], input[autocomplete=email], input[name=first_name], input[name=name], #_systemfield_name')""")
+                if not has_form:
+                    shot = settings.OUTPUT_DIR / "screenshots" / f"{clean_comp}_{clean_role}_noform_{ts}.png"
+                    try:
+                        await page.screenshot(path=str(shot), full_page=False)
+                    except Exception:
+                        pass
+                    AutoApplyEngine._record_transition(db, job, "needs_attention", "Couldn't find the application form on this page", "no_form")
+                    job.skip_reason = "Couldn't find the application form — open the posting and apply, or mark it applied"
+                    job.is_assist_only = True
+                    db.commit()
+                    await browser.close()
+                    return {"status": "needs_input", "reason": "no_form_found", "screenshot": str(shot)}
 
                 # 7. Pre-submit screenshot of the real ATS form
                 form_el = await page.query_selector("form, #application_form, .application-form, #app")

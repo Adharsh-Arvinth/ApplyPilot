@@ -448,8 +448,42 @@ def get_gemini_settings(db: Session = Depends(get_db)):
         "circuit_breaker_active": tripped,
         "circuit_breaker_remaining_seconds": int(remaining),
         "model_name": getattr(settings, "GEMINI_MODEL", "gemini-2.0-flash"),
-        "go_live": profile.go_live
+        "go_live": profile.go_live,
+        "key_source": GeminiService.key_source(),
+        "key_hint": ("…" + GeminiService.active_key()[-4:]) if GeminiService.active_key() else "",
     }
+
+
+class GeminiKeyIn(BaseModel):
+    api_key: str
+
+
+@router.put("/gemini-key", summary="Use your own Gemini API key (tested first, stored encrypted)")
+def set_gemini_key(payload: GeminiKeyIn, db: Session = Depends(get_db)):
+    from backend.app.core.app_settings import set_setting
+    from backend.app.core.security import encrypt_value
+    from backend.app.services.gemini_service import GeminiService
+    key = (payload.api_key or "").strip()
+    if len(key) < 20 or " " in key:
+        raise HTTPException(status_code=400, detail="That doesn't look like a Gemini API key.")
+    ok, msg = GeminiService.test_key(key)
+    if not ok:
+        raise HTTPException(status_code=400, detail=msg)
+    set_setting(db, "gemini_key", {"enc": encrypt_value(key), "saved_at": datetime.datetime.now(datetime.timezone.utc).isoformat()})
+    GeminiService.reload_user_key()
+    GeminiService.reset_circuit_breaker()
+    db.add(RunLog(event_type="profile_update", level="info", outcome="success", message="Gemini API key updated (your own key)."))
+    db.commit()
+    return {"status": "success", "key_source": "yours", "key_hint": "…" + key[-4:]}
+
+
+@router.delete("/gemini-key", summary="Stop using your own Gemini key")
+def delete_gemini_key(db: Session = Depends(get_db)):
+    from backend.app.core.app_settings import delete_setting
+    from backend.app.services.gemini_service import GeminiService
+    delete_setting(db, "gemini_key")
+    GeminiService.reload_user_key()
+    return {"status": "success", "key_source": GeminiService.key_source()}
 
 @router.post("/gemini-settings", summary="Update Gemini Auto-Answer Settings")
 def update_gemini_settings(payload: GeminiSettingsUpdate, db: Session = Depends(get_db)):

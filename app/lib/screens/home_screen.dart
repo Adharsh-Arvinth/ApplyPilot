@@ -5,13 +5,7 @@ import 'package:flutter/services.dart';
 import '../core/theme.dart';
 import '../core/api_client.dart';
 import '../core/apple_music_theme.dart';
-import '../core/hallmark_tokens.dart';
 import '../widgets/smart_widgets.dart';
-import '../ui_templates/theme/design_tokens.dart';
-import '../ui_templates/components/shadcn_card.dart';
-import '../ui_templates/components/shadcn_badge.dart';
-import '../ui_templates/components/shadcn_alert.dart';
-import '../ui_templates/components/kite_stat_card.dart';
 import 'ai_assistant_screen.dart';
 
 class HomeScreen extends StatefulWidget {

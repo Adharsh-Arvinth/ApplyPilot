@@ -20,7 +20,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   bool _discovering = false;
   String _searchQuery = "";
   String _selectedWorkMode = "all"; // all, remote, hybrid, onsite
-  double _minScoreThreshold = 0.0;
+  final double _minScoreThreshold = 0.0;
   List<dynamic> _jobs = [];
   final Set<int> _expandedJobIds = {};
 
@@ -755,7 +755,7 @@ class _AiJobIntelligenceSheetState extends State<_AiJobIntelligenceSheet> {
     final primaryTextColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
     final secondaryTextColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
     final accentGreen = isDark ? AppColors.accentDark : AppColors.racingGreen;
-    final violet = ApplyPilotColors.aiViolet;
+    const violet = ApplyPilotColors.aiViolet;
 
     final requiredSkills = (_intelligence["required_skills"] as List<dynamic>?) ?? [];
     final preferredSkills = (_intelligence["preferred_skills"] as List<dynamic>?) ?? [];

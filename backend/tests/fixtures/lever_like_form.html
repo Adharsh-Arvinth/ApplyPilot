@@ -43,6 +43,15 @@
   <li class="application-question"><label><div class="application-label">Which team interests you most?<span class="required">✱</span></div>
     <select name="cards[q2]"><option value="">Select...</option><option value="ml">Machine Learning Platform</option>
       <option value="data">Data Infrastructure</option><option value="web">Web Frontend</option></select></label></li>
+  <!-- Greenhouse-style react-select: the real input is 1px and transparent under a styled box -->
+  <li class="application-question"><div class="application-label" id="country-label">Country of residence<span class="required">✱</span></div>
+    <div class="select__control" style="position:relative;border:1px solid #ccc;height:32px;width:300px">
+      <div class="select__single-value" style="position:absolute;left:8px;top:6px"></div>
+      <input id="country" role="combobox" aria-labelledby="country-label" aria-required="true" autocomplete="off"
+             style="opacity:0;width:1px;position:absolute;left:4px;top:4px">
+      <div class="select__overlay" style="position:absolute;inset:0"></div>
+      <div class="select__menu" hidden style="position:absolute;top:34px;left:0;background:#fff;border:1px solid #ccc;z-index:5"></div>
+    </div></li>
   <li class="application-question"><label><div class="application-label">Why do you want to work at AcmeCo?<span class="required">✱</span></div>
     <textarea name="cards[q3]"></textarea></label></li>
   <li class="application-question"><label><input type="checkbox" name="consent" value="1">
@@ -70,6 +79,17 @@
   results.addEventListener('click', (e) => { if (e.target.dataset !== undefined && e.target.getAttribute('role') === 'option') {
     loc.value = e.target.textContent; form.selectedLocation.value = e.target.textContent; results.innerHTML = ''; } });
 
+  // react-select behaviour: opens on ArrowDown or a click on the box, filters as you type, shows the choice beside the input
+  (function () {
+    const input = document.getElementById('country'), menu = document.querySelector('.select__menu'), shown = document.querySelector('.select__single-value');
+    const ALL = ['India', 'Indonesia', 'Poland', 'United Kingdom', 'United States'];
+    const draw = (q) => { menu.innerHTML = ALL.filter(o => o.toLowerCase().includes((q || '').toLowerCase())).map(o => `<div role="option" class="select__option">${o}</div>`).join(''); menu.hidden = false; };
+    document.querySelector('.select__overlay').addEventListener('click', () => { input.focus(); draw(''); });
+    input.addEventListener('keydown', (e) => { if (e.key === 'ArrowDown') draw(input.value); if (e.key === 'Escape') menu.hidden = true; });
+    input.addEventListener('input', () => draw(input.value));
+    menu.addEventListener('click', (e) => { const o = e.target.closest('[role=option]'); if (!o) return; shown.textContent = o.textContent; input.value = ''; menu.hidden = true; });
+    window.countryValue = () => shown.textContent;
+  })();
   let otpShown = false;
   form.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -82,6 +102,7 @@
     if (!form.querySelector('input[name="cards[q1]"]:checked')) need(form.querySelector('input[name="cards[q1]"]'));
     if (!form['cards[q2]'].value) need(form['cards[q2]']);
     if (!form.consent.checked) need(form.consent);
+    if (!window.countryValue()) need(document.getElementById('country'));
     if (q.get('strictphone') && form.phone.value && !form.phone.value.trim().startsWith('+')) need(form.phone, 'Phone number must start with a country code, e.g. +91');
     if (bad.length) return;
     if (q.get('otp') && !otpShown) {

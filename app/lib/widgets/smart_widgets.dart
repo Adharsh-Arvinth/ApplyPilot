@@ -302,7 +302,7 @@ class InterviewCountdownWidget extends StatelessWidget {
     final borderColor = isDark ? AppleMusicTheme.hairline : AppColors.borderHairlineLight;
     final primaryTextColor = isDark ? AppleMusicTheme.textPrimary : AppColors.textPrimaryLight;
     final secondaryTextColor = isDark ? AppleMusicTheme.textSecondary : AppColors.textSecondaryLight;
-    final teal = AppleMusicTheme.blue;
+    const teal = AppleMusicTheme.blue;
 
     if (interviewData == null) {
       return Container(

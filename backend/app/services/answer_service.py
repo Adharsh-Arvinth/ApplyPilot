@@ -443,36 +443,39 @@ class AnswerService:
         last_name = profile.full_name.split()[-1] if profile.full_name and len(profile.full_name.split()) > 1 else ""
 
         # 2. Dynamic profile binding (Never hardcoded strings)
+        # Field-style rules ("School", "Email", "Degree") only answer short labels, never sentences that merely
+        # contain those words ("Which languages have you used at work or in school?").
+        field_like = len(stripped_key.split()) <= 6 and not re.match(r"^(are|do|did|does|will|would|have|has|is|was|can|could|should|please|which|what|how|why|tell|describe)\b", stripped_key)
         # Name
-        if re.search(r'\blegal\s*name\b', clean_key):
+        if field_like and re.search(r'\blegal\s*name\b', clean_key):
             return profile.full_name, "always_use"
-        if re.search(r'\bfirst\s*name\b', clean_key):
+        if field_like and re.search(r'\bfirst\s*name\b', clean_key):
             return first_name, "always_use"
-        if re.search(r'\blast\s*name\b', clean_key):
+        if field_like and re.search(r'\blast\s*name\b', clean_key):
             return last_name, "always_use"
-        if re.search(r'\bfull\s*name\b', clean_key):
+        if field_like and re.search(r'\bfull\s*name\b', clean_key):
             return profile.full_name, "always_use"
-        if re.search(r'\bemail\b', clean_key):
+        if field_like and re.search(r'\bemail\b', clean_key):
             return profile.email, "always_use"
-        if re.search(r'\bphone|mobile\b', clean_key):
+        if field_like and re.search(r'\bphone|mobile\b', clean_key):
             return profile.phone, "always_use"
-        if re.search(r'\blinkedin\b', clean_key):
+        if field_like and re.search(r'\blinkedin\b', clean_key):
             return profile.linkedin, "always_use"
-        if re.search(r'\bgithub\b', clean_key):
+        if field_like and re.search(r'\bgithub\b', clean_key):
             return profile.github, "always_use"
-        if re.search(r'\bwebsite|portfolio\b', clean_key):
+        if field_like and re.search(r'\bwebsite|portfolio\b', clean_key):
             return profile.github, "always_use"
 
         # Education
-        if re.search(r'\bschool|college|university|institution\b', clean_key):
+        if field_like and re.search(r'\bschool|college|university|institution\b', clean_key):
             return _institution(), "always_use"
-        if re.search(r'\bdegree|highest.*education\b', clean_key):
+        if field_like and re.search(r'\bdegree|highest.*education\b', clean_key):
             return profile.education, "always_use"
-        if re.search(r'\bdiscipline|major|field of study\b', clean_key):
+        if field_like and re.search(r'\bdiscipline|major|field of study\b', clean_key):
             return _answer("discipline")
-        if re.search(r'\bcgpa|gpa\b', clean_key):
+        if field_like and re.search(r'\bcgpa|gpa\b', clean_key):
             return profile.cgpa, "always_use"
-        if re.search(r'\bgraduation.*(year|date)\b', clean_key):
+        if field_like and re.search(r'\bgraduation.*(year|date)\b', clean_key):
             if profile.graduation_date:
                 return profile.graduation_date, "always_use"
             return None # Locked Facts: Never guess; send to Needs You if unconfirmed
@@ -525,7 +528,7 @@ class AnswerService:
         if re.search(r'how\s*(did|do)\s*you\s*hear|heard\s*about', clean_key):
             return "Company career page / Job Board", "always_use"
         if re.search(r'language\s*skill', clean_key):
-            return "Python", "always_use"
+            return "English", "always_use"
         if re.search(r'proudest\s*accomplishment|favorite\s*project.*(llm|ai|ml)|accomplishment.*(llm|ai|ml)', clean_key):
             return _answer("proudest_accomplishment")
         if re.search(r'why.*(palantir|spotify|figma|elastic|gitlab|cloudflare)', clean_key):

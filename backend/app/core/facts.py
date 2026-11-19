@@ -113,6 +113,12 @@ def candidate_summary() -> str:
         f"- Degree: {e['degree']}, {e.get('institution_full') or e['institution']}",
         f"- Education: Started {e.get('start_date', '')} | CGPA: {e.get('cgpa', '')}",
     ]
+    if p.get("location"):
+        lines.append(f"- Current location: {p['location']}")
+    for key, label in (("work_authorization", "Work authorization"), ("notice_period", "Notice period / earliest start"),
+                       ("relocation_preference", "Relocation")):
+        if f.get(key):
+            lines.append(f"- {label}: {f[key]}")
     if f.get("patents"):
         lines.append("- Published Patents:")
         lines += [f'  {i}. "{t}"' for i, t in enumerate(f["patents"], 1)]
