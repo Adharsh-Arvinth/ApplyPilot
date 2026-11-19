@@ -61,6 +61,14 @@ def test_security_valid_token_allows_access():
     res_query = client.get(f"/app/?token={settings.APPLYPILOT_TOKEN}")
     assert res_query.status_code == 200
 
+    # 4. HttpOnly session cookie (web cockpit) on a Bearer-protected API route
+    res_cookie = client.get("/api/v1/stats", headers={"Cookie": f"applypilot_token={settings.APPLYPILOT_TOKEN}"})
+    assert res_cookie.status_code == 200
+
+    # 5. Wrong cookie is still rejected
+    res_bad_cookie = client.get("/api/v1/stats", headers={"Cookie": "applypilot_token=totally_wrong_token"})
+    assert res_bad_cookie.status_code == 403
+
 # ===========================================================================
 # 2. COOLDOWN & RESUBMIT OVERRIDE TESTS
 # ===========================================================================

@@ -1,5 +1,5 @@
 import secrets
-from fastapi import Header, HTTPException, status, Depends
+from fastapi import Cookie, Header, HTTPException, status, Depends
 from cryptography.fernet import Fernet
 from backend.app.core.config import settings
 
@@ -31,19 +31,27 @@ def decrypt_value(cipher: str) -> str:
 
 from typing import Optional
 
-def verify_token(authorization: Optional[str] = Header(None)) -> bool:
+def verify_token(
+    authorization: Optional[str] = Header(None),
+    applypilot_token: Optional[str] = Cookie(None),
+) -> bool:
     """
     Validate that incoming requests carry the correct Bearer token.
     Enforces that only the authenticated mobile app can access the PC backend.
+    The web cockpit authenticates with the HttpOnly `applypilot_token` cookie the
+    middleware sets on login, since page scripts cannot read that cookie back.
     """
-    if not authorization or not authorization.startswith("Bearer "):
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split("Bearer ", 1)[1].strip()
+    elif applypilot_token:
+        token = applypilot_token.strip()
+    else:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing or malformed Authorization header. Expected Bearer token.",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    token = authorization.split("Bearer ", 1)[1].strip()
+
     if not secrets.compare_digest(token, settings.APPLYPILOT_TOKEN):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

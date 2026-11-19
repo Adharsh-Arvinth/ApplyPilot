@@ -37,7 +37,8 @@ def test_health_endpoint():
     assert "last_seen" in data
 
 def test_auth_protection():
-    # Unauthorized request (missing header)
+    # Unauthorized request (no header, no session cookie left over from earlier tests)
+    client.cookies.clear()
     res = client.get("/api/v1/profile")
     assert res.status_code == 401
 
