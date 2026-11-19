@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:applypilot/main.dart';
 import 'package:applypilot/shell/connect_screen.dart';
 import 'package:applypilot/shell/shell_config.dart';
+import 'package:applypilot/shell/shell_theme.dart';
 import 'package:applypilot/core/theme.dart';
 import 'package:applypilot/widgets/smart_widgets.dart';
 import 'package:applypilot/widgets/interactive_charts.dart';
@@ -30,6 +31,20 @@ void main() {
     expect(cfg.ready, isTrue);
     expect(cfg.serverUrl, 'http://100.1.2.3:8000');
     expect(cfg.cockpitUri().toString(), 'http://100.1.2.3:8000/app/?token=abc');
+  });
+
+  test('Cockpit theme messages drive the native bar colours', () {
+    final light = ShellPalette.fromMessage('theme:#F4F4F2:light')!;
+    expect(light.bg, const Color(0xFFF4F4F2));
+    expect(light.dark, isFalse);
+    expect(light.overlay.statusBarIconBrightness, Brightness.dark); // dark icons on a light bar
+
+    final midnight = ShellPalette.fromMessage('theme:#070B18:dark')!;
+    expect(midnight.bg, const Color(0xFF070B18));
+    expect(midnight.overlay.statusBarIconBrightness, Brightness.light);
+
+    expect(ShellPalette.fromMessage('change-server'), isNull);
+    expect(ShellPalette.fromMessage('theme:not-a-colour:dark'), isNull);
   });
 
   test('Server addresses are normalized', () {

@@ -1166,7 +1166,10 @@
     const id = resolveTheme(pref), root = document.documentElement;
     const swap = () => {
       root.dataset.theme = id;
-      const m = $('meta[name=theme-color]'); if (m) m.content = getComputedStyle(root).getPropertyValue('--bg').trim();
+      const cs = getComputedStyle(root), bg = cs.getPropertyValue('--bg').trim();
+      const m = $('meta[name=theme-color]'); if (m) m.content = bg;
+      // Android app: let the native status/navigation bars match the page ("theme:#RRGGBB:light|dark").
+      if (IN_SHELL) window.ApplyPilotShell.postMessage(`theme:${bg}:${cs.colorScheme.includes('dark') ? 'dark' : 'light'}`);
     };
     if (root.dataset.theme === id) return swap();
     if (animate && document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) document.startViewTransition(swap);
