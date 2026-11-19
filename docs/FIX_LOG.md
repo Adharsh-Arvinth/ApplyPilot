@@ -2,6 +2,27 @@
 
 ---
 
+## Section 15: CI Audit, Failure Email Clarification & Service Health (2026-11-19 14:10 IST)
+
+**Trigger**: User received a failure notification email from GitHub Actions with subject `[Adharsh-Arvinth/ApplyPilot] Run failed: ApplyPilot CI - main (1be7c7f)` and reported "im getting the failure mail again - fix the issues".
+
+**Root Cause & Audit Findings**:
+1. **Email Origin**: The notification email was triggered by commit `1be7c7f` (Run ID: `44369200573` at 23:53 IST), where the Flutter test failed due to a 0.200px headless text render overflow.
+2. **Subsequent Green Runs**:
+   - Commit `bd2fb52` ("fix(flutter): prevent RenderFlex overflow in Weekly Velocity bar chart with FittedBox and increased height") triggered Run ID: `44369896624`.
+     - `ApplyPilot CI / Flutter Test Suite`: **Completed: SUCCESS** (38s) ✅
+     - `ApplyPilot CI / Backend Test Suite`: **Completed: SUCCESS** (2m 55s) ✅
+   - Commit `241bbff` triggered Run ID: `44370626932`.
+     - `ApplyPilot CI / Flutter Test Suite`: **Completed: SUCCESS** (37s) ✅
+     - `ApplyPilot CI / Backend Test Suite`: **Completed: SUCCESS** (2m 51s) ✅
+3. **Notification Behavior**: GitHub Actions sends email alerts exclusively on workflow failure by default, not on success. Thus, no success email was dispatched to counteract the failure email.
+4. **Local Verification**:
+   - Backend Pytest Suite: **99 passed, 0 failed in 170.65s (2m 50s)**.
+   - Uvicorn Server: Daemon restarted on `0.0.0.0:8000`.
+   - Web Cockpit Endpoint: `http://127.0.0.1:8000/app/?token=mApIGVEyORqpXbJzPhrhLPk9pRaS_vPOFyxH07nuPV4` verified returning **HTTP 200 OK (116,424 bytes)**.
+
+---
+
 ## Section 14: CI Fix - Prevent RenderFlex Overflow in HomeScreen Weekly Velocity (2026-11-18 23:56 IST)
 
 **Trigger**: CI Run `44369200573` failed with `A RenderFlex overflowed by 0.200 pixels on the bottom` at `home_screen.dart:2209` inside test `ApplyPilotApp boots to MainNavigationShell when onboarding is complete`.
