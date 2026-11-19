@@ -30,7 +30,74 @@ def _freeze(value):
     return value
 
 
-LOCKED_FACTS = _freeze(json.loads(FACTS_FILE.read_text(encoding="utf-8")))
+# Read-only to the code; a save from Settings › Your background refreshes it in place, so every
+# module holding LOCKED_FACTS sees your edits at once.
+_FACTS: Dict[str, Any] = {}
+LOCKED_FACTS = MappingProxyType(_FACTS)
+
+
+def _load_raw() -> Dict[str, Any]:
+    return json.loads(FACTS_FILE.read_text(encoding="utf-8"))
+
+
+def reload_facts() -> None:
+    raw = _load_raw()
+    _FACTS.clear()
+    _FACTS.update({k: _freeze(v) for k, v in raw.items()})
+
+
+reload_facts()
+
+EDITABLE_TEXT = {
+    "personal": ("name", "email", "phone", "location", "linkedin", "github"),
+    "education": ("degree", "institution", "institution_full", "start_date", "cgpa", "expected_graduation"),
+}
+EDITABLE_LISTS = ("patents", "certifications", "skills")
+EDITABLE_SCALARS = ("work_authorization", "notice_period", "relocation_preference")
+
+
+def save_facts(patch: Dict[str, Any]) -> Dict[str, Any]:
+    """Apply your edits to the local facts file (backing up the previous version) and reload them.
+
+    Only the fields shown in Settings are touched; everything else in the file (answers, records…) is kept.
+    When no personal file exists yet, the example is copied to candidate_facts.json first.
+    """
+    global FACTS_FILE
+    raw = _load_raw()
+    target = FACTS_FILE
+    if target.name == "candidate_facts.example.json":
+        target = _DATA_DIR / "candidate_facts.json"
+    else:
+        backup = target.with_name(target.stem + ".backup.local.json")
+        backup.write_text(target.read_text(encoding="utf-8"), encoding="utf-8")
+    clean = lambda v, n=500: re.sub(r"\s+", " ", str(v or "")).strip()[:n]
+    for section, keys in EDITABLE_TEXT.items():
+        if isinstance(patch.get(section), dict):
+            raw.setdefault(section, {})
+            for k in keys:
+                if k in patch[section]:
+                    raw[section][k] = clean(patch[section][k])
+    for k in EDITABLE_LISTS:
+        if isinstance(patch.get(k), list):
+            raw[k] = [clean(x, 300) for x in patch[k] if clean(x, 300)][:60]
+    for k in EDITABLE_SCALARS:
+        if k in patch:
+            raw[k] = clean(patch[k])
+    if isinstance(patch.get("projects"), list):
+        old = {pr.get("name"): pr for pr in raw.get("projects", []) if isinstance(pr, dict)}
+        projects = []
+        for pr in patch["projects"][:30]:
+            if not isinstance(pr, dict) or not clean(pr.get("name")):
+                continue
+            keep = dict(old.get(pr.get("name"), {}))  # keep extra fields (metrics, corpus…) of an unchanged project
+            keep.update({"name": clean(pr.get("name"), 200), "description": clean(pr.get("description"), 1500)})
+            projects.append(keep)
+        raw["projects"] = projects
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(raw, indent=2, ensure_ascii=False), encoding="utf-8")
+    FACTS_FILE = target
+    reload_facts()
+    return raw
 
 
 def candidate_summary() -> str:

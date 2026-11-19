@@ -100,6 +100,21 @@ def get_locked_facts():
         return obj
     return _convert(LOCKED_FACTS)
 
+@router.put("/facts", summary="Edit your verified facts (education, projects, patents, skills…)")
+def update_facts(patch: dict, db: Session = Depends(get_db)):
+    """Saves to your local facts file (a backup of the previous version is kept next to it) and
+    refreshes every AI prompt, form answer and resume check straight away."""
+    from backend.app.core import facts as facts_mod
+    from backend.app.services import gemini_service
+    if not isinstance(patch, dict) or not patch:
+        raise HTTPException(status_code=400, detail="Nothing to save.")
+    facts_mod.save_facts(patch)
+    gemini_service.CANDIDATE_FACTS = facts_mod.candidate_summary()
+    db.add(RunLog(event_type="profile_update", level="info", outcome="success", message="Verified facts updated from Settings."))
+    db.commit()
+    return get_locked_facts()
+
+
 @router.put("", response_model=ProfileOut)
 def update_profile(update: ProfileUpdate, db: Session = Depends(get_db)):
     profile = db.query(Profile).first()

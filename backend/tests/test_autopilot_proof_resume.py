@@ -160,3 +160,58 @@ def test_avatar_upload_replace_and_remove(tmp_path, monkeypatch):
     assert client.get("/api/v1/profile/avatar").status_code == 401
     client.delete("/api/v1/profile/avatar", headers=AUTH)
     assert client.get("/api/v1/profile/avatar/meta", headers=AUTH).json()["has_avatar"] is False
+
+
+# ── Speed: compact job list, gzip, cacheable versioned assets ──
+def test_compact_job_list_and_gzip():
+    full = client.get("/api/v1/jobs", headers=AUTH)
+    compact = client.get("/api/v1/jobs", headers={**AUTH, "Accept-Encoding": "gzip"}, params={"compact": 1})
+    assert full.status_code == compact.status_code == 200
+    if compact.json():
+        row = compact.json()[0]
+        assert "id" in row and "company" in row and "status" in row
+        assert "fit_breakdown" not in row and "score_reason" not in row
+        assert len(compact.content) <= len(full.content)
+    if len(compact.content) > 800:
+        assert compact.headers.get("content-encoding") == "gzip"
+
+
+def test_versioned_cockpit_assets_are_cacheable():
+    js = client.get("/app/app.js?v=99", headers=AUTH)
+    page = client.get("/app/", headers=AUTH)
+    assert js.status_code == 200 and "immutable" in js.headers.get("cache-control", "")
+    assert page.status_code == 200 and page.headers.get("cache-control") == "no-cache"
+
+
+# ── Assistant: real numbers even when Gemini is unavailable ──
+def test_assistant_answers_from_live_data_without_gemini(monkeypatch):
+    monkeypatch.setattr(GeminiService, "_call_model", classmethod(lambda cls, *a, **k: None))
+    res = client.post("/api/v1/ai/chat", headers=AUTH, json={"message": "What needs me today?", "history": [], "view": "home"})
+    assert res.status_code == 200
+    body = res.json()
+    assert body.get("offline") is True and "queued" in body["response"]
+
+
+# ── Your background is editable from Settings; untouched details stay exactly as they were ──
+def test_facts_are_editable_kept_and_backed_up(tmp_path, monkeypatch):
+    from backend.app.core import facts as f
+    from backend.app.services import gemini_service
+    src = f.FACTS_FILE
+    copy = tmp_path / "candidate_facts.json"
+    copy.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+    monkeypatch.setattr(f, "FACTS_FILE", copy)
+    f.reload_facts()
+    try:
+        before = client.get("/api/v1/profile/facts", headers=AUTH).json()
+        res = client.put("/api/v1/profile/facts", headers=AUTH,
+                         json={"skills": list(before["skills"]) + ["Rust"], "personal": {"location": "Test City"}})
+        after = res.json()
+        assert res.status_code == 200 and "Rust" in after["skills"] and after["personal"]["location"] == "Test City"
+        assert after["personal"]["name"] == before["personal"]["name"] and after["patents"] == before["patents"]
+        assert (tmp_path / "candidate_facts.backup.local.json").exists()
+        assert f.LOCKED_FACTS["personal"]["location"] == "Test City"  # every module sees it immediately
+    finally:
+        f.FACTS_FILE = src
+        f.reload_facts()
+        gemini_service.CANDIDATE_FACTS = f.candidate_summary()
+    assert src.read_text(encoding="utf-8").count("Test City") == 0  # your real file was never touched

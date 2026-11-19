@@ -130,7 +130,15 @@ class _WebShellState extends State<WebShell> {
           // Keep the cockpit clear of the status bar and gesture/nav bar (Android 15 is edge-to-edge).
           body: SafeArea(
             child: Stack(children: [
-              if (_error == null) WebViewWidget(controller: _web),
+              if (_error == null)
+                // Hybrid composition: the WebView draws natively instead of being copied through a
+                // Flutter texture each frame, so scrolling and animations keep the display's 90/120 Hz.
+                WebViewWidget.fromPlatformCreationParams(
+                  params: AndroidWebViewWidgetCreationParams(
+                    controller: _web.platform as AndroidWebViewController,
+                    displayWithHybridComposition: true,
+                  ),
+                ),
               if (_error != null) _errorView(),
               if (_loading && _error == null)
                 Positioned(top: 0, left: 0, right: 0, child: LinearProgressIndicator(minHeight: 2, color: _palette.ink, backgroundColor: Colors.transparent)),

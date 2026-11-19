@@ -8,6 +8,7 @@ from fastapi.responses import RedirectResponse, FileResponse, JSONResponse, HTML
 from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.gzip import GZipMiddleware
 from backend.app.core.config import settings
 from backend.app.core.database import engine, Base, SessionLocal, migrate_db
 import backend.app.models  # Ensure all models are registered with Base.metadata
@@ -159,6 +160,13 @@ async def security_and_token_middleware(request: Request, call_next):
 
     # If valid token provided via query parameter or header on /app, set cookie for static assets
     response = await call_next(request)
+    # Cockpit code is versioned (?v=N in index.html), so it can be cached for good; the page itself is always fresh
+    path = request.url.path
+    if path.startswith("/app"):
+        if request.query_params.get("v") and path.endswith((".js", ".css")):
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        elif path.endswith((".html", "/")):
+            response.headers["Cache-Control"] = "no-cache"
     if token == valid_token and (request.query_params.get("token") or not request.cookies.get("applypilot_token")):
         response.set_cookie(
             key="applypilot_token",
@@ -169,6 +177,9 @@ async def security_and_token_middleware(request: Request, call_next):
             max_age=86400 * 30
         )
     return response
+
+# Compress JSON and static files (the job list shrinks ~10x over Tailscale)
+app.add_middleware(GZipMiddleware, minimum_size=800)
 
 # CORS enabled for mobile client over Tailscale
 app.add_middleware(

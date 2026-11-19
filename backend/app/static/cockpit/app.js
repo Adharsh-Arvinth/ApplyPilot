@@ -190,7 +190,7 @@
 
   // ───────────────────────── State ─────────────────────────
   const S = {
-    view: 'home',
+    view: 'home', fresh: {},
     stats: null, analytics: null, logs: [], automation: null, profile: null, gemini: null, resumes: [],
     jobs: null, needs: [], aiAnswers: [], triage: [], answers: null,
     autopilot: null, proofStatus: null, proofs: [], resume: null,
@@ -410,6 +410,65 @@
     glide($('#tabbar'), 'tab', 'button.active');
   }
 
+  // ── Tab bar: hold and glide (like Apple Music) ──
+  // Press a tab and the glass lens swells; slide and it follows your finger with a light tick on
+  // every tab it crosses; lift to open the tab under your finger. A plain tap works as before.
+  (function tabGlide() {
+    const bar = $('#tabbar');
+    if (!bar) return;
+    let drag = null;
+    const tabs = () => $$('button[data-nav]', bar);
+    const tabAt = (x) => {
+      const list = tabs();
+      return list.find(b => { const r = b.getBoundingClientRect(); return x >= r.left && x < r.right; })
+        || (x < bar.getBoundingClientRect().left + 8 ? list[0] : list[list.length - 1]);
+    };
+    const lens = () => bar.querySelector(':scope > .glide');
+    const tick = () => { try { navigator.vibrate && navigator.vibrate(6); } catch (e) {} };
+    const follow = (x) => {
+      const l = lens(); if (!l) return;
+      const br = bar.getBoundingClientRect(), w = l.offsetWidth;
+      const left = Math.max(0, Math.min(br.width - w, x - br.left - w / 2));
+      l.style.translate = `${left}px ${l.style.translate.split(' ')[1] || '0px'}`;
+    };
+    const hot = (btn) => tabs().forEach(b => b.classList.toggle('hot', b === btn));
+    bar.addEventListener('pointerdown', (e) => {
+      const btn = e.target.closest('button[data-nav]');
+      if (!btn || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      drag = { id: e.pointerId, x0: e.clientX, over: btn, gliding: false };
+      const l = lens(); if (l) l.classList.add('held');
+      hot(btn);
+    });
+    bar.addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      if (!drag.gliding) {
+        if (Math.abs(e.clientX - drag.x0) < 8) return;
+        drag.gliding = true;
+        try { bar.setPointerCapture(e.pointerId); } catch (err) {}
+        const l = lens(); if (l) l.classList.add('gliding');
+      }
+      follow(e.clientX);
+      const over = tabAt(e.clientX);
+      if (over && over !== drag.over) { drag.over = over; hot(over); tick(); }
+    });
+    const end = (e, cancel) => {
+      if (!drag || (e && e.pointerId !== drag.id)) return;
+      const { gliding, over } = drag; drag = null;
+      const l = lens(); if (l) l.classList.remove('held', 'gliding');
+      hot(null);
+      if (!gliding) return; // a plain tap: the normal click handler navigates
+      const swallow = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+      document.addEventListener('click', swallow, { capture: true, once: true });
+      setTimeout(() => document.removeEventListener('click', swallow, true), 0);
+      if (cancel || !over) { glide(bar, 'tab', 'button.active'); return; }
+      if (over.dataset.nav === S.view) glide(bar, 'tab', 'button.active');
+      else go(over.dataset.nav);
+    };
+    bar.addEventListener('pointerup', (e) => end(e, false));
+    bar.addEventListener('pointercancel', (e) => end(e, true));
+    bar.addEventListener('contextmenu', (e) => e.preventDefault()); // long-press shouldn't open a menu
+  })();
+
   function renderEngine() {
     const st = S.stats;
     const [label, color] = engineLabel(st);
@@ -460,7 +519,7 @@
   const loaders = {
     async home() {
       await settle({ autopilot: api('/autopilot'), proofStatus: api('/proofs/status'), proofs: api('/proofs', { query: { limit: 5 } }),
-        resume: api('/profile/resume'), profile: api('/profile'), analytics: api('/analytics'), jobs: api('/jobs'), avatar: api('/profile/avatar/meta') });
+        resume: api('/profile/resume'), profile: api('/profile'), analytics: api('/analytics'), jobs: api('/jobs', { query: { compact: 1 } }), avatar: api('/profile/avatar/meta') });
     },
     async proof() {
       await settle({ proofStatus: api('/proofs/status'), proofs: api('/proofs', { query: { limit: 300 } }), stats: api('/stats') });
@@ -474,11 +533,11 @@
       if (g.status === 'fulfilled') S.aiAnswers = g.value;
       if (t.status === 'fulfilled') S.triage = t.value;
     },
-    async pipeline() { S.jobs = await api('/jobs'); },
+    async pipeline() { S.jobs = await api('/jobs', { query: { compact: 1 } }); },
     async settings() {
       await settle({ profile: api('/profile'), gemini: api('/profile/gemini-settings'), resumes: api('/resumes'),
         automation: api('/automation/status'), autopilot: api('/autopilot'), proofStatus: api('/proofs/status'),
-        resume: api('/profile/resume'), answers: api('/answer-bank'), avatar: api('/profile/avatar/meta') });
+        resume: api('/profile/resume'), answers: api('/answer-bank'), avatar: api('/profile/avatar/meta'), facts: api('/profile/facts') });
     },
   };
 
@@ -497,11 +556,28 @@
     renderChrome();
     const my = ++viewToken;
     if (changed) S.anim = true;
-    if (changed || !silent) { $('#content').innerHTML = skeleton(view); $('#content').scrollTop = 0; S.lastHtml = ''; }
-    try { await loaders[view](); }
-    catch (e) { if (my === viewToken) $('#content').innerHTML = errorView(e); return; }
+    // Seen this tab before? Show it instantly from memory, then refresh quietly in the background.
+    const cached = !!S.fresh[view];
+    if (cached && changed) { $('#content').scrollTop = 0; S.lastHtml = ''; render(); }
+    else if (changed || !silent) { $('#content').innerHTML = skeleton(view); $('#content').scrollTop = 0; S.lastHtml = ''; }
+    try { await loaders[view](); S.fresh[view] = Date.now(); if (view === 'home') persist(); }
+    catch (e) { if (my === viewToken && !cached) $('#content').innerHTML = errorView(e); return; }
     if (my !== viewToken) return;
-    render();
+    render({ poll: cached });
+    prefetchSoon();
+  }
+  // Warm every other tab while the app is idle, so the first visit is instant too.
+  let prefetched = false;
+  function prefetchSoon() {
+    if (prefetched) return; prefetched = true;
+    const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 600));
+    idle(async () => {
+      for (const v of ['home', 'pipeline', 'inbox', 'proof', 'settings', 'insights']) {
+        if (S.fresh[v] || !loaders[v]) continue;
+        try { await loaders[v](); S.fresh[v] = Date.now(); } catch (e) {}
+        await new Promise(r => setTimeout(r, 150)); // stay out of the way of scrolling
+      }
+    }, { timeout: 2500 });
   }
   function render({ poll = false } = {}) {
     const html = renderers[S.view]();
@@ -1124,6 +1200,8 @@
   const FONT_KEY = 'ap_font';
   const FONT_STYLES = [
     { id: 'default', name: 'System', note: 'SF Pro / Inter' },
+    { id: 'modern', name: 'Modern', note: 'Plus Jakarta Sans', href: 'Plus+Jakarta+Sans:wght@400;500;600;700' },
+    { id: 'elegant', name: 'Elegant', note: 'Fraunces headings', href: 'Fraunces:opsz,wght@9..144,400..700' },
     { id: 'rounded', name: 'Rounded', note: 'Soft and friendly', href: 'Nunito:wght@400;500;600;700' },
     { id: 'serif', name: 'Serif', note: 'Editorial', href: 'Newsreader:opsz,wght@6..72,400..700' },
     { id: 'readable', name: 'Readable', note: 'Atkinson Hyperlegible', href: 'Atkinson+Hyperlegible:wght@400;700' },
@@ -1223,7 +1301,7 @@
 
   // ───────────────────────── View: Settings ─────────────────────────
   const SETTINGS_SECTIONS = [
-    ['profile', 'person', 'Profile'], ['appearance', 'palette', 'Appearance'], ['resume', 'description', 'Resume'], ['preferences', 'tune', 'Job preferences'],
+    ['profile', 'person', 'Profile'], ['appearance', 'palette', 'Appearance'], ['resume', 'description', 'Resume'], ['facts', 'school', 'Your background'], ['preferences', 'tune', 'Job preferences'],
     ['autopilot', 'smart_toy', 'Autopilot'], ['email', 'mail', 'Email proof'], ['ai', 'auto_awesome', 'AI answers'],
     ['answers', 'forum', 'Answer bank'], ['help', 'help', 'Help & tutorials'], ['data', 'shield_lock', 'Data & privacy'],
   ];
@@ -1234,6 +1312,36 @@
       `<button class="set-link hv ${sec === id ? 'on' : ''}" data-section="${id}" ${sec === id ? 'aria-current="page"' : ''}>${icon(ic)}<span>${label}</span></button>`).join('')}</nav>`;
     return `${pageHead()}<div class="settings-shell">${nav}<div class="set-panel" id="set-panel">${settingsPanel(sec)}</div></div>`;
   };
+
+  // ── Your background: the verified facts every form answer, resume and AI reply is built from ──
+  const projRow = (pr = {}) => `<div class="proj-row">
+      <div class="field"><label>Project</label><input class="input" data-proj="name" value="${esc(pr.name || '')}" placeholder="Project name"></div>
+      <div class="field"><label>What it does / results</label><textarea class="textarea short" data-proj="description" placeholder="One or two sentences with real numbers">${esc(pr.description || '')}</textarea></div>
+      <button type="button" class="btn sm ghost hv" data-act="proj-del" aria-label="Remove project">${icon('delete')}Remove</button></div>`;
+  function factsEditor() {
+    const f = S.facts || {}, p = f.personal || {}, e = f.education || {};
+    const txt = (sec, k, label, attrs = '') => `<div class="field"><label for="ff-${sec}-${k}">${label}</label><input class="input" id="ff-${sec}-${k}" data-sec="${sec}" name="${k}" value="${esc((sec === 'personal' ? p : e)[k] || '')}" ${attrs}></div>`;
+    const one = (k, label, hint) => `<div class="field full"><label for="ff-${k}">${label}</label><input class="input" id="ff-${k}" name="${k}" value="${esc(f[k] || '')}" placeholder="${hint || ''}"></div>`;
+    const list = (k, label, hint, sep = '\n') => `<div class="field full"><label for="ff-${k}">${label}<small class="faint"> · ${hint}</small></label><textarea class="textarea" id="ff-${k}" name="${k}" data-sep="${sep === '\n' ? 'line' : 'comma'}">${esc((f[k] || []).join(sep === '\n' ? '\n' : ', '))}</textarea></div>`;
+    return `<form class="stack" data-facts-form>
+      <p class="muted small">This is the only source ApplyPilot uses for anything it says about you — form answers, tailored resumes, cover letters and the assistant. It stays on your PC. Change anything, any time; your previous version is backed up automatically.</p>
+      <section class="card"><div class="card-h"><span class="card-t">About you</span><span class="aside">Used on application forms</span></div>
+        <div class="card-b form-grid">${txt('personal', 'name', 'Full name', 'autocomplete="name"')}${txt('personal', 'email', 'Email', 'type="email" autocomplete="email"')}
+          ${txt('personal', 'phone', 'Phone', 'type="tel" autocomplete="tel"')}${txt('personal', 'location', 'Current location', 'placeholder="City, Country"')}
+          ${txt('personal', 'linkedin', 'LinkedIn URL', 'type="url"')}${txt('personal', 'github', 'GitHub / portfolio URL', 'type="url"')}</div></section>
+      <section class="card"><div class="card-h"><span class="card-t">Education</span></div>
+        <div class="card-b form-grid">${txt('education', 'degree', 'Degree')}${txt('education', 'institution', 'Institution (short)')}
+          ${txt('education', 'institution_full', 'Institution (full name)')}${txt('education', 'cgpa', 'CGPA / grade')}
+          ${txt('education', 'start_date', 'Started')}${txt('education', 'expected_graduation', 'Graduation (expected)')}</div></section>
+      <section class="card"><div class="card-h"><span class="card-t">Projects</span><button type="button" class="btn sm hv ml-auto" data-act="proj-add">${icon('add')}Add project</button></div>
+        <div class="card-b stack" id="proj-list">${(f.projects || []).map(projRow).join('') || projRow()}</div></section>
+      <section class="card"><div class="card-h"><span class="card-t">Achievements & skills</span></div>
+        <div class="card-b form-grid">${list('patents', 'Patents / publications', 'one per line')}${list('certifications', 'Certifications', 'one per line')}${list('skills', 'Skills', 'separate with commas', ',')}</div></section>
+      <section class="card"><div class="card-h"><span class="card-t">Work details</span><span class="aside">Answers to common screening questions</span></div>
+        <div class="card-b form-grid">${one('work_authorization', 'Work authorisation', 'e.g. Indian citizen, no sponsorship needed')}${one('notice_period', 'Notice period / earliest start', 'e.g. Immediately')}${one('relocation_preference', 'Open to relocation?', 'e.g. Yes, anywhere in India')}</div></section>
+      <div class="row-end sticky-save"><button class="btn primary hv" type="submit">${icon('check')}Save background</button></div>
+    </form>`;
+  }
   function settingsPanel(sec) {
     const p = S.profile, g = S.gemini || {}, st = S.stats || {}, au = S.automation || {};
     const f = (name, label, opts = {}) => {
@@ -1247,6 +1355,7 @@
     const card = (title, aside, body) => `<section class="card"><div class="card-h"><span class="card-t">${title}</span><span class="aside">${aside || ''}</span></div>${body}</section>`;
 
     if (sec === 'appearance') return `<div class="stack">${appearancePanel(true)}</div>`;
+    if (sec === 'facts') return factsEditor();
     if (sec === 'profile') return `<div class="stack">
       <div class="card"><div class="profile-hero">
         <label class="avatar-pick" title="Change profile picture">${me('lg')}<span class="avatar-edit">${icon('photo_camera')}</span>
@@ -1471,7 +1580,7 @@
   // ───────────────────────── Actions ─────────────────────────
   async function refreshAfterJobChange() {
     loadStats();
-    if (S.view === 'pipeline') { S.jobs = await api('/jobs'); $('#pipe-body') ? ($('#pipe-body').innerHTML = S.pipe.mode === 'table' ? pipeTable() : pipeBoard()) : render(); }
+    if (S.view === 'pipeline') { S.jobs = await api('/jobs', { query: { compact: 1 } }); $('#pipe-body') ? ($('#pipe-body').innerHTML = S.pipe.mode === 'table' ? pipeTable() : pipeBoard()) : render(); }
     else if (['inbox', 'home', 'proof'].includes(S.view)) { await loaders[S.view](); render(); }
   }
 
@@ -1629,7 +1738,11 @@
       S.answers = S.answers.filter(x => x.id !== id); render();
     },
     async backup(btn) { await run(btn, () => api('/backup', { method: 'POST' }), 'Backup created'); },
+    'proj-add'() { const l = $('#proj-list'); if (l) { l.insertAdjacentHTML('beforeend', projRow()); $('.proj-row:last-child input', l).focus(); } },
+    'proj-del'(btn) { const row = btn.closest('.proj-row'); if (row) row.remove(); },
     async 'avatar-remove'() {
+      const ok = await confirmModal({ title: 'Remove your profile picture?', body: 'Your initials will show instead. You can add a photo again any time.', ok: 'Remove', danger: true });
+      if (!ok) return;
       try { S.avatar = await api('/profile/avatar', { method: 'DELETE' }); toast('Profile picture removed'); S.lastHtml = ''; render(); }
       catch (e) { toast(e.message, true); }
     },
@@ -1745,6 +1858,19 @@
       }
       return;
     }
+    if (form.hasAttribute('data-facts-form')) {
+      const body = { personal: {}, education: {} };
+      $$('input[data-sec]', form).forEach(i => { body[i.dataset.sec][i.name] = i.value.trim(); });
+      ['patents', 'certifications', 'skills'].forEach(k => {
+        const t = form.elements[k]; if (!t) return;
+        body[k] = t.value.split(t.dataset.sep === 'comma' ? /[,\n]/ : /\n/).map(x => x.trim()).filter(Boolean);
+      });
+      ['work_authorization', 'notice_period', 'relocation_preference'].forEach(k => { if (form.elements[k]) body[k] = form.elements[k].value.trim(); });
+      body.projects = $$('.proj-row', form).map(r => ({ name: $('[data-proj="name"]', r).value.trim(), description: $('[data-proj="description"]', r).value.trim() })).filter(pr => pr.name);
+      const r = await run(btn, () => api('/profile/facts', { method: 'PUT', body }), 'Saved · forms, resumes and the assistant use this now');
+      if (r) S.facts = r;
+      return;
+    }
     if (form.dataset.profileForm) {
       const keys = PROFILE_SECTIONS[form.dataset.profileForm], body = {};
       keys.forEach(k => {
@@ -1811,7 +1937,7 @@
   }
   function openPalette() {
     if (pal) return;
-    if (!S.jobs) api('/jobs').then(j => { S.jobs = j; if (pal) drawPalette(); }).catch(() => {});
+    if (!S.jobs) api('/jobs', { query: { compact: 1 } }).then(j => { S.jobs = j; if (pal) drawPalette(); }).catch(() => {});
     $('#overlay').innerHTML = `<div class="palette-wrap" id="pal-wrap"><div class="palette" role="dialog" aria-label="Command palette">
       <div class="palette-in">${icon('search')}<input id="pal-in" placeholder="Type a command or search jobs…" autocomplete="off"><span class="kbd">Esc</span></div>
       <div class="palette-list" id="pal-list"></div></div></div>`;
@@ -1847,6 +1973,8 @@
     { id: 'neutral-dark', name: 'Neutral Dark', note: 'Charcoal' },
     { id: 'midnight', name: 'Midnight', note: 'Deep blue' },
     { id: 'rose', name: 'Rose', note: 'Music-inspired accent' },
+    { id: 'sand', name: 'Sand', note: 'Warm cream · light' },
+    { id: 'ocean', name: 'Ocean', note: 'Deep teal · dark' },
   ];
   const THEME_KEY = 'ap_theme';
   const LEGACY_THEME = { light: 'neutral', dark: 'rose' };
@@ -1959,6 +2087,7 @@
   // Android app (app/lib/shell): the hardware back button asks the page first.
   // Returns true when it closed something or went back to Today; false lets the app exit.
   window.__apBack = () => {
+    if (typeof closeAI === 'function' && closeAI()) return true;
     if ($('#overlay').innerHTML) { if (pal) closePalette(); else $('#overlay').innerHTML = ''; return true; }
     if (S.jobId) { closeJob(); return true; }
     if (S.ans.editing || S.ans.adding) { actions['ans-cancel'](); return true; }
@@ -1968,6 +2097,112 @@
 
   window.addEventListener('hashchange', () => { const v = location.hash.replace(/^#\/?/, ''); if (v && v !== S.view) go(v); });
 
+  // ── Last-known snapshot for an instant cold start (small: no job list) ──
+  const SNAP_KEY = 'ap_snapshot_v1', SNAP_FIELDS = ['stats', 'analytics', 'autopilot', 'proofStatus', 'proofs', 'profile', 'avatar', 'resume', 'needs', 'aiAnswers'];
+  function hydrate() {
+    try {
+      const snap = JSON.parse(localStorage.getItem(SNAP_KEY) || 'null');
+      if (!snap || Date.now() - snap.at > 3 * 86400000) return false;
+      SNAP_FIELDS.forEach(k => { if (snap[k] != null && (S[k] == null || (Array.isArray(S[k]) && !S[k].length))) S[k] = snap[k]; });
+      return !!snap.stats;
+    } catch (e) { return false; }
+  }
+  let persistT = 0;
+  function persist() {
+    clearTimeout(persistT);
+    persistT = setTimeout(() => {
+      try { localStorage.setItem(SNAP_KEY, JSON.stringify({ at: Date.now(), ...Object.fromEntries(SNAP_FIELDS.map(k => [k, S[k]])) })); } catch (e) {}
+    }, 1500);
+  }
+
+
+  // ───────────────────────── Assistant (always one tap away) ─────────────────────────
+  // A floating ✦ button on every screen opens a chat that knows your facts, live numbers and
+  // what you are looking at (Home, a job, Proof…). Ctrl/⌘ + I toggles it on desktop.
+  S.chat = S.chat || [];
+  const md = (text) => {
+    const lines = esc(String(text || '')).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').split(/\n/);
+    let html = '', list = false;
+    for (const raw of lines) {
+      const line = raw.trim();
+      const li = line.match(/^(?:[-*•]|\d+\.)\s+(.*)$/);
+      if (li) { if (!list) { html += '<ul>'; list = true; } html += `<li>${li[1]}</li>`; continue; }
+      if (list) { html += '</ul>'; list = false; }
+      if (!line) continue;
+      const h = line.match(/^#{1,4}\s+(.*)$/);
+      html += h ? `<p class="ai-h">${h[1]}</p>` : `<p>${line}</p>`;
+    }
+    return html + (list ? '</ul>' : '');
+  };
+  const aiSuggestions = () => {
+    if (S.job) return [`Should I apply to ${S.job.company}?`, `Prep me for a ${S.job.title} interview`, 'What could make this application stronger?'];
+    return ({
+      inbox: ['Help me answer these questions', 'Which triage roles are worth a yes?'],
+      pipeline: ['Which roles should I prioritise?', 'Why were some jobs skipped?'],
+      proof: ['Summarise what employers sent me', 'Who should I follow up with?'],
+      settings: ['How do I turn on live applying?', 'How do I connect my email?'],
+    }[S.view] || []).concat(['What needs me today?', 'How is my search going this week?']).slice(0, 4);
+  };
+  const fab = document.createElement('button');
+  fab.className = 'ai-fab'; fab.id = 'ai-fab'; fab.setAttribute('aria-label', 'Ask the assistant'); fab.title = 'Ask the assistant (Ctrl+I)';
+  fab.innerHTML = icon('auto_awesome', 'fill');
+  document.body.appendChild(fab);
+  const panel = document.createElement('section');
+  panel.className = 'ai-panel'; panel.id = 'ai-panel'; panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', 'Assistant'); panel.hidden = true;
+  document.body.appendChild(panel);
+  let aiBusy = false;
+  function drawChat() {
+    const msgs = S.chat.map(m => `<div class="ai-msg ${m.role}">${m.role === 'user' ? `<p>${esc(m.content)}</p>` : md(m.content)}</div>`).join('');
+    const empty = `<div class="ai-empty"><div class="ai-orb">${icon('auto_awesome', 'fill')}</div><b>${esc(greeting())}</b><span>Ask anything about your search. I only use your verified facts and the app's live data.</span></div>`;
+    panel.innerHTML = `<header class="ai-head"><span class="ai-title">${icon('auto_awesome', 'fill')}Assistant</span>
+        ${S.chat.length ? `<button class="btn sm ghost hv" data-ai="clear">New chat</button>` : ''}
+        <button class="btn icon ghost hv" data-ai="close" aria-label="Close">${icon('close')}</button></header>
+      <div class="ai-body" id="ai-body">${S.chat.length ? msgs : empty}${aiBusy ? '<div class="ai-msg assistant typing"><i></i><i></i><i></i></div>' : ''}</div>
+      ${aiBusy ? '' : `<div class="ai-chips">${aiSuggestions().map(q => `<button class="chip-btn hv" data-ai-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>`}
+      <form class="ai-compose" data-ai-form><textarea id="ai-input" rows="1" placeholder="Ask the assistant…" aria-label="Message"></textarea>
+        <button class="btn primary icon hv" type="submit" aria-label="Send" ${aiBusy ? 'disabled' : ''}>${icon('arrow_upward')}</button></form>`;
+    const body = $('#ai-body'); body.scrollTop = body.scrollHeight;
+  }
+  function openAI() {
+    if (!panel.hidden) return;
+    drawChat(); panel.hidden = false; fab.classList.add('open');
+    requestAnimationFrame(() => panel.classList.add('on'));
+    setTimeout(() => { const i = $('#ai-input'); i && matchMedia('(pointer: fine)').matches && i.focus(); }, 180);
+  }
+  function closeAI() {
+    if (panel.hidden) return false;
+    panel.classList.remove('on'); fab.classList.remove('open');
+    setTimeout(() => { if (!panel.classList.contains('on')) panel.hidden = true; }, 260);
+    return true;
+  }
+  async function askAI(text) {
+    text = String(text || '').trim();
+    if (!text || aiBusy) return;
+    S.chat.push({ role: 'user', content: text }); aiBusy = true; drawChat();
+    try {
+      const timeout = new Promise((_, no) => setTimeout(() => no(new Error('it took too long — please try again')), 25000));
+      const r = await Promise.race([timeout, api('/ai/chat', { method: 'POST', body: { message: text, history: S.chat.slice(-9, -1), view: S.view, job_id: S.job ? S.job.id : null } })]);
+      S.chat.push({ role: 'assistant', content: r.response || 'No answer this time.' });
+    } catch (e) { S.chat.push({ role: 'assistant', content: `Couldn't reach the assistant: ${e.message}` }); }
+    aiBusy = false; drawChat();
+    const i = $('#ai-input'); i && matchMedia('(pointer: fine)').matches && i.focus();
+  }
+  fab.addEventListener('click', () => (panel.hidden ? openAI() : closeAI()));
+  panel.addEventListener('click', (e) => {
+    const a = e.target.closest('[data-ai]'); const q = e.target.closest('[data-ai-q]');
+    if (q) { askAI(q.dataset.aiQ); return; }
+    if (!a) return;
+    if (a.dataset.ai === 'close') closeAI();
+    if (a.dataset.ai === 'clear') { S.chat = []; drawChat(); }
+  });
+  panel.addEventListener('submit', (e) => { e.preventDefault(); e.stopPropagation(); const i = $('#ai-input'); askAI(i.value); });
+  panel.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && e.target.id === 'ai-input') { e.preventDefault(); askAI(e.target.value); }
+    if (e.key === 'Escape') { e.stopPropagation(); closeAI(); fab.focus(); }
+  });
+  panel.addEventListener('input', (e) => { if (e.target.id === 'ai-input') { e.target.style.height = 'auto'; e.target.style.height = Math.min(120, e.target.scrollHeight) + 'px'; } });
+  document.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') { e.preventDefault(); panel.hidden ? openAI() : closeAI(); } });
+
   // ───────────────────────── Live polling ─────────────────────────
   async function poll() {
     if (document.hidden) return;
@@ -1975,7 +2210,7 @@
     const editing = isTyping() || $('#overlay').innerHTML || S.ans.editing || S.ans.adding;
     if (editing) return;
     // render({ poll: true }) skips the DOM entirely when nothing changed, so hovers are never interrupted.
-    if (S.view === 'home') { try { await settle({ autopilot: api('/autopilot'), proofStatus: api('/proofs/status'), proofs: api('/proofs', { query: { limit: 5 } }) }); if (S.view === 'home') render({ poll: true }); } catch (e) {} }
+    if (S.view === 'home') { try { await settle({ autopilot: api('/autopilot'), proofStatus: api('/proofs/status'), proofs: api('/proofs', { query: { limit: 5 } }) }); if (S.view === 'home') render({ poll: true }); persist(); } catch (e) {} }
     if (S.view === 'proof') { try { await loaders.proof(); if (S.view === 'proof') render({ poll: true }); } catch (e) {} }
     if (S.view === 'insights' && S.ins.tab === 'log') { try { await settle({ logs: api('/logs', { query: { limit: 250 } }) }); if (S.view === 'insights') render({ poll: true }); } catch (e) {} }
   }
@@ -1987,9 +2222,11 @@
     initLiquidGlass();
     renderChrome();
     const start = location.hash.replace(/^#\/?/, '') || 'home';
-    // Inbox counts power the nav badge everywhere, so fetch them alongside the first view.
-    await Promise.allSettled([loadStats(), loaders.inbox()]);
-    await go(start);
+    // Open instantly with the last Home you saw (kept on this device), then refresh everything at once.
+    if (hydrate()) S.fresh.home = 1;
+    await Promise.allSettled([loadStats(), loaders.inbox(), go(start)]);
+    render({ poll: true });
+    persist();
     let toured = false; try { toured = localStorage.getItem(TOUR_KEY) === '1'; } catch (e) {}
     if (!toured) openTour(0);
     setInterval(poll, 15000);

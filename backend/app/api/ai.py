@@ -16,6 +16,8 @@ router = APIRouter(prefix="/ai", tags=["Gemini AI Intelligence"])
 class ChatRequest(BaseModel):
     message: str = Field(..., description="User's query to career advisor")
     history: List[Dict[str, str]] = Field(default=[], description="Previous conversation turns")
+    view: Optional[str] = Field(default=None, description="Screen the user is on (home, inbox, pipeline, proof, settings)")
+    job_id: Optional[int] = Field(default=None, description="Job the user has open, if any")
 
 class JobIntelligenceRequest(BaseModel):
     job_id: Optional[int] = None
@@ -63,7 +65,9 @@ def chat_with_advisor(
     db: Session = Depends(get_db),
     token: str = Depends(verify_token)
 ):
-    """Conversational career advisor powered by Gemini, grounded in live application database."""
+    """Conversational assistant powered by Gemini, grounded in your facts and the live database."""
+    import datetime
+    from backend.app.models import EmailProof
     profile = db.query(Profile).first()
     profile_dict = {
         "education": profile.education if profile else "",
@@ -72,20 +76,31 @@ def chat_with_advisor(
         "proof_points_text": profile.proof_points_text if profile else "",
     }
 
-    # Fetch live stats for copilot context
-    total_jobs = db.query(Job).count()
-    total_apps = db.query(Application).count()
-    pending_inputs = db.query(NeedsInput).filter(NeedsInput.status == "pending").count()
-    active_interviews = db.query(Job).filter(Job.status == "interview").count()
+    today = datetime.datetime.now(datetime.timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    sent_statuses = ["submitted", "unverified", "applied"]
+    top = db.query(Job).filter(Job.status.in_(["queued", "maybe", "evaluated", "approved"])).order_by(Job.score.desc()).limit(5).all()
+    pending = db.query(NeedsInput).filter(NeedsInput.status == "pending").order_by(NeedsInput.created_at.desc()).limit(5).all()
+    proofs = db.query(EmailProof).order_by(EmailProof.received_at.desc()).limit(5).all()
+    open_job = db.query(Job).filter(Job.id == req.job_id).first() if req.job_id else None
 
     db_stats = {
-        "total_jobs": total_jobs,
-        "total_applications": total_apps,
-        "today_applications": total_apps, # simplified
+        "live_mode": bool(profile and profile.go_live),
+        "paused": bool(profile and profile.is_paused),
         "daily_cap": profile.daily_cap if profile else 100,
-        "pending_inputs": pending_inputs,
-        "active_interviews": active_interviews,
-        "career_streak": 5,
+        "sent_today": db.query(Application).filter(Application.submitted_at >= today, Application.status.in_(sent_statuses)).count(),
+        "dry_runs_today": db.query(Application).filter(Application.submitted_at >= today, Application.status == "dry_run").count(),
+        "sent_total": db.query(Application).filter(Application.status.in_(sent_statuses)).count(),
+        "dry_runs_total": db.query(Application).filter(Application.status == "dry_run").count(),
+        "queued": db.query(Job).filter(Job.status == "queued").count(),
+        "to_triage": db.query(Job).filter(Job.status == "maybe").count(),
+        "interviews": db.query(Job).filter(Job.status == "interview").count(),
+        "tracked_jobs": db.query(Job).count(),
+        "open_questions": [n.question_text[:140] for n in pending],
+        "top_matches": [f"{j.title} at {j.company} (fit {round(j.score or 0, 1)}/5, {j.status})" for j in top],
+        "recent_employer_emails": [f"{p.company}: {p.kind} — {p.subject[:80]}" for p in proofs],
+        "screen": req.view or "",
+        "open_job": (f"{open_job.title} at {open_job.company} — status {open_job.status}, fit {round(open_job.score or 0, 1)}/5, "
+                     f"{(open_job.score_reason or '')[:300]}") if open_job else "",
     }
 
     result = GeminiService.chat_career_advisor(

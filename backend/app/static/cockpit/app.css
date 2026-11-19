@@ -64,7 +64,7 @@
 }
 
 /* ── Shared dark foundation ── */
-[data-theme="neutral-dark"], [data-theme="midnight"], [data-theme="rose"] {
+[data-theme="neutral-dark"], [data-theme="midnight"], [data-theme="rose"], [data-theme="ocean"] {
   color-scheme: dark;
   --hover: rgba(255, 255, 255, .06); --press: rgba(255, 255, 255, .1);
   --track: rgba(255, 255, 255, .1); --scrim: rgba(0, 0, 0, .5);
@@ -120,6 +120,51 @@
   --accent-soft: rgba(250, 45, 72, .16); --accent-glow: rgba(250, 45, 72, .55);
   --lens: rgba(255, 255, 255, .14);
   --blob-1: rgba(250, 45, 72, .42); --blob-2: rgba(94, 106, 210, .38); --blob-3: rgba(43, 181, 160, .26);
+}
+
+
+/* ── Sand: warm cream, espresso type, terracotta accent (light) ── */
+[data-theme="sand"] {
+  color-scheme: light;
+  --bg: #F3EEE6;
+  --surface-1: rgba(255, 252, 247, .78);
+  --surface-2: rgba(76, 52, 30, .05);
+  --surface-3: rgba(76, 52, 30, .09);
+  --solid: #FBF8F3;
+  --glass: rgba(250, 245, 238, .6);
+  --glass-strong: rgba(251, 247, 241, .86);
+  --glass-tint: rgba(255, 252, 247, .66);
+  --glass-tint-hi: rgba(255, 253, 249, .94);
+  --hair: rgba(76, 52, 30, .09);
+  --hair-strong: rgba(76, 52, 30, .16);
+  --ink: #2B2620; --ink-2: #5F564C; --ink-3: #6E6458;
+  --accent: #A34A24; --accent-hi: #D0794F; --accent-btn: #A34A24; --accent-ink: #FFFFFF;
+  --accent-soft: rgba(163, 74, 36, .12); --accent-glow: rgba(163, 74, 36, .3);
+  --hover: rgba(76, 52, 30, .05); --press: rgba(76, 52, 30, .09);
+  --lens: rgba(255, 253, 249, .92); --track: rgba(76, 52, 30, .1); --scrim: rgba(43, 38, 32, .24);
+  --rim: inset 0 1px 0 rgba(255,255,255,.95), inset 0 -1px 0 rgba(76,52,30,.05), inset 0 0 0 .5px rgba(76,52,30,.1);
+  --rim-soft: inset 0 1px 0 rgba(255,255,255,.9), inset 0 0 0 1px rgba(76,52,30,.07);
+  --sheen: linear-gradient(180deg, rgba(255,255,255,.7), rgba(255,255,255,.18) 46%, rgba(255,255,255,0) 72%);
+  --spec: rgba(255, 255, 255, .95);
+  --glass-shadow: 0 12px 32px -12px rgba(76, 52, 30, .22), 0 1px 3px rgba(76, 52, 30, .06);
+  --shadow-lift: 0 16px 36px -14px rgba(76, 52, 30, .24), 0 4px 10px -4px rgba(76, 52, 30, .08);
+  --shadow-float: 0 32px 80px -20px rgba(76, 52, 30, .3), 0 0 0 1px rgba(76, 52, 30, .06);
+  --blob-1: rgba(232, 190, 150, .5); --blob-2: rgba(214, 196, 170, .5); --blob-3: rgba(240, 214, 190, .45);
+}
+
+/* ── Ocean: deep teal night, aqua accent (dark) ── */
+[data-theme="ocean"] {
+  --bg: #061416;
+  --surface-1: rgba(120, 230, 220, .045); --surface-2: rgba(120, 230, 220, .075); --surface-3: rgba(120, 230, 220, .12);
+  --solid: #0C2024;
+  --glass: rgba(10, 34, 38, .5); --glass-strong: rgba(9, 30, 34, .8);
+  --glass-tint: rgba(140, 240, 230, .07); --glass-tint-hi: rgba(140, 240, 230, .14);
+  --hair: rgba(140, 240, 230, .09); --hair-strong: rgba(140, 240, 230, .16);
+  --ink: #E6F2F1; --ink-2: #9FBDBA; --ink-3: #86A7A3;
+  --accent: #4FD1C5; --accent-hi: #8BE9E0; --accent-btn: #4FD1C5; --accent-ink: #04201E;
+  --accent-soft: rgba(79, 209, 197, .15); --accent-glow: rgba(79, 209, 197, .4);
+  --lens: rgba(140, 240, 230, .14);
+  --blob-1: rgba(32, 160, 150, .4); --blob-2: rgba(40, 96, 180, .32); --blob-3: rgba(90, 200, 170, .2);
 }
 
 /* Smooth, flicker-free theme switching: the browser cross-fades a snapshot. */
@@ -874,6 +919,9 @@ html { font-size: calc(16px * var(--text-scale, 1)); }
 [data-font="rounded"] { --font: "SF Pro Rounded", ui-rounded, "Nunito", -apple-system, "Segoe UI", sans-serif; --font-display: "SF Pro Rounded", ui-rounded, "Nunito", -apple-system, "Segoe UI", sans-serif; }
 [data-font="serif"] { --font: "New York", ui-serif, "Newsreader", Georgia, serif; --font-display: "New York", ui-serif, "Newsreader", Georgia, serif; }
 [data-font="readable"] { --font: "Atkinson Hyperlegible", -apple-system, "Segoe UI", sans-serif; --font-display: "Atkinson Hyperlegible", -apple-system, "Segoe UI", sans-serif; }
+[data-font="modern"] { --font: "Plus Jakarta Sans", -apple-system, "Segoe UI", sans-serif; --font-display: "Plus Jakarta Sans", -apple-system, "Segoe UI", sans-serif; }
+[data-font="elegant"] { --font-display: "Fraunces", "New York", ui-serif, Georgia, serif; }
+[data-font="elegant"] h1, [data-font="elegant"] .card-t, [data-font="elegant"] .dash-t { font-weight: 600; letter-spacing: -0.01em; }
 [data-font="mono"] { --font: ui-monospace, "SF Mono", "JetBrains Mono", Consolas, monospace; --font-display: ui-monospace, "SF Mono", "JetBrains Mono", Consolas, monospace; }
 html[data-motion="reduce"] *, html[data-motion="reduce"] *::before, html[data-motion="reduce"] *::after { animation-duration: .01ms !important; animation-delay: 0ms !important; transition-duration: .01ms !important; }
 html[data-motion="reduce"] .lift:hover, html[data-motion="reduce"] .tile:hover .art { transform: none !important; }
@@ -1048,7 +1096,7 @@ html.lite .search-trigger::after, html.lite .lcd::after, html.lite .seg button::
 
 /* ═════════════ Home dashboard: calm charts ═════════════ */
 :root { --c-sent: #34B394; --c-dry: #6F7CF0; --c-neutral: color-mix(in oklab, var(--ink) 30%, transparent); }
-[data-theme="neutral-dark"], [data-theme="midnight"], [data-theme="rose"] { --c-sent: #2E9E82; }
+[data-theme="neutral-dark"], [data-theme="midnight"], [data-theme="rose"], [data-theme="ocean"] { --c-sent: #2E9E82; }
 .dash { display: grid; grid-template-columns: minmax(0, 1.25fr) 1px minmax(0, 1fr); gap: var(--s6); padding: var(--s5) var(--s6); }
 .dash-rule { background: var(--hair); }
 .dash-pane { min-width: 0; display: flex; flex-direction: column; }
@@ -1145,3 +1193,102 @@ html[data-motion="reduce"] .tour-body.swap { animation: none; }
 .theme-pop .pop-more .ms:last-child { margin-left: auto; }
 .seg.wide button { white-space: nowrap; min-width: 0; }
 @media (max-width: 480px) { #set-panel .seg.wide .size-a { display: none; } }
+
+/* ═════════════ Phones & the app, round 2: every scroll frame cheap enough for 120 Hz ═════════════ */
+/* Only the tab bar keeps a (small) live blur; the other floating pieces use tinted glass that needs no
+   per-frame work, the background blobs go, and off-screen rows/sections aren't painted until needed. */
+html.lite .ambient { display: none; }
+html.lite body { background: var(--bg); }
+html.lite .topbar::before { backdrop-filter: none; -webkit-backdrop-filter: none; -webkit-mask-image: none; mask-image: none;
+  background: linear-gradient(var(--bg) 55%, transparent); opacity: 1; }
+html.lite .search-trigger, html.lite .theme-btn, html.lite .lcd, html.lite .capsule, html.lite .glass, html.lite .theme-pop,
+html.lite .modal, html.lite .inspector, html.lite .tbl thead th {
+  backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--sheen), var(--glass-strong);
+}
+html.lite .tabbar { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); background: var(--sheen), var(--glass-strong);
+  transform: translateZ(0); contain: layout paint; }
+html.lite #content { contain: layout paint; }
+html.lite .tbl tbody tr { content-visibility: auto; contain-intrinsic-size: auto 56px; }
+html.lite .view > .block, html.lite .view > section { content-visibility: auto; contain-intrinsic-size: auto 320px; }
+html.lite .view.enter > * { animation-duration: .32s; }
+html.lite .view.enter > *:nth-child(n+3) { animation-delay: 60ms; }
+html.lite .card, html.lite .kpi, html.lite .tile .art { box-shadow: var(--rim-soft); }
+
+/* Tab bar hold-and-glide: the lens swells when held and tracks the finger while gliding */
+.tabbar { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.tabbar .glide.held { scale: 1.1 1.14; transition: translate 560ms var(--ease-sheet), width 560ms var(--ease-sheet), height 560ms var(--ease-sheet), scale 220ms var(--ease-sheet), opacity 200ms; }
+.tabbar .glide.gliding { transition: translate 70ms linear, width 200ms var(--ease-sheet), height 200ms var(--ease-sheet), scale 220ms var(--ease-sheet), opacity 200ms; }
+.tabbar button.hot { color: var(--accent); }
+.tabbar button.hot .ms { transform: scale(1.12); }
+
+/* ═════════════ Assistant ═════════════ */
+.ai-fab {
+  position: fixed; right: var(--s6); bottom: var(--s6); z-index: var(--z-pop); display: grid; place-items: center;
+  width: 52px; height: 52px; border-radius: 50%; color: var(--accent-ink);
+  background: linear-gradient(140deg, var(--accent-hi), var(--accent-btn));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 10px 28px -8px var(--accent-glow), 0 2px 6px rgba(0,0,0,.18);
+  transition: transform var(--t-out) var(--ease-out), opacity .2s; -webkit-tap-highlight-color: transparent;
+}
+.ai-fab .ms { font-size: 24px; transition: transform .45s var(--ease-sheet); }
+.ai-fab.open .ms { transform: rotate(72deg) scale(.9); }
+@media (hover: hover) and (pointer: fine) { .ai-fab:hover { transform: translateY(-2px) scale(1.04); transition-duration: var(--t-in); } }
+.ai-fab:active { transform: scale(.92); transition-duration: var(--t-press); }
+
+.ai-panel {
+  position: fixed; right: var(--s6); bottom: calc(var(--s6) + 64px); z-index: var(--z-pop); width: min(400px, calc(100vw - 32px));
+  height: min(620px, calc(100dvh - 140px)); display: flex; flex-direction: column; border-radius: var(--r-xl); overflow: hidden;
+  background: var(--sheen), var(--glass-strong); box-shadow: var(--rim), 0 24px 60px -18px rgba(0,0,0,.45);
+  backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
+  opacity: 0; transform: translateY(16px) scale(.97); transform-origin: bottom right;
+  transition: opacity .22s var(--ease-out), transform .34s var(--ease-sheet);
+}
+.ai-panel.on { opacity: 1; transform: none; }
+.ai-head { display: flex; align-items: center; gap: var(--s2); padding: var(--s3) var(--s3) var(--s2) var(--s4); }
+.ai-title { display: inline-flex; align-items: center; gap: var(--s2); margin-right: auto; font: 600 1rem/1 var(--font-display); }
+.ai-title .ms { color: var(--accent); }
+.ai-body { flex: 1; min-height: 0; overflow-y: auto; padding: var(--s2) var(--s4) var(--s3); display: flex; flex-direction: column; gap: var(--s3); overscroll-behavior: contain; }
+.ai-empty { margin: auto 0; display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--s2); color: var(--ink-2); font-size: .875rem; padding: var(--s6) var(--s2); }
+.ai-empty b { color: var(--ink); font: 600 1.125rem/1.3 var(--font-display); }
+.ai-orb { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; color: var(--accent-ink); margin-bottom: var(--s2);
+  background: linear-gradient(140deg, var(--accent-hi), var(--accent-btn)); box-shadow: 0 10px 26px -10px var(--accent-glow); }
+.ai-msg { max-width: 88%; font-size: .875rem; line-height: 1.5; animation: rise .3s var(--ease-out) both; }
+.ai-msg p { margin: 0 0 var(--s2); } .ai-msg p:last-child { margin-bottom: 0; }
+.ai-msg ul { margin: 0 0 var(--s2); padding-left: var(--s5); } .ai-msg li { margin: 2px 0; }
+.ai-msg .ai-h { font-weight: 600; }
+.ai-msg.user { align-self: flex-end; padding: var(--s2) var(--s3); border-radius: 18px 18px 6px 18px; color: var(--accent-ink); background: var(--accent-btn); }
+.ai-msg.assistant { align-self: flex-start; padding: var(--s3); border-radius: 18px 18px 18px 6px; background: var(--surface-2); }
+.ai-msg.typing { display: flex; gap: 4px; padding: var(--s3) var(--s4); }
+.ai-msg.typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-3); animation: blink 1s infinite ease-in-out both; }
+.ai-msg.typing i:nth-child(2) { animation-delay: .15s; } .ai-msg.typing i:nth-child(3) { animation-delay: .3s; }
+@keyframes blink { 0%, 80%, 100% { opacity: .25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-2px); } }
+.ai-chips { display: flex; gap: var(--s2); overflow-x: auto; padding: 0 var(--s4) var(--s2); scrollbar-width: none; }
+.ai-chips::-webkit-scrollbar { display: none; }
+.chip-btn { flex: none; padding: 7px 12px; border-radius: var(--r-pill); font-size: .75rem; color: var(--ink-2); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--hair); white-space: nowrap; }
+@media (hover: hover) and (pointer: fine) { .chip-btn:hover { color: var(--ink); } }
+.ai-compose { display: flex; align-items: flex-end; gap: var(--s2); padding: var(--s2) var(--s3) var(--s3); border-top: 1px solid var(--hair); }
+.ai-compose textarea { flex: 1; min-height: 40px; max-height: 120px; padding: 10px 14px; border: 0; outline: none; resize: none; border-radius: 20px;
+  font: inherit; font-size: .875rem; line-height: 1.4; color: var(--ink); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--hair); }
+.ai-compose textarea:focus { box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 3px var(--accent-soft); }
+.ai-compose .btn.icon { width: 40px; height: 40px; border-radius: 50%; flex: none; }
+
+@media (max-width: 767px) {
+  /* Above the floating tab bar, thumb-reachable on the right */
+  .ai-fab { right: var(--s4); bottom: calc(max(var(--s3), env(safe-area-inset-bottom)) + 84px); width: 48px; height: 48px; }
+  .ai-panel { left: var(--s2); right: var(--s2); width: auto; bottom: calc(max(var(--s3), env(safe-area-inset-bottom)) + 140px);
+    height: min(560px, calc(100dvh - 220px)); transform-origin: bottom center; }
+}
+html.lite .ai-panel { backdrop-filter: none; -webkit-backdrop-filter: none; }
+html[data-motion="reduce"] .ai-panel, html[data-motion="reduce"] .ai-msg { transition: none; animation: none; }
+/* Panels you read over other content: solid surface on phones (no blur there, so no see-through text) */
+html.lite .ai-panel, html.lite .modal, html.lite .inspector, html.lite .theme-pop, html.lite .palette { background: var(--sheen), var(--solid); }
+/* Keyboard-only hints mean nothing on a phone */
+html.lite .toolbar > .hint, html.lite .kbd { display: none; }
+
+/* Your background editor */
+.proj-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto; gap: var(--s3); align-items: end; padding-bottom: var(--s3); border-bottom: 1px solid var(--hair); }
+.proj-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.sticky-save { position: sticky; bottom: var(--s3); z-index: 2; }
+.sticky-save .btn { box-shadow: 0 10px 24px -10px rgba(0,0,0,.4); }
+@media (max-width: 767px) { .proj-row { grid-template-columns: minmax(0, 1fr); } .sticky-save { bottom: 96px; } }
+/* Keep sticky save buttons clear of the floating assistant button */
+.sticky-save { padding-right: 72px; }

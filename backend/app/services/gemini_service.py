@@ -863,15 +863,8 @@ Respond ONLY with a JSON object:
 
         stats_summary = ""
         if db_stats:
-            stats_summary = (
-                f"\nLIVE SYSTEM STATE:\n"
-                f"- Total Discovered Jobs: {db_stats.get('total_jobs', 0)}\n"
-                f"- Applications Submitted/Dry Run: {db_stats.get('total_applications', 0)}\n"
-                f"- Applications Today: {db_stats.get('today_applications', 0)} / {db_stats.get('daily_cap', 100)}\n"
-                f"- Pending Actions (Needs You): {db_stats.get('pending_inputs', 0)}\n"
-                f"- Active Interviews: {db_stats.get('active_interviews', 0)}\n"
-                f"- Streak: {db_stats.get('career_streak', 1)} days active\n"
-            )
+            lines = [f"- {k.replace('_', ' ')}: {v}" for k, v in db_stats.items() if v not in ("", [], None)]
+            stats_summary = "\nLIVE STATE (true right now; use these numbers, never invent others):\n" + "\n".join(lines) + "\n"
 
         formatted_history = ""
         for h in history[-5:]:
@@ -886,9 +879,20 @@ Conversation History:
 
 User: {user_message}
 
-Provide a direct, helpful, and motivating response formatted in markdown. Include 2-3 concrete recommended actions for today.
+Answer briefly (under 150 words unless asked for more) in simple markdown (short paragraphs, "- " bullets, **bold**).
+If the user asks what to do, give at most 3 concrete next steps that refer to the app's own screens
+(Home, Needs you, Jobs, Proof, Settings). If something is not in the live state or the candidate facts, say you don't know.
 """
-        response_text = cls._call_model(prompt, system_instruction, json_mode=False)
+        # Never leave the user staring at a spinner: give Gemini 15 s (it sometimes answers 503 and falls back slowly).
+        import concurrent.futures
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        try:
+            response_text = pool.submit(cls._call_model, prompt, system_instruction, False).result(timeout=15)
+        except concurrent.futures.TimeoutError:
+            logger.warning("Assistant: Gemini took longer than 15 s; answering from live data instead.")
+            response_text = None
+        finally:
+            pool.shutdown(wait=False)
         if response_text:
             return {
                 "response": response_text,
@@ -899,13 +903,19 @@ Provide a direct, helpful, and motivating response formatted in markdown. Includ
                 ]
             }
 
+        # No Gemini (no key or offline): a short, true summary from the live state instead of a canned pep talk.
+        st = db_stats or {}
+        bits = []
+        if st.get("open_questions"):
+            bits.append(f"- **{len(st['open_questions'])} question(s) need you** in Needs you.")
+        if st.get("to_triage"):
+            bits.append(f"- **{st['to_triage']} roles to triage** — quick yes or no in Needs you › Triage.")
+        bits.append(f"- **{st.get('queued', 0)} queued**, {st.get('sent_today', 0)} sent today"
+                    + ("" if st.get("live_mode") else " (dry run is on — turn on Live in Settings › Autopilot to really apply)") + ".")
         return {
-            "response": f"### ApplyPilot Career Advisor\n\nYou're making solid progress! With your degree, published research and certifications, your profile stands in the top tier for Data Science and Machine Learning roles.\n\n* **Today's Focus:** Review your pending approvals and tailor your patent highlights for your target roles in Bengaluru and Chennai.\n* **Interview Edge:** Frame your answers around your strongest verified project and patent.",
-            "suggested_actions": [
-                "Review top matched jobs",
-                "Generate interview prep",
-                "Verify Answer Bank entries"
-            ]
+            "response": "Gemini isn't reachable right now, so here's where things stand:\n\n" + "\n".join(bits),
+            "suggested_actions": ["What needs me today?", "Which roles should I prioritise?"],
+            "offline": True,
         }
 
     # ── Troubleshooting during an application ──

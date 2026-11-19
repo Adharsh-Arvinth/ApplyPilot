@@ -151,6 +151,7 @@ def list_jobs(
     work_mode: Optional[str] = Query(None, description="Filter by remote, hybrid, onsite"),
     search: Optional[str] = Query(None, description="Search company, title, or location"),
     min_score: Optional[float] = Query(None, description="Minimum composite fit score"),
+    compact: bool = Query(False, description="List view: leave out detail-only fields (the job sheet loads those itself)"),
     db: Session = Depends(get_db)
 ):
     query = db.query(Job)
@@ -166,7 +167,20 @@ def list_jobs(
             (Job.company.ilike(s)) | (Job.title.ilike(s)) | (Job.location.ilike(s))
         )
     jobs = query.order_by(Job.score.desc(), Job.created_at.desc()).all()
+    if compact:
+        from fastapi.encoders import jsonable_encoder
+        from fastapi.responses import JSONResponse
+        # Bypass the full response model, which would put every dropped field back with a default
+        return JSONResponse(jsonable_encoder([{k: v for k, v in _format_job_out(j).items() if k not in COMPACT_DROP} for j in jobs]))
     return [_format_job_out(j) for j in jobs]
+
+
+# Detail-only fields: the list needs none of them, and they are most of its size
+COMPACT_DROP = {
+    "fit_breakdown", "eligibility_reason", "score_reason", "applications", "required_skills", "matching_skills",
+    "missing_skills", "missing_qualifications", "interview_prep_notes", "company_research_notes",
+    "quality_readiness_notes", "notes", "recruiter_info", "blocked_reason", "description", "experience_required",
+}
 
 @router.get("/jobs/kanban", summary="Get Jobs Grouped for Kanban Board")
 def get_kanban_jobs(db: Session = Depends(get_db)):
