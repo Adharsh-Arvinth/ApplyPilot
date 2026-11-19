@@ -74,13 +74,19 @@
   }
 
   async function run(btn, fn, okMsg) {
-    if (btn) { btn.classList.add('busy'); btn.disabled = true; }
+    // Busy state: the label fades and a spinner takes its place (see .btn.busy in app.css).
+    if (btn) { btn.classList.add('busy'); btn.disabled = true; btn.setAttribute('aria-busy', 'true'); btn.insertAdjacentHTML('beforeend', '<span class="spin" aria-hidden="true"></span>'); }
     try {
       const r = await fn();
       if (okMsg) toast(typeof okMsg === 'function' ? okMsg(r) : okMsg);
       return r;
     } catch (e) { toast(e.message || 'Something went wrong', true); return undefined; }
-    finally { if (btn && btn.isConnected) { btn.classList.remove('busy'); btn.disabled = false; } }
+    finally {
+      if (btn && btn.isConnected) {
+        btn.classList.remove('busy'); btn.disabled = false; btn.removeAttribute('aria-busy');
+        const s = btn.querySelector('.spin'); if (s) s.remove();
+      }
+    }
   }
 
   function confirmModal({ title, body, ok = 'Confirm', danger = false }) {
@@ -188,22 +194,70 @@
     el.innerHTML = html; el.__html = html; return true;
   }
 
-  // Sliding selection pill for nav and segmented controls. It remembers its last
-  // position per control, so it glides from the old item even after a re-render.
+  // Liquid lens for nav, tab bar and segmented controls. It remembers its last position
+  // per control, glides from the old item even after a re-render, and briefly stretches
+  // ("moving") while it travels — position uses `translate`, the stretch uses `scale`,
+  // so the two never fight and both stay on the compositor.
   const glidePos = {};
   function glide(root, key, activeSel = '.on') {
-    if (!root || !root.offsetParent) return;
+    if (!root || !root.getClientRects().length) return;
     let ind = root.querySelector(':scope > .glide');
     const fresh = !ind;
     if (fresh) { ind = document.createElement('i'); ind.className = 'glide'; ind.setAttribute('aria-hidden', 'true'); root.prepend(ind); }
     const on = root.querySelector(activeSel);
     if (!on || !on.offsetWidth) { ind.style.opacity = '0'; return; }
     const to = { x: on.offsetLeft, y: on.offsetTop, w: on.offsetWidth, h: on.offsetHeight };
-    const place = (p) => { ind.style.transform = `translate3d(${p.x}px, ${p.y}px, 0)`; ind.style.width = `${p.w}px`; ind.style.height = `${p.h}px`; };
-    if (fresh) { ind.style.transition = 'none'; place(glidePos[key] || to); void ind.offsetWidth; ind.style.transition = ''; }
+    const from = glidePos[key];
+    const place = (p) => { ind.style.translate = `${p.x}px ${p.y}px`; ind.style.width = `${p.w}px`; ind.style.height = `${p.h}px`; };
+    if (fresh) { ind.style.transition = 'none'; place(from || to); void ind.offsetWidth; ind.style.transition = ''; }
+    if (from && (from.x !== to.x || from.y !== to.y)) {
+      ind.classList.add('moving');
+      clearTimeout(ind.__t); ind.__t = setTimeout(() => ind.classList.remove('moving'), 200);
+    }
     place(to); ind.style.opacity = '1';
     glidePos[key] = to;
   }
+
+  // ───────────────────────── Liquid Glass ─────────────────────────
+  // Edge refraction: a displacement map that is neutral in the middle and ramps at the
+  // rim, so the backdrop bends like light through the edge of a lens. Chromium only
+  // (Chrome, Edge, Android WebView); elsewhere the CSS falls back to frosted blur.
+  function initLiquidGlass() {
+    const ok = !!window.chrome && CSS.supports('backdrop-filter', 'url(#lg-lens) blur(2px)')
+      && !matchMedia('(prefers-reduced-transparency: reduce)').matches;
+    if (!ok) return;
+    const map = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100" viewBox="0 0 200 100" preserveAspectRatio="none">
+      <defs><linearGradient id="r" x1="0" x2="1"><stop offset="0" stop-color="#000"/><stop offset="1" stop-color="#f00"/></linearGradient>
+      <linearGradient id="g" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#000"/><stop offset="1" stop-color="#0f0"/></linearGradient>
+      <filter id="b" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="10"/></filter></defs>
+      <rect width="200" height="100" fill="url(#r)"/><rect width="200" height="100" fill="url(#g)" style="mix-blend-mode:screen"/>
+      <rect x="16" y="14" width="168" height="72" rx="36" fill="#808000" filter="url(#b)"/></svg>`;
+    const href = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(map);
+    document.body.insertAdjacentHTML('beforeend', `<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+      <filter id="lg-lens" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+        <feImage href="${href}" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="map"/>
+        <feDisplacementMap in="SourceGraphic" in2="map" scale="-64" xChannelSelector="R" yChannelSelector="G"/>
+      </filter></svg>`);
+    document.documentElement.classList.add('lg-refract');
+  }
+
+  // Specular highlight that follows the pointer across glass controls (one rAF per frame,
+  // touches only the hovered element's custom properties).
+  const SPEC = '.btn, .search-trigger, .lcd, .filter-chip, .nav-item, .seg button, .mode-switch button';
+  let specEvt = null, specRaf = 0;
+  document.addEventListener('pointermove', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    specEvt = e;
+    if (specRaf) return;
+    specRaf = requestAnimationFrame(() => {
+      specRaf = 0;
+      const el = specEvt.target.closest && specEvt.target.closest(SPEC);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      el.style.setProperty('--mx', `${specEvt.clientX - r.left}px`);
+      el.style.setProperty('--my', `${specEvt.clientY - r.top}px`);
+    });
+  }, { passive: true });
 
   // After every render: sliding pills + accessible names for icon-only controls.
   function enhance(root) {
@@ -227,6 +281,7 @@
       const v = VIEWS.find(x => x.id === id), on = S.view === id, b = id === 'inbox' ? n : 0;
       return `<button class="${on ? 'active' : ''}" data-nav="${id}" ${on ? 'aria-current="page"' : ''}>${icon(v.mobile)}<span>${MOBILE_LABEL[id]}</span>${b ? `<span class="badge">${b > 99 ? '99+' : b}</span>` : ''}</button>`;
     }).join(''));
+    glide($('#tabbar'), 'tab', 'button.active');
   }
 
   function renderEngine() {
@@ -305,7 +360,7 @@
     renderChrome();
     const my = ++viewToken;
     if (changed) S.anim = true;
-    if (changed || !silent) { $('#content').innerHTML = skeleton(); $('#content').scrollTop = 0; S.lastHtml = ''; }
+    if (changed || !silent) { $('#content').innerHTML = skeleton(view); $('#content').scrollTop = 0; S.lastHtml = ''; }
     try { await loaders[view](); }
     catch (e) { if (my === viewToken) $('#content').innerHTML = errorView(e); return; }
     if (my !== viewToken) return;
@@ -323,10 +378,12 @@
     enhance(content);
     afterRender[S.view] && afterRender[S.view]();
   }
-  const skeleton = () => `<div class="view"><div class="view-head"><div class="skel sk-title"></div></div>
-    <div class="kpis">${'<div class="card kpi"><div class="skel sk-line"></div><div class="skel sk-num"></div></div>'.repeat(4)}</div>
-    <div class="grid-today"><div class="card card-b span-8"><div class="skel sk-block"></div></div><div class="card card-b span-4"><div class="skel sk-block"></div></div></div></div>`;
-  const errorView = (e) => `<div class="view"><div class="card"><div class="empty">${icon('cloud_off')}<b>Couldn't reach the ApplyPilot backend</b><span>${esc(e.message)}</span><button class="btn hv" data-act="reload">${icon('refresh')}Try again</button></div></div></div>`;
+  // Loading skeletons shaped like the view that is coming (dashboard vs. list views).
+  const skeleton = (view) => `<div class="view" aria-busy="true"><div class="view-head"><div class="skel sk-title"></div></div>${view === 'today'
+    ? `<div class="kpis">${'<div class="card kpi"><div class="skel sk-line"></div><div class="skel sk-num"></div></div>'.repeat(4)}</div>
+       <div class="grid-today"><div class="card card-b span-8"><div class="skel sk-block"></div></div><div class="card card-b span-4"><div class="skel sk-block"></div></div></div>`
+    : `<div class="card list">${'<div class="skel sk-row"></div>'.repeat(6)}</div>`}</div>`;
+  const errorView = (e) => `<div class="view"><div class="card"><div class="empty error" role="alert">${icon('cloud_off')}<b>Couldn't reach the ApplyPilot backend</b><span>${esc(e.message)}</span><button class="btn hv" data-act="reload">${icon('refresh')}Try again</button></div></div></div>`;
   const emptyCard = (ic, title, text = '', extra = '') => `<div class="card"><div class="empty">${icon(ic)}<b>${title}</b>${text ? `<span>${text}</span>` : ''}${extra}</div></div>`;
 
   // ───────────────────────── View: Today ─────────────────────────
@@ -732,6 +789,9 @@
       <div class="stack">
         <div class="card"><div class="profile-hero">${art(p.full_name, 'lg')}<div class="min0"><h2>${esc(p.full_name)}</h2><div class="muted small">${esc(p.education)} · CGPA ${esc(p.cgpa)}</div></div></div></div>
 
+        <div class="card"><div class="card-h"><span class="card-t">Appearance</span><span class="aside">Saved on this device</span></div>
+          <div class="card-b">${themeSwatches()}</div></div>
+
         <form class="card" data-profile-form="engine"><div class="card-h"><span class="card-t">Engine</span><span class="aside">${st.go_live ? '<span class="chip accent">Live submissions</span>' : '<span class="chip">Dry run</span>'}</span></div>
           <div class="set-list">
             <div class="set-row"><div class="grow">Live submissions<small>${st.go_live ? 'Applications are really submitted to employers.' : 'Forms are filled and screenshotted but never submitted.'}</small></div><button type="button" class="btn sm hv ${st.go_live ? 'danger' : ''}" data-act="${st.go_live ? 'mode-dry' : 'mode-live'}">${st.go_live ? 'Switch to dry run' : 'Go live…'}</button></div>
@@ -1044,7 +1104,8 @@
       S.stats && S.stats.is_paused ? { icon: 'play_arrow', label: 'Resume engine', run: () => actions.resume() } : { icon: 'pause', label: 'Pause engine', run: () => actions.pause() },
       { icon: 'science', label: S.stats && S.stats.go_live ? 'Switch to dry run' : 'Go live…', run: () => setMode(!(S.stats && S.stats.go_live)) },
       { icon: 'backup', label: 'Back up database now', run: () => actions.backup() },
-      { icon: 'contrast', label: 'Toggle light / dark', run: toggleTheme },
+      ...THEMES.map(t => ({ icon: 'palette', label: `Theme: ${t.name}`, hint: themePref() === t.id ? 'Current' : t.note, run: () => setTheme(t.id) })),
+      { icon: 'brightness_auto', label: 'Theme: Match system', hint: themePref() === 'auto' ? 'Current' : '', run: () => setTheme('auto') },
       ...(IN_SHELL ? [{ icon: 'dns', label: 'Phone app: change server', run: () => actions['shell-server']() }] : []),
     ];
     const c = cmds.filter(x => !q || x.label.toLowerCase().includes(q));
@@ -1081,13 +1142,91 @@
   function closePalette() { pal = null; $('#overlay').innerHTML = ''; }
   $('#search-trigger').addEventListener('click', openPalette);
 
-  function toggleTheme() {
-    const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
-    document.documentElement.dataset.theme = next;
-    $('meta[name=theme-color]').content = next === 'light' ? '#F5F4F1' : '#000000';
-    try { localStorage.setItem('ap_theme', next); } catch (e) {}
+  // ───────────────────────── Themes ─────────────────────────
+  // Every colour lives in a [data-theme] block in app.css. The choice is saved in
+  // localStorage (applied before first paint by the inline script in index.html) and
+  // switched with a View Transition cross-fade, so there is no flash between themes.
+  const THEMES = [
+    { id: 'neutral', name: 'Neutral', note: 'Default · light' },
+    { id: 'neutral-dark', name: 'Neutral Dark', note: 'Charcoal' },
+    { id: 'midnight', name: 'Midnight', note: 'Deep blue' },
+    { id: 'rose', name: 'Rose', note: 'Music-inspired accent' },
+  ];
+  const THEME_KEY = 'ap_theme';
+  const LEGACY_THEME = { light: 'neutral', dark: 'rose' };
+  const darkQuery = matchMedia('(prefers-color-scheme: dark)');
+  function themePref() {
+    let p = 'neutral';
+    try { p = localStorage.getItem(THEME_KEY) || 'neutral'; } catch (e) {}
+    p = LEGACY_THEME[p] || p;
+    return p === 'auto' || THEMES.some(t => t.id === p) ? p : 'neutral';
   }
-  $('#theme-btn').addEventListener('click', toggleTheme);
+  const resolveTheme = (p) => p === 'auto' ? (darkQuery.matches ? 'neutral-dark' : 'neutral') : p;
+  function applyTheme(pref, animate = true) {
+    const id = resolveTheme(pref), root = document.documentElement;
+    const swap = () => {
+      root.dataset.theme = id;
+      const m = $('meta[name=theme-color]'); if (m) m.content = getComputedStyle(root).getPropertyValue('--bg').trim();
+    };
+    if (root.dataset.theme === id) return swap();
+    if (animate && document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) document.startViewTransition(swap);
+    else swap();
+  }
+  function setTheme(pref) {
+    try { localStorage.setItem(THEME_KEY, pref); } catch (e) {}
+    applyTheme(pref);
+    syncThemeControls();
+    const t = THEMES.find(x => x.id === resolveTheme(pref));
+    toast(pref === 'auto' ? `Theme follows your system · ${t.name}` : `${t.name} theme`);
+  }
+  darkQuery.addEventListener('change', () => { if (themePref() === 'auto') { applyTheme('auto'); syncThemeControls(); } });
+
+  // Swatches render a live mini-preview using each theme's own tokens (data-theme on the preview).
+  function themeSwatches() {
+    const pref = themePref(), cur = resolveTheme(pref);
+    return `<div class="swatches" role="radiogroup" aria-label="Theme">${THEMES.map(t => `<button class="swatch ${cur === t.id ? 'on' : ''}" role="radio" aria-checked="${pref === t.id}" data-theme-choice="${t.id}">
+      <span class="check">${icon('check')}</span>
+      <span class="preview" data-theme="${t.id}" aria-hidden="true"><span class="p-side"></span><span class="p-main"><span class="p-line"></span><span class="p-line s"></span><span class="p-card"><span class="p-btn"></span></span></span></span>
+      <span class="swatch-name">${t.name}</span><span class="swatch-note">${t.note}</span></button>`).join('')}</div>
+      <label class="theme-row"><span class="grow">Match system<small>Neutral by day, Neutral Dark at night</small></span>
+        <span class="toggle"><input type="checkbox" data-theme-auto ${pref === 'auto' ? 'checked' : ''}><i></i></span></label>`;
+  }
+  function syncThemeControls() {
+    const pref = themePref(), cur = resolveTheme(pref);
+    $$('.swatch').forEach(s => { s.classList.toggle('on', s.dataset.themeChoice === cur); s.setAttribute('aria-checked', String(pref === s.dataset.themeChoice)); });
+    $$('[data-theme-auto]').forEach(c => { c.checked = pref === 'auto'; });
+  }
+  function openThemePop() {
+    if ($('#theme-pop')) { closeThemePop(); return; }
+    document.body.insertAdjacentHTML('beforeend', `<div class="theme-pop" id="theme-pop" role="dialog" aria-label="Appearance">
+      <h3>Appearance</h3><p>Saved on this device.</p>${themeSwatches()}</div>`);
+    $('#theme-btn').setAttribute('aria-expanded', 'true');
+    const first = $('#theme-pop .swatch.on') || $('#theme-pop .swatch'); first && first.focus({ preventScroll: true });
+  }
+  function closeThemePop(restoreFocus = false) {
+    const p = $('#theme-pop'); if (!p) return;
+    p.remove();
+    $('#theme-btn').setAttribute('aria-expanded', 'false');
+    if (restoreFocus) $('#theme-btn').focus({ preventScroll: true });
+  }
+  $('#theme-btn').addEventListener('click', (e) => { e.stopPropagation(); openThemePop(); });
+  document.addEventListener('click', (e) => {
+    const choice = e.target.closest('[data-theme-choice]');
+    if (choice) { setTheme(choice.dataset.themeChoice); return; }
+    if ($('#theme-pop') && !e.target.closest('#theme-pop')) closeThemePop();
+  });
+  document.addEventListener('change', (e) => {
+    if (e.target.matches('[data-theme-auto]')) setTheme(e.target.checked ? 'auto' : resolveTheme('auto'));
+  });
+  // Arrow keys move between swatches; Escape closes the popover.
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && $('#theme-pop')) { e.stopImmediatePropagation(); closeThemePop(true); return; }
+    const sw = e.target.closest && e.target.closest('.swatch');
+    if (!sw || !/^Arrow(Left|Right|Up|Down)$/.test(e.key)) return;
+    e.preventDefault();
+    const all = $$('.swatch', sw.parentElement), step = /Right|Down/.test(e.key) ? 1 : -1;
+    all[(all.indexOf(sw) + step + all.length) % all.length].focus();
+  }, true);
 
   document.addEventListener('keydown', (e) => {
     if (pal) {
@@ -1137,6 +1276,8 @@
 
   // ───────────────────────── Boot ─────────────────────────
   (async () => {
+    applyTheme(themePref(), false);   // pre-paint script set the theme; this syncs the browser chrome colour
+    initLiquidGlass();
     renderChrome();
     const start = location.hash.replace(/^#\/?/, '') || 'today';
     // Inbox counts power the nav badge everywhere, so fetch them alongside the first view.

@@ -1,17 +1,23 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="neutral">
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
-  <meta name="theme-color" content="#0B0B0D"/>
+  <meta name="theme-color" content="#F4F4F2"/>
   <title>ApplyPilot</title>
   <script>
     // Retire legacy Flutter service workers / caches from earlier builds.
     if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister()));
     if ('caches' in window) caches.keys().then(ks => ks.forEach(k => caches.delete(k)));
-    // Apply saved theme before first paint.
-    try { const t = localStorage.getItem('ap_theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+    // Apply the saved theme before first paint (no flash). Neutral is the default.
+    (function () {
+      var themes = ['neutral', 'neutral-dark', 'midnight', 'rose'], legacy = { light: 'neutral', dark: 'rose' }, p = 'neutral';
+      try { p = localStorage.getItem('ap_theme') || 'neutral'; } catch (e) {}
+      p = legacy[p] || p;
+      if (p === 'auto') p = matchMedia('(prefers-color-scheme: dark)').matches ? 'neutral-dark' : 'neutral';
+      document.documentElement.dataset.theme = themes.indexOf(p) >= 0 ? p : 'neutral';
+    })();
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -19,9 +25,10 @@
        Icons: display=block on purpose, so icon names never flash as plain words. -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..24,400..500,0..1,0&display=block"/>
-  <link rel="stylesheet" href="app.css?v=8"/>
+  <link rel="stylesheet" href="app.css?v=12"/>
 </head>
 <body>
+  <div class="ambient" aria-hidden="true"><i></i><i></i><i></i></div>
   <div class="shell">
     <aside class="sidebar" aria-label="Primary">
       <div class="brand">
@@ -37,24 +44,24 @@
 
     <section class="main">
       <header class="topbar">
-        <button class="search-trigger hv" id="search-trigger" aria-label="Search jobs and run commands">
+        <button class="search-trigger hv refract" id="search-trigger" aria-label="Search jobs and run commands">
           <span class="ms" aria-hidden="true">search</span><span class="lbl">Search jobs, run commands…</span><span class="kbd">Ctrl K</span>
         </button>
-        <div class="lcd" id="lcd" role="status" aria-live="polite"></div>
-        <div class="top-actions" id="top-actions"></div>
-        <button class="btn icon ghost hv" id="theme-btn" aria-label="Toggle light and dark" title="Toggle light and dark"><span class="ms" aria-hidden="true">contrast</span></button>
+        <div class="lcd refract" id="lcd" role="status" aria-live="polite"></div>
+        <div class="top-actions capsule refract" id="top-actions"></div>
+        <button class="btn icon theme-btn hv refract" id="theme-btn" aria-label="Appearance" title="Appearance" aria-haspopup="dialog" aria-expanded="false"><span class="ms" aria-hidden="true">palette</span></button>
       </header>
       <main class="content" id="content"></main>
     </section>
   </div>
 
-  <nav class="tabbar" id="tabbar" aria-label="Tabs"></nav>
+  <nav class="tabbar refract" id="tabbar" aria-label="Tabs"></nav>
 
   <div class="scrim" id="scrim"></div>
   <aside class="inspector" id="inspector" aria-label="Job detail"></aside>
   <div id="overlay"></div>
   <div class="toasts" id="toasts" aria-live="polite"></div>
 
-  <script src="app.js?v=8"></script>
+  <script src="app.js?v=12"></script>
 </body>
 </html>
