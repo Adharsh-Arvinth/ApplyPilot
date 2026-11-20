@@ -187,10 +187,10 @@ class _WebShellState extends State<WebShell> {
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             Icon(Icons.cloud_off_outlined, color: _palette.ink2, size: 40),
             const SizedBox(height: 16),
-            Text('Can\'t reach your PC', style: TextStyle(color: _palette.ink, fontSize: 20, fontWeight: FontWeight.w600)),
+            Text('Can\'t reach the server', style: TextStyle(color: _palette.ink, fontSize: 20, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             Text(
-              'Make sure the ApplyPilot backend is running at ${widget.config.serverUrl} and Tailscale is on.',
+              'Couldn\'t connect to ${widget.config.serverUrl}. Check your internet connection and try again.',
               textAlign: TextAlign.center,
               style: TextStyle(color: _palette.ink2, fontSize: 14, height: 1.4),
             ),

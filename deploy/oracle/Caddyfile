@@ -1,0 +1,18 @@
+# ApplyPilot behind HTTPS. Caddy gets and renews the certificate on its own and redirects http -> https.
+__DOMAIN__ {
+	reverse_proxy 127.0.0.1:8000 {
+		# Long-running AI answers and form fills
+		transport http {
+			read_timeout 180s
+		}
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+	request_body {
+		max_size 25MB
+	}
+}

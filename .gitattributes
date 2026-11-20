@@ -1,3 +1,5 @@
 # Windows batch files must use CRLF or cmd.exe misparses them
 *.bat text eol=crlf
 *.cmd text eol=crlf
+*.sh text eol=lf
+deploy/oracle/* text eol=lf

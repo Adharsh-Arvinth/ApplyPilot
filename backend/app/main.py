@@ -1,5 +1,8 @@
+import hmac
 import logging
 import ipaddress
+import time
+from collections import defaultdict, deque
 from pathlib import Path
 from typing import Optional
 from contextlib import asynccontextmanager
@@ -73,6 +76,33 @@ def is_trusted_network(client_host: str) -> bool:
     except Exception:
         return False
 
+# Brute-force guard: an address that sends too many wrong tokens is locked out for a while.
+_FAILS: "defaultdict[str, deque]" = defaultdict(deque)
+FAIL_LIMIT, FAIL_WINDOW = 10, 600  # 10 wrong tokens in 10 minutes → 10 minute lockout
+
+
+def _locked_out(host: str) -> bool:
+    q = _FAILS.get(host)
+    if not q:
+        return False
+    now = time.monotonic()
+    while q and now - q[0] > FAIL_WINDOW:
+        q.popleft()
+    if not q:
+        _FAILS.pop(host, None)
+    return len(q) >= FAIL_LIMIT
+
+
+def _note_failure(host: str) -> None:
+    if len(_FAILS) > 10000:  # never let the table grow without bound
+        _FAILS.clear()
+    _FAILS[host].append(time.monotonic())
+
+
+def token_ok(token: Optional[str]) -> bool:
+    return bool(token) and hmac.compare_digest(token.encode(), settings.APPLYPILOT_TOKEN.encode())
+
+
 def extract_token(request: Request) -> Optional[str]:
     # 1. Bearer token in Authorization header
     auth_header = request.headers.get("Authorization", "")
@@ -98,9 +128,9 @@ def extract_token(request: Request) -> Optional[str]:
 
 @app.middleware("http")
 async def security_and_token_middleware(request: Request, call_next):
-    # 1. IP / Interface check: localhost and Tailscale mesh only
+    # 1. Network check: localhost and Tailscale only, unless this is the public HTTPS server
     client_host = request.client.host if request.client else ""
-    if not is_trusted_network(client_host):
+    if not settings.PUBLIC_ACCESS and not is_trusted_network(client_host):
         logger.warning(f"Rejected request from untrusted interface/IP: {client_host}")
         return JSONResponse(
             status_code=403,
@@ -108,8 +138,9 @@ async def security_and_token_middleware(request: Request, call_next):
         )
 
     # 2. Token Authentication on EVERY route including /app, /output, and /api
+    if _locked_out(client_host):
+        return JSONResponse(status_code=429, content={"detail": "Too many wrong tokens. Try again in a few minutes."})
     token = extract_token(request)
-    valid_token = settings.APPLYPILOT_TOKEN
     
     if not token:
         logger.warning(f"Unauthorized request to {request.url.path} from {client_host}: missing token.")
@@ -135,7 +166,8 @@ async def security_and_token_middleware(request: Request, call_next):
             content={"detail": "Unauthorized: Valid ApplyPilot login token required."}
         )
 
-    if token != valid_token:
+    if not token_ok(token):
+        _note_failure(client_host)
         logger.warning(f"Forbidden request to {request.url.path} from {client_host}: invalid token.")
         if request.url.path.startswith("/app"):
             return HTMLResponse(
@@ -167,13 +199,14 @@ async def security_and_token_middleware(request: Request, call_next):
             response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         elif path.endswith((".html", "/")):
             response.headers["Cache-Control"] = "no-cache"
-    if token == valid_token and (request.query_params.get("token") or not request.cookies.get("applypilot_token")):
+    if request.query_params.get("token") or not request.cookies.get("applypilot_token"):
         response.set_cookie(
             key="applypilot_token",
             value=token,
             path="/",
             httponly=True,
             samesite="lax",
+            secure=request.url.scheme == "https",
             max_age=86400 * 30
         )
     return response

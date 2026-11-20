@@ -1286,8 +1286,8 @@
       'Press Ctrl+K (or /) to search jobs and run any command.',
       'Press 1–6 to jump between sections and Esc to close panels.'] },
     { id: 'phone', icon: 'smartphone', title: 'Using the phone app', steps: [
-      'Install the APK and keep Tailscale on, on both your PC and phone.',
-      'Enter your PC’s Tailscale address and token once — the app remembers them.',
+      'Install the APK — it works on Wi-Fi or mobile data, no VPN or extra app needed.',
+      'Enter the server address and your token once — the app remembers them.',
       'Everything here works on the phone, and the bars follow your theme.'] },
     { id: 'safety', icon: 'shield', title: 'Safety rails', steps: [
       'Live submissions stay off until you turn them on.',

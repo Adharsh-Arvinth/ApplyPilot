@@ -30,6 +30,32 @@ def test_security_untrusted_ip_rejected():
     assert "Forbidden" in res.json()["detail"]
     assert "Tailscale" in res.json()["detail"]
 
+def test_public_server_accepts_any_network_but_still_needs_the_token(monkeypatch):
+    """On the public HTTPS server (PUBLIC_ACCESS) any address may connect, but only with the token."""
+    import backend.app.main as main
+    monkeypatch.setattr(settings, "PUBLIC_ACCESS", True)
+    main._FAILS.clear()
+    phone = TestClient(app, client=("198.51.100.56", 50000))
+    assert phone.get("/api/v1/health", headers=AUTH_HEADERS).status_code == 200
+    stranger = TestClient(app, client=("198.51.100.59", 50000))
+    assert stranger.get("/api/v1/health").status_code == 401
+    assert stranger.get("/api/v1/health", headers={"Authorization": "Bearer wrong"}).status_code == 403
+
+
+def test_wrong_tokens_lock_the_address_out(monkeypatch):
+    """Guessing tokens from one address gets it locked out — even the right token then waits."""
+    import backend.app.main as main
+    monkeypatch.setattr(settings, "PUBLIC_ACCESS", True)
+    main._FAILS.clear()
+    guesser = TestClient(app, client=("198.51.100.57", 50000))
+    for _ in range(main.FAIL_LIMIT):
+        assert guesser.get("/api/v1/health", headers={"Authorization": "Bearer guess"}).status_code == 403
+    assert guesser.get("/api/v1/health", headers=AUTH_HEADERS).status_code == 429
+    # other addresses are unaffected
+    assert TestClient(app, client=("198.51.100.58", 50000)).get("/api/v1/health", headers=AUTH_HEADERS).status_code == 200
+    main._FAILS.clear()
+
+
 def test_security_missing_token_rejected_on_all_routes():
     """Every route including /app, /output, and /api requires the login token."""
     # 1. /app without token

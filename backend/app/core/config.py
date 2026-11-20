@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     APPLYPILOT_HOST: str = "0.0.0.0"
     APPLYPILOT_PORT: int = 8000
     APPLYPILOT_TOKEN: str = "applypilot_dev_token_insecure_replace_in_env"
+    # Public server (HTTPS reverse proxy in front, e.g. Caddy on Oracle Cloud): accept any network, token still required.
+    # Off = only this machine and the Tailscale network can connect.
+    PUBLIC_ACCESS: bool = False
     APPLYPILOT_ENCRYPTION_KEY: str = "ECvqzWXsliXT4qtOZoppgQGIJcC2HuLTGEB8w2FBbnI="
     CLAUDE_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None

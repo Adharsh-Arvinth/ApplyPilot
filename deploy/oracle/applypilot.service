@@ -1,18 +1,22 @@
 [Unit]
 Description=ApplyPilot backend (API, cockpit, autopilot)
-After=network-online.target tailscaled.service
+After=network-online.target
 Wants=network-online.target
 
 [Service]
 User=__USER__
 WorkingDirectory=/opt/applypilot
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/opt/applypilot/venv/bin/python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --log-level info
+# Public over HTTPS: Caddy terminates TLS and forwards to this local-only port; the token guards every route
+Environment=PUBLIC_ACCESS=true
+ExecStart=/opt/applypilot/venv/bin/python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips 127.0.0.1 --log-level info
 Restart=always
 RestartSec=5
 # Keep the server responsive: the autopilot's browser never starves the API
 Nice=5
 MemoryMax=16G
+NoNewPrivileges=true
+PrivateTmp=true
 
 [Install]
 WantedBy=multi-user.target

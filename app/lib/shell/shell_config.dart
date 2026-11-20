@@ -65,7 +65,7 @@ class ShellConfig {
       if (res.statusCode == 401 || res.statusCode == 403) return 'The server rejected this token.';
       return 'The server answered with HTTP ${res.statusCode}.';
     } catch (_) {
-      return 'Couldn\'t reach $base. Check that the backend is running and Tailscale is connected on both devices.';
+      return 'Couldn\'t reach $base. Check your internet connection and the server address.';
     }
   }
 }

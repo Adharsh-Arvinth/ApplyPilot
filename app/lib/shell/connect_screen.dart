@@ -80,10 +80,10 @@ class _ConnectScreenState extends State<ConnectScreen> {
                 TextButton(onPressed: widget.onCancel, child: const Text('Cancel', style: TextStyle(color: ShellColors.ink2))),
             ]),
             const SizedBox(height: 28),
-            const Text('Connect to\nyour PC', style: TextStyle(color: ShellColors.ink, fontSize: 32, height: 1.1, fontWeight: FontWeight.w600, letterSpacing: -0.8)),
+            const Text('Connect to\nyour server', style: TextStyle(color: ShellColors.ink, fontSize: 32, height: 1.1, fontWeight: FontWeight.w600, letterSpacing: -0.8)),
             const SizedBox(height: 10),
             const Text(
-              'ApplyPilot runs on your always-on PC. Enter its Tailscale address and the token from backend/.env.',
+              'Enter your ApplyPilot server address and your token. You only do this once.',
               style: TextStyle(color: ShellColors.ink2, fontSize: 15, height: 1.4),
             ),
             const SizedBox(height: 28),
@@ -97,7 +97,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
             const SizedBox(height: 6),
             const Padding(
               padding: EdgeInsets.only(left: 4),
-              child: Text('e.g. http://100.64.0.1:8000', style: TextStyle(color: ShellColors.ink3, fontSize: 12)),
+              child: Text('e.g. https://your-server.sslip.io', style: TextStyle(color: ShellColors.ink3, fontSize: 12)),
             ),
             const SizedBox(height: 16),
             TextField(
