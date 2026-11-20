@@ -25,6 +25,10 @@ a Windows notification and leaves `ApplyPilot server.txt` on the Desktop. It is 
 the Windows Startup folder and stops for good once the server is set up. To switch over for real:
 `bash deploy/oracle/switch_over.sh` (copies your latest data and turns the server's autopilot on; close the PC backend first).
 
+**While the PC is off:** the always-free micro VM runs the same script with `--create-only` as a systemd service
+(`applypilot-grab`, program in `/opt/apgrab` because SELinux blocks services from home folders). When it gets the
+server, the PC's script finds it by name at the next login and installs it.
+
 ## 2. Install (from this PC, Git Bash, repo root)
 ```bash
 bash deploy/oracle/push.sh ubuntu@<public-ip> --with-data   # code + your data (once)

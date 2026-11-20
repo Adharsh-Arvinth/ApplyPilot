@@ -241,19 +241,21 @@ def main():
     ap.add_argument("--disk", type=int, default=100)
     ap.add_argument("--open-ports", action="store_true")
     ap.add_argument("--log", help="append output to this file (for running hidden at login)")
+    ap.add_argument("--create-only", action="store_true",
+                    help="only get the server (e.g. from the always-on micro VM); the PC installs it at its next login")
     a = ap.parse_args()
 
     if a.log:
         f = open(a.log, "a", encoding="utf-8", buffering=1)
         sys.stdout = sys.stderr = f
-    if not a.open_ports and load_state().get("deployed"):
+    if not a.open_ports and (load_state().get("deployed") or (a.create_only and load_state().get("public_ip"))):
         log(f"Server already set up ({load_state().get('url')}); nothing to do.")
         return
     if not single_instance():
         log("Another copy is already asking Oracle; this one exits.")
         return
     st = load_state()
-    if not a.open_ports and st.get("public_ip"):
+    if not a.open_ports and not a.create_only and st.get("public_ip"):
         log(f"Server exists at {st['public_ip']} but isn't set up yet; setting it up now.")
         finish(st["public_ip"])
         return
@@ -316,7 +318,9 @@ def main():
     open_web_ports(net, subnet)
     save_state(name=NAME, id=inst.id, public_ip=ip, shape=inst.shape, created=str(inst.time_created))
     log(f"READY  {NAME} is running at {ip}  (saved to {STATE_FILE})")
-    if not a.open_ports:
+    if a.create_only:
+        log("Created. The PC sets it up at its next login (it finds the server by name).")
+    elif not a.open_ports:
         notify("ApplyPilot: got the free Oracle server!", f"Server {ip} created. Installing everything now (about 20 minutes)...")
         finish(ip)
 
