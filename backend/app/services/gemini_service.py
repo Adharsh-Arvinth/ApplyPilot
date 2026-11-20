@@ -503,7 +503,8 @@ Respond ONLY with a JSON object matching this schema:
         mode = LocalAI.status()["mode"]
         client = cls.get_client() if mode != "local" else None
         if not client:
-            return LocalAI.chat(prompt, system_instruction, json_mode, timeout=max(timeout, 20))
+            # Local models write long text more slowly than Gemini: give them 50% more time (at least 30 s)
+            return LocalAI.chat(prompt, system_instruction, json_mode, timeout=max(timeout * 1.5, 30))
         started = time.time()
 
         # Check prompt cache
@@ -927,14 +928,23 @@ Respond ONLY with a JSON object:
         return {"cover_letter": text.strip(), "source": "gemini"}
 
     @classmethod
-    def chat_career_advisor(
-        cls,
-        user_message: str,
-        history: List[Dict[str, str]],
-        profile_dict: Optional[Dict[str, Any]] = None,
-        db_stats: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
-        """Contextual conversational career copilot with live application statistics and actionable recommendations."""
+    def chat_prompt(cls, user_message: str, history: List[Dict[str, str]], db_stats: Optional[Dict[str, Any]] = None,
+                    compact: bool = False) -> Tuple[str, str]:
+        """The assistant's grounded (system, prompt) pair. `compact` trims it for small on-device models."""
+        if compact:
+            system = ("You are ApplyPilot's assistant inside a job-search app. Use ONLY the candidate facts and live state "
+                      "given; never invent numbers, employers or credentials. Answer in under 120 words with short "
+                      "'- ' bullets when listing. Refer to the app's screens: Home, Needs you, Jobs, Proof, Settings.\n"
+                      f"{CANDIDATE_FACTS}")
+            state = ""
+            if db_stats:
+                state = "LIVE STATE:\n" + "\n".join(f"- {k.replace('_', ' ')}: {v}" for k, v in db_stats.items() if v not in ("", [], None))
+            past = "\n".join(f"{'User' if h.get('role') == 'user' else 'Assistant'}: {h.get('content', '')[:400]}" for h in history[-4:])
+            return system, f"{state}\n\n{past}\nUser: {user_message}".strip()
+        return cls._chat_prompt_full(user_message, history, db_stats)
+
+    @classmethod
+    def _chat_prompt_full(cls, user_message: str, history: List[Dict[str, str]], db_stats: Optional[Dict[str, Any]] = None) -> Tuple[str, str]:
         system_instruction = (
             "You are ApplyPilot AI, the user's elite autonomous career copilot and job search strategist. "
             f"{CANDIDATE_FACTS}\n"
@@ -965,6 +975,18 @@ Answer briefly (under 150 words unless asked for more) in simple markdown (short
 If the user asks what to do, give at most 3 concrete next steps that refer to the app's own screens
 (Home, Needs you, Jobs, Proof, Settings). If something is not in the live state or the candidate facts, say you don't know.
 """
+        return system_instruction, prompt
+
+    @classmethod
+    def chat_career_advisor(
+        cls,
+        user_message: str,
+        history: List[Dict[str, str]],
+        profile_dict: Optional[Dict[str, Any]] = None,
+        db_stats: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Contextual conversational career copilot with live application statistics and actionable recommendations."""
+        system_instruction, prompt = cls._chat_prompt_full(user_message, history, db_stats)
         # Never leave the user staring at a spinner: give Gemini 15 s (it sometimes answers 503 and falls back slowly).
         import concurrent.futures
         pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)

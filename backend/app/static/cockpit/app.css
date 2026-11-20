@@ -1299,3 +1299,7 @@ html.lite .toolbar > .hint, html.lite .kbd { display: none; }
 /* A closed panel must be gone, not just transparent (it was swallowing taps underneath it) */
 [hidden] { display: none !important; }
 .ai-panel:not(.on) { pointer-events: none; }
+
+/* On-device AI */
+#device-progress:empty { display: none; }
+.ai-msg.assistant.device::after { content: 'on this phone'; display: block; margin-top: 6px; font-size: .6875rem; color: var(--ink-3); }

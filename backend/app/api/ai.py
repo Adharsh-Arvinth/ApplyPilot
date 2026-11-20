@@ -59,13 +59,8 @@ def get_ai_status(token: str = Depends(verify_token)):
     return GeminiService.get_model_status()
 
 
-@router.post("/chat")
-def chat_with_advisor(
-    req: ChatRequest,
-    db: Session = Depends(get_db),
-    token: str = Depends(verify_token)
-):
-    """Conversational assistant powered by Gemini, grounded in your facts and the live database."""
+def _assistant_state(db: Session, req: "ChatRequest"):
+    """Live numbers and context the assistant is grounded in (shared by Gemini and on-device answers)."""
     import datetime
     from backend.app.models import EmailProof
     profile = db.query(Profile).first()
@@ -103,6 +98,17 @@ def chat_with_advisor(
                      f"{(open_job.score_reason or '')[:300]}") if open_job else "",
     }
 
+    return profile_dict, db_stats
+
+
+@router.post("/chat")
+def chat_with_advisor(
+    req: ChatRequest,
+    db: Session = Depends(get_db),
+    token: str = Depends(verify_token)
+):
+    """Conversational assistant powered by Gemini, grounded in your facts and the live database."""
+    profile_dict, db_stats = _assistant_state(db, req)
     result = GeminiService.chat_career_advisor(
         user_message=req.message,
         history=req.history,
@@ -309,3 +315,12 @@ def local_ai_pull(body: Dict[str, Any] = None, token: str = Depends(verify_token
         return LocalAI.start_pull((body or {}).get("model"))
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+
+@router.post("/chat-prompt")
+def chat_prompt_for_device(req: ChatRequest, db: Session = Depends(get_db), token: str = Depends(verify_token)):
+    """The assistant's grounded prompt for the phone's own model: the server builds it (cheap), the phone answers."""
+    _profile, db_stats = _assistant_state(db, req)
+    system, prompt = GeminiService.chat_prompt(req.message, req.history, db_stats, compact=True)
+    return {"system": system, "prompt": prompt}

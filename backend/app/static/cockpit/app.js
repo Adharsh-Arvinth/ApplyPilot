@@ -1524,7 +1524,7 @@
           <div class="card-b"><ol class="steps">${TUTORIALS.find(t => t.id === 'email').steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol></div></details></div>`;
     }
 
-    if (sec === 'ai') return `<div class="stack">${freeAICard()}${geminiKeyCard()}<form class="card" data-gemini-form><div class="card-h"><span class="card-t">AI answers</span><span class="aside tnum">${fmt(g.gemini_answers_today || 0)} today · ~${fmt(g.saved_minutes || 0)} min saved</span></div>
+    if (sec === 'ai') return `<div class="stack">${deviceCard()}${freeAICard()}${geminiKeyCard()}<form class="card" data-gemini-form><div class="card-h"><span class="card-t">AI answers</span><span class="aside tnum">${fmt(g.gemini_answers_today || 0)} today · ~${fmt(g.saved_minutes || 0)} min saved</span></div>
         <div class="set-list"><label class="set-row hv"><div class="grow">Draft answers for new questions<small>Grounded only in your verified facts. Drafts wait in Needs you › AI drafts.</small></div><span class="toggle"><input type="checkbox" name="gemini_auto_answer_enabled" ${g.gemini_auto_answer_enabled ? 'checked' : ''}><i></i></span></label></div>
         <div class="card-b form-grid card-sep">
           <div class="field"><label for="g-conf">Minimum confidence</label><div class="range-row"><input type="range" id="g-conf" name="gemini_min_confidence" min="0.5" max="1" step="0.01" value="${g.gemini_min_confidence ?? 0.85}"><output>${Math.round((g.gemini_min_confidence ?? 0.85) * 100)}%</output></div></div>
@@ -1554,7 +1554,9 @@
     if (S.set.section === 'answers') afterRender.answers();
     const preset = $('[data-cloud-preset]');
     if (preset) preset.addEventListener('change', () => { const p = CLOUD_PRESETS.find(x => x[0] === preset.value); if (p && p[0]) { $('#la-curl').value = p[0]; $('#la-cmodel').value = p[2]; } });
-    if (S.set.section === 'ai') watchLocalPull();
+    if (S.set.section === 'ai') { watchLocalPull(); if (IN_SHELL && !S.device) refreshDevice(); drawDeviceProgress(); }
+    const dp = $('[data-device-pref]');
+    if (dp) dp.addEventListener('change', () => { try { localStorage.setItem(DEVICE_PREF, dp.checked ? '1' : '0'); } catch (e) {} });
     const pic = $('#avatar-file');
     if (pic) pic.addEventListener('change', () => pic.files[0] && uploadAvatar(pic.files[0]));
     const input = $('#resume-file'), zone = $('[data-dropzone]');
@@ -1813,6 +1815,17 @@
       S.answers = S.answers.filter(x => x.id !== id); render();
     },
     async backup(btn) { await run(btn, () => api('/backup', { method: 'POST' }), 'Backup created'); },
+    async 'device-download'(btn) {
+      const mobile = !!($('#device-mobile') && $('#device-mobile').checked);
+      try { await deviceAI('download', { model: btn.dataset.model, allowMobileData: mobile }); await refreshDevice(); toast('Downloading — you can keep using the app'); }
+      catch (e) { toast(e.message, true); }
+    },
+    async 'device-cancel'() { try { await deviceAI('cancel'); } catch (e) {} setTimeout(refreshDevice, 600); },
+    async 'device-delete'(btn) {
+      const ok = await confirmModal({ title: 'Delete the on-device model?', body: 'Frees its storage. The assistant will use the online AI until you download it again.', ok: 'Delete', danger: true });
+      if (!ok) return;
+      try { await deviceAI('delete', { model: btn.dataset.model }); setTimeout(refreshDevice, 500); toast('Model deleted'); } catch (e) { toast(e.message, true); }
+    },
     async 'local-ai-pull'(btn) {
       try { await api('/ai/local/pull', { method: 'POST', body: {} }); S.localAI = await api('/ai/local'); S.lastHtml = ''; render(); watchLocalPull(); toast('Downloading the free model — you can keep using the app'); }
       catch (e) { toast(e.message, true); }
@@ -2219,6 +2232,71 @@
   }
 
 
+
+  // ───────────────────────── On-device AI (the phone's own model, via the Android app) ─────────────────────────
+  // The server builds the grounded prompt (cheap); the phone's model writes the answer (free, private, offline-capable).
+  const DEVICE_PREF = 'ap_device_ai';
+  const devicePending = {}; let deviceSeq = 0; let deviceStream = null;
+  S.device = null;
+  const deviceAI = (op, args = {}) => new Promise((resolve, reject) => {
+    if (!IN_SHELL) { reject(new Error('Only in the Android app')); return; }
+    const id = String(++deviceSeq);
+    devicePending[id] = { resolve, reject };
+    window.ApplyPilotShell.postMessage('ai:' + JSON.stringify({ id, op, args }));
+    if (op !== 'generate') setTimeout(() => { if (devicePending[id]) { delete devicePending[id]; reject(new Error('No answer from the app')); } }, 15000);
+  });
+  window.__apAIReply = (r) => { const p = devicePending[r.id]; if (!p) return; delete devicePending[r.id]; r.ok ? p.resolve(r.result) : p.reject(new Error(r.error || 'On-device AI failed')); };
+  window.__apAIEvent = (e) => {
+    if (e.type === 'token' && deviceStream && e.data && e.data.id === deviceStream.id) deviceStream.onToken(e.data.text || '');
+    if (e.type === 'download' && S.device) {
+      S.device.download = e.data;
+      if (e.data.status === 'done' || e.data.status === 'idle' || e.data.status === 'error') refreshDevice();
+      else if (S.view === 'settings' && S.set.section === 'ai') drawDeviceProgress();
+    }
+  };
+  async function refreshDevice(draw = true) {
+    if (!IN_SHELL) return null;
+    try { S.device = await deviceAI('status'); } catch (e) { S.device = { unavailable: true, error: e.message }; }
+    if (draw && S.view === 'settings' && S.set.section === 'ai') { S.lastHtml = ''; render(); }
+    return S.device;
+  }
+  const devicePrefOn = () => { try { return localStorage.getItem(DEVICE_PREF) !== '0'; } catch (e) { return true; } };
+  const deviceReady = () => !!(S.device && !S.device.unavailable && devicePrefOn() && (S.device.models || []).some(m => m.installed && m.fits));
+  function drawDeviceProgress() {
+    const d = (S.device && S.device.download) || {}, el = $('#device-progress');
+    if (!el || d.status !== 'downloading') return;
+    const pct = d.total ? Math.round(d.done / d.total * 100) : 0;
+    el.innerHTML = `<div class="bar thin"><i style="width:${pct}%"></i></div><span class="small faint tnum">Downloading · ${pct}% · ${Math.round((d.done || 0) / 1048576)} of ${Math.round((d.total || 0) / 1048576)} MB</span>`;
+  }
+  function deviceCard() {
+    if (!IN_SHELL) return '';
+    const D = S.device;
+    if (!D) return `<section class="card"><div class="card-h"><span class="card-t">AI on this phone</span><span class="aside">Checking…</span></div></section>`;
+    if (D.unavailable) return `<section class="card"><div class="card-h"><span class="card-t">AI on this phone</span><span class="aside"><span class="dot slate"></span>Needs the latest app</span></div>
+      <div class="card-b"><p class="muted small">Update the ApplyPilot app to run AI directly on this phone.</p></div></section>`;
+    if (!D.supported) return `<section class="card"><div class="card-h"><span class="card-t">AI on this phone</span><span class="aside"><span class="dot slate"></span>Not enough memory</span></div>
+      <div class="card-b"><p class="muted small">This phone has ${D.ram_gb} GB of memory — too little to run a model smoothly, so the online AI is used instead.</p></div></section>`;
+    const dl = D.download || {}, busy = dl.status === 'downloading';
+    const installed = (D.models || []).filter(m => m.installed);
+    const state = installed.length ? ['teal', `Ready · ${esc(installed[0].name)}${D.loaded ? ` · ${D.backend === 'gpu' ? 'graphics chip' : 'processor'}` : ''}`] : ['slate', 'Not downloaded'];
+    const row = (m) => `<div class="set-row"><div class="grow">${esc(m.name)}${m.recommended ? ' <span class="chip teal">Best for this phone</span>' : ''}
+        <small>${m.size_mb} MB${m.fits ? '' : ' · needs more memory than this phone has'}</small></div>
+      ${m.installed ? `<button type="button" class="btn sm ghost hv" data-act="device-delete" data-model="${m.id}">Delete</button>`
+        : `<button type="button" class="btn sm hv ${m.recommended ? 'primary' : ''}" data-act="device-download" data-model="${m.id}" ${!m.fits || busy ? 'disabled' : ''}>${icon('download')}Download</button>`}</div>`;
+    return `<section class="card"><div class="card-h"><span class="card-t">AI on this phone</span><span class="aside"><span class="dot ${state[0]}"></span>${state[1]}</span></div>
+      <div class="card-b stack">
+        <p class="muted small">Runs the assistant right on your phone — free, private and works offline. It only uses memory while answering and is released a minute later, so it won't slow your phone down.</p>
+        <span class="faint small">This phone: ${D.ram_gb} GB memory · ${Math.round(D.free_mb / 1024 * 10) / 10} GB free right now${D.wifi ? ' · on Wi-Fi' : ' · on mobile data'}</span>
+      </div>
+      <div class="set-list card-sep">${(D.models || []).map(row).join('')}</div>
+      <div class="card-b stack">
+        <div id="device-progress">${busy ? '' : (dl.status === 'error' ? `<p class="small bad">${esc(dl.error || 'Download failed')}</p>` : '')}</div>
+        ${busy ? `<div class="row-end"><button type="button" class="btn sm ghost hv" data-act="device-cancel">Cancel download</button></div>` : ''}
+        <label class="set-row hv bordered"><span class="grow">Allow downloads on mobile data<small>Off: models download on Wi-Fi only</small></span><span class="toggle"><input type="checkbox" id="device-mobile"><i></i></span></label>
+        <label class="set-row hv bordered"><span class="grow">Use it for the assistant<small>Falls back to the online AI if the phone is busy or low on memory</small></span><span class="toggle"><input type="checkbox" data-device-pref ${devicePrefOn() ? 'checked' : ''}><i></i></span></label>
+      </div></section>`;
+  }
+
   // ───────────────────────── Assistant (always one tap away) ─────────────────────────
   // A floating ✦ button on every screen opens a chat that knows your facts, live numbers and
   // what you are looking at (Home, a job, Proof…). Ctrl/⌘ + I toggles it on desktop.
@@ -2255,7 +2333,7 @@
   document.body.appendChild(panel);
   let aiBusy = false;
   function drawChat() {
-    const msgs = S.chat.map(m => `<div class="ai-msg ${m.role}">${m.role === 'user' ? `<p>${esc(m.content)}</p>` : md(m.content)}</div>`).join('');
+    const msgs = S.chat.map(m => `<div class="ai-msg ${m.role}${m.device ? ' device' : ''}">${m.role === 'user' ? `<p>${esc(m.content)}</p>` : md(m.content)}</div>`).join('');
     const empty = `<div class="ai-empty"><div class="ai-orb">${icon('auto_awesome', 'fill')}</div><b>${esc(greeting())}</b><span>Ask anything about your search. I only use your verified facts and the app's live data.</span></div>`;
     panel.innerHTML = `<header class="ai-head"><span class="ai-title">${icon('auto_awesome', 'fill')}Assistant</span>
         ${S.chat.length ? `<button class="btn sm ghost hv" data-ai="clear">New chat</button>` : ''}
@@ -2283,9 +2361,30 @@
     if (!text || aiBusy) return;
     S.chat.push({ role: 'user', content: text }); aiBusy = true; drawChat();
     try {
-      const timeout = new Promise((_, no) => setTimeout(() => no(new Error('it took too long — please try again')), 25000));
-      const r = await Promise.race([timeout, api('/ai/chat', { method: 'POST', body: { message: text, history: S.chat.slice(-9, -1), view: S.view, job_id: S.job ? S.job.id : null } })]);
-      S.chat.push({ role: 'assistant', content: r.response || 'No answer this time.' });
+      const body = { message: text, history: S.chat.slice(-9, -1).map(m => ({ role: m.role, content: String(m.content || '') })), view: S.view, job_id: S.job ? S.job.id : null };
+      let answer = null;
+      if (IN_SHELL && !S.device) await refreshDevice(false);
+      if (deviceReady()) {
+        try {
+          const p = await api('/ai/chat-prompt', { method: 'POST', body });
+          const msg = { role: 'assistant', content: '', device: true };
+          S.chat.push(msg); aiBusy = false; drawChat();
+          const id = 'chat' + Date.now();
+          deviceStream = { id, onToken: (t) => { msg.content += t; const last = $$('#ai-body .ai-msg.assistant'); const el = last[last.length - 1]; if (el) { el.innerHTML = md(msg.content.replace(/<think>[\s\S]*?(<\/think>|$)/g, '')); $('#ai-body').scrollTop = 1e9; } } };
+          answer = await deviceAI('generate', { id, system: p.system, prompt: p.prompt, temperature: 0.5 });
+          msg.content = answer || msg.content;
+          deviceStream = null;
+        } catch (e) {
+          deviceStream = null;
+          if (S.chat.length && S.chat[S.chat.length - 1].device && !S.chat[S.chat.length - 1].content) S.chat.pop();
+          answer = null; aiBusy = true; drawChat();
+        }
+      }
+      if (answer == null) {
+        const timeout = new Promise((_, no) => setTimeout(() => no(new Error('it took too long — please try again')), 25000));
+        const r = await Promise.race([timeout, api('/ai/chat', { method: 'POST', body })]);
+        S.chat.push({ role: 'assistant', content: r.response || 'No answer this time.' });
+      }
     } catch (e) { S.chat.push({ role: 'assistant', content: `Couldn't reach the assistant: ${e.message}` }); }
     aiBusy = false; drawChat();
     const i = $('#ai-input'); i && matchMedia('(pointer: fine)').matches && i.focus();

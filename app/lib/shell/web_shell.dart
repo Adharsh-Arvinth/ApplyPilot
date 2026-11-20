@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -38,6 +39,7 @@ class _WebShellState extends State<WebShell> {
       ..setBackgroundColor(_palette.bg)
       ..addJavaScriptChannel('ApplyPilotShell', onMessageReceived: (m) {
         if (m.message == 'change-server') { widget.onChangeServer(null); return; }
+        if (m.message.startsWith('ai:')) { _onDeviceAI(m.message.substring(3)); return; }
         final p = ShellPalette.fromMessage(m.message);
         if (p != null) _setPalette(p);
       })
@@ -71,6 +73,36 @@ class _WebShellState extends State<WebShell> {
       platform.setOnShowFileSelector(_pickFiles);
     }
   }
+
+  // ── On-device AI bridge: cockpit → this phone's model (Kotlin, LiteRT-LM) → cockpit ──
+  static const _ai = MethodChannel('applypilot/ondevice_ai');
+  bool _aiWired = false;
+
+  void _wireAI() {
+    if (_aiWired) return;
+    _aiWired = true;
+    // Download progress and streamed words flow back to the page as they happen.
+    _ai.setMethodCallHandler((call) async {
+      _toPage('window.__apAIEvent && window.__apAIEvent(${jsonEncode({'type': call.method, 'data': call.arguments})})');
+    });
+  }
+
+  Future<void> _onDeviceAI(String raw) async {
+    _wireAI();
+    Map<String, dynamic> req;
+    try { req = jsonDecode(raw) as Map<String, dynamic>; } catch (_) { return; }
+    final id = req['id'];
+    try {
+      final result = await _ai.invokeMethod(req['op'] as String, (req['args'] as Map?)?.cast<String, dynamic>() ?? {});
+      _toPage('window.__apAIReply && window.__apAIReply(${jsonEncode({'id': id, 'ok': true, 'result': result})})');
+    } on PlatformException catch (e) {
+      _toPage('window.__apAIReply && window.__apAIReply(${jsonEncode({'id': id, 'ok': false, 'error': e.message ?? 'On-device AI failed'})})');
+    } on MissingPluginException {
+      _toPage('window.__apAIReply && window.__apAIReply(${jsonEncode({'id': id, 'ok': false, 'error': 'On-device AI is not available in this app version'})})');
+    }
+  }
+
+  void _toPage(String js) { if (mounted) _web.runJavaScript(js); }
 
   Future<List<String>> _pickFiles(FileSelectorParams params) async {
     // Profile picture → the photo picker; resume → documents.

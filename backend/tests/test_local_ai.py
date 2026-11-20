@@ -80,3 +80,13 @@ def test_free_ai_settings_api(fake_ollama):
     client.put("/api/v1/ai/local", headers=AUTH, json={"cloud": {"url": "", "model": "", "clear_key": True}})
     client.cookies.clear()  # earlier calls left the (valid) sign-in cookie
     assert client.get("/api/v1/ai/local").status_code == 401
+
+
+def test_phone_gets_a_compact_grounded_prompt():
+    from backend.app.services.gemini_service import CANDIDATE_FACTS
+    res = client.post("/api/v1/ai/chat-prompt", headers=AUTH, json={"message": "What needs me today?", "history": [{"role": "user", "content": "hi"}], "view": "home"})
+    body = res.json()
+    assert res.status_code == 200 and set(body) == {"system", "prompt"}
+    assert "never invent" in body["system"] and CANDIDATE_FACTS.splitlines()[0] in body["system"]
+    assert "LIVE STATE" in body["prompt"] and body["prompt"].rstrip().endswith("User: What needs me today?")
+    assert len(body["system"]) + len(body["prompt"]) < 6000  # small enough for a small on-device model

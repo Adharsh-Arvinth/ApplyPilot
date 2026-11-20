@@ -47,3 +47,8 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // On-device AI (Google LiteRT-LM): runs a small open model inside the app, no server needed
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.19.1")
+}
