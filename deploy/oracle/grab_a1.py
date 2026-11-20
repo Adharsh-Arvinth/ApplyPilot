@@ -31,7 +31,7 @@ def log(msg: str) -> None:
 def clients():
     cfg = oci.config.from_file()
     oci.config.validate_config(cfg)
-    kw = {"timeout": (15, 90), "retry_strategy": oci.retry.DEFAULT_RETRY_STRATEGY}
+    kw = {"timeout": (15, 90), "retry_strategy": oci.retry.NoneRetryStrategy()}  # we pace retries ourselves
     return (cfg, oci.core.ComputeClient(cfg, **kw), oci.core.VirtualNetworkClient(cfg, **kw),
             oci.identity.IdentityClient(cfg, **kw))
 
