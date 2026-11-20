@@ -22,6 +22,7 @@ class WebShell extends StatefulWidget {
 class _WebShellState extends State<WebShell> {
   late final WebViewController _web;
   bool _loading = true;
+  bool _opening = true; // branded cover until the cockpit's first page has drawn
   String? _error;
   ShellPalette _palette = ShellPalette.neutral;
 
@@ -39,13 +40,19 @@ class _WebShellState extends State<WebShell> {
       ..setBackgroundColor(_palette.bg)
       ..addJavaScriptChannel('ApplyPilotShell', onMessageReceived: (m) {
         if (m.message == 'change-server') { widget.onChangeServer(null); return; }
+        if (m.message.startsWith('token:')) { ShellConfig.save(widget.config.serverUrl, m.message.substring(6)); return; }
         if (m.message.startsWith('ai:')) { _onDeviceAI(m.message.substring(3)); return; }
         final p = ShellPalette.fromMessage(m.message);
         if (p != null) _setPalette(p);
       })
       ..setNavigationDelegate(NavigationDelegate(
         onPageStarted: (_) { if (mounted) setState(() => _loading = true); },
-        onPageFinished: (_) { if (mounted) setState(() => _loading = false); },
+        onPageFinished: (_) {
+          if (!mounted) return;
+          setState(() => _loading = false);
+          // Give the page a moment to paint before lifting the cover, so there's no white flash.
+          Future.delayed(const Duration(milliseconds: 250), () { if (mounted && _opening) setState(() => _opening = false); });
+        },
         onWebResourceError: (e) {
           if (e.isForMainFrame == false) return;
           if (mounted) setState(() { _error = e.description; _loading = false; });
@@ -54,7 +61,7 @@ class _WebShellState extends State<WebShell> {
           final uri = e.request?.uri;
           final code = e.response?.statusCode ?? 0;
           if (uri != null && _sameServer(uri) && uri.path.startsWith('/app') && (code == 401 || code == 403)) {
-            widget.onChangeServer('The server rejected the saved token. Enter the current one from backend/.env.');
+            widget.onChangeServer('Your access key has changed. Sign in again with the new key.');
           }
         },
         onNavigationRequest: (req) {
@@ -172,8 +179,17 @@ class _WebShellState extends State<WebShell> {
                   ),
                 ),
               if (_error != null) _errorView(),
-              if (_loading && _error == null)
+              if (_loading && _error == null && !_opening)
                 Positioned(top: 0, left: 0, right: 0, child: LinearProgressIndicator(minHeight: 2, color: _palette.ink, backgroundColor: Colors.transparent)),
+              IgnorePointer(
+                ignoring: !_opening || _error != null,
+                child: AnimatedOpacity(
+                  opacity: _opening && _error == null ? 1 : 0,
+                  duration: const Duration(milliseconds: 320),
+                  curve: Curves.easeOut,
+                  child: _openingCover(),
+                ),
+              ),
             ]),
           ),
         ),
@@ -181,11 +197,30 @@ class _WebShellState extends State<WebShell> {
     );
   }
 
+  Widget _openingCover() => Container(
+        color: _palette.bg,
+        alignment: Alignment.center,
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          BrandMark(size: 64, dark: _palette.dark),
+          const SizedBox(height: 22),
+          Text('ApplyPilot', style: TextStyle(color: _palette.ink, fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -0.4)),
+          const SizedBox(height: 18),
+          SizedBox(width: 120, child: ClipRRect(
+            borderRadius: BorderRadius.circular(2),
+            child: LinearProgressIndicator(minHeight: 3, color: _palette.ink, backgroundColor: _palette.ink.withValues(alpha: 0.1)),
+          )),
+        ]),
+      );
+
   Widget _errorView() => Center(
         child: Padding(
           padding: const EdgeInsets.all(28),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.cloud_off_outlined, color: _palette.ink2, size: 40),
+            Container(
+              width: 64, height: 64,
+              decoration: BoxDecoration(color: _palette.ink.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(20)),
+              child: Icon(Icons.cloud_off_outlined, color: _palette.ink2, size: 30),
+            ),
             const SizedBox(height: 16),
             Text('Can\'t reach the server', style: TextStyle(color: _palette.ink, fontSize: 20, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
@@ -200,7 +235,7 @@ class _WebShellState extends State<WebShell> {
             ],
             const SizedBox(height: 24),
             FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: _palette.ink, foregroundColor: _palette.bg, minimumSize: const Size(200, 48), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+              style: FilledButton.styleFrom(backgroundColor: _palette.ink, foregroundColor: _palette.bg, minimumSize: const Size(220, 52), shape: const StadiumBorder(), textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               onPressed: _retry,
               child: const Text('Try again'),
             ),

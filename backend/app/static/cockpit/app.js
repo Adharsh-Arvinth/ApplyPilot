@@ -46,6 +46,11 @@
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = (n) => (n ?? 0).toLocaleString('en-IN');
   const icon = (name, cls = '') => `<span class="ms ${cls}" aria-hidden="true">${name}</span>`;
+  async function copyText(text) {
+    try { await navigator.clipboard.writeText(text); return; } catch (e) {}
+    const t = document.createElement('textarea'); t.value = text; t.setAttribute('readonly', ''); t.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(t); t.select(); try { document.execCommand('copy'); } finally { t.remove(); }
+  }
   const initials = (s) => (String(s || '?').replace(/[^A-Za-z0-9 ]/g, ' ').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('') || '?').toUpperCase();
   // Stable hue per company name -> generated "album art" tiles.
   const hue = (s) => { let h = 7; for (const ch of String(s || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h % 360; };
@@ -305,7 +310,7 @@
   let setNavLeft = 0;
   function edgeFade(el) {
     const max = el.scrollWidth - el.clientWidth;
-    const f = max > 1 ? [el.scrollLeft > 1 ? 'l' : '', el.scrollLeft < max - 1 ? 'r' : ''].filter(Boolean).join(' ') : '';
+    const f = max > 8 ? [el.scrollLeft > 8 ? 'l' : '', el.scrollLeft < max - 8 ? 'r' : ''].filter(Boolean).join(' ') : '';
     if ((el.dataset.fade || '') !== f) { if (f) el.dataset.fade = f; else delete el.dataset.fade; }
   }
   function hscroll(root) { $$(HSCROLL, root || document).forEach(edgeFade); }
@@ -695,7 +700,8 @@
     const st = S.stats || {};
     const rows = [
       ['Waiting in queue', st.queue_count || 0, 'pipeline', 'queued'],
-      ['Needs you', st.needs_you_count || 0, 'inbox', ''],
+      ['Questions for you', st.needs_you_count || 0, 'inbox', ''],
+      ['Roles to triage', st.maybe_count || 0, 'inbox', ''],
       ['Dry runs', st.total_dry_run || 0, 'pipeline', 'practice'],
       ['Sent to employers', st.total_submitted_real || 0, 'pipeline', 'submitted'],
       ['Interviews', st.interview_count || 0, 'pipeline', 'interview'],
@@ -888,6 +894,8 @@
   renderers.inbox = () => {
     const I = S.inbox;
     const tabs = [['questions', 'Questions', S.needs.length], ['ai', 'AI drafts', S.aiAnswers.length], ['triage', 'Triage', S.triage.length]];
+    // Open on the first tab that has something, until the user picks one themselves
+    if (!I.chosen && !(tabs.find(t => t[0] === I.tab) || [0, 0, 0])[2]) { const first = tabs.find(t => t[2] > 0); if (first) I.tab = first[0]; }
     const seg = `<div class="seg" role="tablist" data-glide="inbox">${tabs.map(([id, l, n]) => `<button role="tab" aria-selected="${I.tab === id}" class="${I.tab === id ? 'on' : ''}" data-inbox-tab="${id}">${l} <span class="n">${n}</span></button>`).join('')}</div>`;
     const hint = I.tab === 'triage' ? 'Q queue · X dismiss the first card' : I.tab === 'questions' ? 'J / K to move between questions' : '';
     const body = I.tab === 'questions' ? inboxQuestions() : I.tab === 'ai' ? inboxAI() : inboxTriage();
@@ -1543,8 +1551,13 @@
         <div class="set-row"><span class="grow">Back up now<small>Saves the database and Answer bank to the backups folder on your PC</small></span><button class="btn sm hv" data-act="backup">${icon('backup')}Back up</button></div>
       </div>`)}
       ${card('Privacy', '', `<div class="card-b small muted stack">
-        <p>Everything is stored on your own PC. Data leaves it only to: the job sites you apply to, Google Gemini (questions and job text, to draft answers), and Gmail (read-only) if you connect it.</p>
+        <p>Everything is stored on your own ApplyPilot server. Data leaves it only to: the job sites you apply to, Google Gemini (questions and job text, to draft answers), and Gmail (read-only) if you connect it.</p>
         <p>Your email app password is encrypted on disk. Your access token is kept in a secure, script-proof cookie and never shown in the address bar.</p></div>`)}
+      ${card('Sign in on your phone', '', `<div class="set-list">
+        <div class="set-row"><span class="grow">Sign-in link<small>Copy it, open the ApplyPilot app and tap Paste — the server and key fill in together</small></span><button type="button" class="btn sm hv" data-act="copy-signin">${icon('link')}Copy link</button></div>
+        <div class="set-row"><span class="grow">Access key<small>The key that unlocks your server. Keep it private</small></span><button type="button" class="btn sm hv" data-act="copy-key">${icon('key')}Copy key</button></div>
+        <div class="set-row"><span class="grow">New access key<small>Signs out every phone and browser; sign in again with the new key</small></span><button type="button" class="btn sm ghost hv" data-act="rotate-key">${icon('autorenew')}Replace</button></div>
+      </div>`)}
       ${IN_SHELL ? card('Phone app', '', `<div class="set-list"><div class="set-row"><div class="grow">Connected to<small>${esc(location.host)}</small></div><button type="button" class="btn sm hv" data-act="shell-server">Change server</button></div></div>`) : ''}
     </div>`;
   }
@@ -1826,6 +1839,25 @@
       if (!ok) return;
       try { await deviceAI('delete', { model: btn.dataset.model }); setTimeout(refreshDevice, 500); toast('Model deleted'); } catch (e) { toast(e.message, true); }
     },
+    async 'copy-signin'() {
+      try {
+        const r = await api('/profile/phone-sign-in');
+        await copyText(r.link);
+        toast(r.local_only ? 'Copied — but this is a local address; open the cockpit via your server\'s https address for a phone link' : 'Sign-in link copied');
+      } catch (e) { toast(e.message, true); }
+    },
+    async 'copy-key'() {
+      try { const r = await api('/profile/phone-sign-in'); await copyText(r.token); toast('Access key copied'); } catch (e) { toast(e.message, true); }
+    },
+    async 'rotate-key'() {
+      const ok = await confirmModal({ title: 'Replace the access key?', body: 'Every phone and browser is signed out and must sign in with the new key. Use this if your key may have leaked.', ok: 'Replace key', danger: true });
+      if (!ok) return;
+      try {
+        const r = await api('/profile/rotate-token', { method: 'POST' });
+        if (IN_SHELL) window.ApplyPilotShell.postMessage('token:' + r.new_token);
+        location.replace('/app/?token=' + encodeURIComponent(r.new_token) + location.hash);
+      } catch (e) { toast(e.message, true); }
+    },
     async 'local-ai-pull'(btn) {
       try { await api('/ai/local/pull', { method: 'POST', body: {} }); S.localAI = await api('/ai/local'); S.lastHtml = ''; render(); watchLocalPull(); toast('Downloading the free model — you can keep using the app'); }
       catch (e) { toast(e.message, true); }
@@ -1899,8 +1931,8 @@
       e.preventDefault();
       const [base, sub] = nav.dataset.nav.split('/');
       if (nav.dataset.stage) { S.pipe.stage = nav.dataset.stage; S.pipe.limit = 100; }
-      if (nav.dataset.tab) S.inbox.tab = nav.dataset.tab;
-      if (base === 'inbox' && sub) S.inbox.tab = sub;
+      if (nav.dataset.tab) { S.inbox.tab = nav.dataset.tab; S.inbox.chosen = true; }
+      if (base === 'inbox' && sub) { S.inbox.tab = sub; S.inbox.chosen = true; }
       if (nav.dataset.tut) S.helpOpen = nav.dataset.tut;
       closeJob(); go(nav.dataset.nav, { silent: S.view === base }); return;
     }
@@ -1909,7 +1941,7 @@
     const job = t.closest('[data-job]');
     if (job) { openJob(job.dataset.job); return; }
     const it = t.closest('[data-inbox-tab]');
-    if (it) { S.inbox.tab = it.dataset.inboxTab; render(); return; }
+    if (it) { S.inbox.tab = it.dataset.inboxTab; S.inbox.chosen = true; render(); return; }
     const q = t.closest('[data-q]');
     if (q) { S.inbox.sel = Number(q.dataset.q); render(); return; }
     const pick = t.closest('[data-pick]');

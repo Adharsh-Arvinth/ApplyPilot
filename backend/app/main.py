@@ -45,6 +45,8 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         AnswerService.seed_initial_data(db)
+        from backend.app.services.scoring_service import ScoringService
+        ScoringService.refresh_stale_summaries(db)  # one-off: replace old template card summaries
     finally:
         db.close()
     

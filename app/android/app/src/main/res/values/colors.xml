@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Same as the cockpit's Neutral theme background, so launch → first screen has no colour jump -->
+    <color name="splash_bg">#F4F4F2</color>
+</resources>

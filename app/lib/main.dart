@@ -9,20 +9,17 @@ import 'shell/web_shell.dart';
 /// served by the backend on your PC (backend/app/static/cockpit).
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: ShellColors.bg,
-    statusBarIconBrightness: Brightness.light,
-    systemNavigationBarColor: ShellColors.bg,
-    systemNavigationBarIconBrightness: Brightness.light,
-  ));
   final config = await ShellConfig.load();
-  runApp(ApplyPilotApp(initialConfig: config));
+  final palette = await ShellPalette.load(); // the theme picked in the app last time (Neutral on a new install)
+  SystemChrome.setSystemUIOverlayStyle(palette.overlay);
+  runApp(ApplyPilotApp(initialConfig: config, palette: palette));
 }
 
 class ApplyPilotApp extends StatefulWidget {
   final ShellConfig initialConfig;
+  final ShellPalette palette;
 
-  const ApplyPilotApp({super.key, required this.initialConfig});
+  const ApplyPilotApp({super.key, required this.initialConfig, this.palette = ShellPalette.neutral});
 
   @override
   State<ApplyPilotApp> createState() => _ApplyPilotAppState();
@@ -41,6 +38,8 @@ class _ApplyPilotAppState extends State<ApplyPilotApp> {
         key: ValueKey('connect-${_config.serverUrl}-$_message'),
         initial: _config,
         message: _message,
+        palette: widget.palette,
+        showIntro: !_config.ready,
         onCancel: _config.ready ? () => setState(() { _connecting = false; _message = null; }) : null,
         onConnected: (cfg) => setState(() { _config = cfg; _connecting = false; _message = null; }),
       );
@@ -55,9 +54,17 @@ class _ApplyPilotAppState extends State<ApplyPilotApp> {
       title: 'ApplyPilot',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: ShellColors.bg,
-        colorScheme: const ColorScheme.dark(primary: ShellColors.ink, surface: ShellColors.card),
+        brightness: widget.palette.dark ? Brightness.dark : Brightness.light,
+        scaffoldBackgroundColor: widget.palette.bg,
+        colorScheme: widget.palette.dark
+            ? ColorScheme.dark(primary: widget.palette.ink, surface: const Color(0xFF1C1C1E))
+            : ColorScheme.light(primary: widget.palette.ink, surface: Colors.white),
+        textSelectionTheme: TextSelectionThemeData(
+          cursorColor: widget.palette.ink,
+          selectionColor: widget.palette.ink.withValues(alpha: 0.18),
+          selectionHandleColor: widget.palette.ink,
+        ),
+        pageTransitionsTheme: const PageTransitionsTheme(builders: {TargetPlatform.android: PredictiveBackPageTransitionsBuilder()}),
         useMaterial3: true,
       ),
       home: home,

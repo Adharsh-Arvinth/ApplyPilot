@@ -425,7 +425,7 @@ Respond in strict JSON with composite score and explainable sub-scores:
             role_label = "Backend & Systems Development"
         else:
             role_relevance_score = 70.0
-            role_label = "General Technical Engineering"
+            role_label = "Outside your core AI / data focus"
 
         # 2. Dynamic Skills Alignment
         core_skills = ["python", "pytorch", "machine learning", "data science", "sql", "fastapi", "docker", "deep learning", "algorithms", "analytics", "ai", "nlp", "computer vision"]
@@ -489,7 +489,7 @@ Respond in strict JSON with composite score and explainable sub-scores:
         if eligibility.status in ["potentially_eligible", "needs_verification"] or job.is_assist_only:
             final_score = min(3.8, max(3.2, final_score))
 
-        reason = f"{role_label} with {skills_reason} in {job.location or 'target region'}."
+        reason = ScoringService.fit_summary(job, role_label)
 
         return HeuristicResult({
             "score": final_score,
@@ -511,6 +511,53 @@ Respond in strict JSON with composite score and explainable sub-scores:
                 "compensation": comp_reason
             }
         })
+
+    # Skills worth naming in a one-line summary (whole-word matches against the posting)
+    SUMMARY_SKILLS = [
+        ("python", "Python"), ("sql", "SQL"), ("pytorch", "PyTorch"), ("tensorflow", "TensorFlow"),
+        ("machine learning", "machine learning"), ("deep learning", "deep learning"), ("llm", "LLMs"),
+        ("large language model", "LLMs"), ("generative ai", "GenAI"), ("genai", "GenAI"), ("nlp", "NLP"),
+        ("computer vision", "computer vision"), ("data science", "data science"), ("analytics", "analytics"),
+        ("fastapi", "FastAPI"), ("docker", "Docker"), ("kubernetes", "Kubernetes"), ("aws", "AWS"),
+        ("gcp", "GCP"), ("azure", "Azure"), ("spark", "Spark"), ("statistics", "statistics"),
+        ("rag", "RAG"), ("agents", "AI agents"), ("agentic", "AI agents"), ("mlops", "MLOps"),
+        ("javascript", "JavaScript"), ("typescript", "TypeScript"), ("react", "React"), ("java", "Java"),
+        ("golang", "Go"), ("rust", "Rust"), ("c++", "C++"), ("security", "security"),
+    ]
+
+    @staticmethod
+    def fit_summary(job: Job, role_label: str) -> str:
+        """One honest line for a job card: what kind of role and which of the candidate's skills it asks for."""
+        try:
+            req = " ".join(json.loads(job.required_skills_json or "[]"))
+        except Exception:
+            req = ""
+        text = f"{job.title or ''} {getattr(job, 'description', '') or ''} {req}".lower()
+        seen, named = set(), []
+        for key, label in ScoringService.SUMMARY_SKILLS:
+            if label not in seen and re.search(r"(?<![a-z0-9])" + re.escape(key) + r"(?![a-z0-9])", text):
+                seen.add(label)
+                named.append(label)
+        parts = [role_label]
+        if named:
+            parts.append("asks for " + (", ".join(named) if len(named) <= 3 else f"{', '.join(named[:3])} +{len(named) - 3} more"))
+        return " · ".join(parts)  # location is shown next to it on every card already
+
+    @staticmethod
+    def refresh_stale_summaries(db: Session) -> int:
+        """Rewrite old template summaries (same sentence on every card) without touching scores or statuses."""
+        stale = db.query(Job).filter(Job.score_reason.like("%Foundational data science and computer engineering background%")).all()
+        stale += db.query(Job).filter(Job.score_reason.like("% with Direct alignment on %")).all()
+        n = 0
+        for job in {j.id: j for j in stale}.values():
+            label = (job.score_reason or "").split(" with ")[0].strip() or "Role"
+            if label == "General Technical Engineering":
+                label = "Outside your core AI / data focus"
+            job.score_reason = ScoringService.fit_summary(job, label)
+            n += 1
+        if n:
+            db.commit()
+        return n
 
     @staticmethod
     async def evaluate_all_discovered(db: Session) -> int:

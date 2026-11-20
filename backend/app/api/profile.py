@@ -5,10 +5,10 @@ import secrets
 from pathlib import Path
 from typing import List, Optional
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Request
 from pypdf import PdfReader
 from sqlalchemy.orm import Session
-from backend.app.core.config import settings
+from backend.app.core.config import settings, BASE_DIR
 from backend.app.core.database import get_db
 from backend.app.core.security import verify_token
 from backend.app.models import Profile, RunLog, CandidateRecord
@@ -157,13 +157,24 @@ def toggle_go_live(db: Session = Depends(get_db)):
     db.commit()
     return {"go_live": profile.go_live, "mode": "LIVE" if profile.go_live else "DRY_RUN"}
 
+@router.get("/phone-sign-in", summary="Sign-in link for the phone app")
+def phone_sign_in(request: Request):
+    """The address this page was opened on plus the access key, for signing in on a phone.
+    Only reachable with the key already (every route is token-protected)."""
+    host = request.headers.get("host") or request.url.netloc
+    base = f"{request.url.scheme}://{host}"
+    local = host.split(":")[0] in ("localhost", "127.0.0.1", "::1", "testserver")
+    return {"server": base, "token": settings.APPLYPILOT_TOKEN,
+            "link": f"{base}/app/?token={settings.APPLYPILOT_TOKEN}", "local_only": local}
+
+
 @router.post("/rotate-token", response_model=TokenRotationOut, summary="Rotate Security Bearer Token")
 def rotate_token(db: Session = Depends(get_db)):
     new_token = secrets.token_urlsafe(32)
     settings.APPLYPILOT_TOKEN = new_token
     
-    # Save to .env if present
-    env_file = settings.BASE_DIR / ".env"
+    # Save to .env so the new key survives a restart
+    env_file = BASE_DIR / ".env"
     try:
         lines = []
         if env_file.exists():

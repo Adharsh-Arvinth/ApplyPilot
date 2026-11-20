@@ -343,3 +343,14 @@ def test_gemini_fake_client_all_conditions():
         assert res8["success"] is False
         assert "sensitive" in res8["reason"].lower()
         mock_never_sent.assert_not_called()
+
+
+def test_phone_sign_in_link_needs_the_key_and_carries_it():
+    """The cockpit's 'Copy sign-in link' returns this server's address plus the key, and only to someone who already has it."""
+    assert TestClient(app, client=("127.0.0.1", 50000)).get("/api/v1/profile/phone-sign-in").status_code == 401
+    r = client.get("/api/v1/profile/phone-sign-in", headers=AUTH_HEADERS)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["token"] == settings.APPLYPILOT_TOKEN
+    assert body["link"] == f"{body['server']}/app/?token={settings.APPLYPILOT_TOKEN}"
+    assert body["local_only"] is True  # the test client is a local address
