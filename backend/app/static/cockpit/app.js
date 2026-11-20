@@ -582,6 +582,7 @@
         try { await loaders[v](); S.fresh[v] = Date.now(); } catch (e) {}
         await new Promise(r => setTimeout(r, 150)); // stay out of the way of scrolling
       }
+      setupDeviceAI();
     }, { timeout: 2500 });
   }
   function render({ poll = false } = {}) {
@@ -1378,9 +1379,9 @@
       : !L.ready ? `${pulling ? `<div class="pull"><div class="bar thin"><i style="width:${pct}%"></i></div><span class="small faint tnum">Downloading ${esc(pull.model || '')} · ${pct}%</span></div>`
           : pull.status === 'error' ? `<p class="small bad">${esc(pull.error)}</p>` : ''}
          <div class="row-end"><button type="button" class="btn primary hv" data-act="local-ai-pull" ${pulling ? 'disabled' : ''}>${icon('download')}Download ${esc(L.model || 'model')} · ${esc(size(L.model))}</button></div>` : '';
-    return `<form class="card" data-local-ai-form><div class="card-h"><span class="card-t">Free AI · no key needed</span><span class="aside"><span class="dot ${state[0]}"></span>${state[1]}</span></div>
+    return `<form class="card" data-local-ai-form><div class="card-h"><span class="card-t">Free AI on this computer · optional</span><span class="aside"><span class="dot ${state[0]}"></span>${state[1]}</span></div>
       <div class="card-b stack">
-        <p class="muted small">An open model (Qwen3.5) runs on the computer that runs ApplyPilot — free, unlimited and private. It takes over whenever Gemini has no key, runs out of quota or is down. Phones use it through this computer.</p>
+        <p class="muted small">Optional, for power users: an open model (Qwen3.5) running on the computer that hosts ApplyPilot helps with form answers when Gemini has no key or quota. It needs a lot of memory, so leave it off if your computer feels slow. Phones don&#39;t need it: the app has its own built-in AI.</p>
         <div class="form-grid">
           <div class="field"><label for="la-mode">When to use it</label><select class="select" id="la-mode" name="mode">
             ${[['auto', 'Automatically when Gemini is unavailable'], ['local', 'Always (private — nothing leaves this computer)'], ['gemini', 'Never (Gemini only)']].map(([v, l]) => `<option value="${v}" ${L.mode === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
@@ -1532,7 +1533,7 @@
           <div class="card-b"><ol class="steps">${TUTORIALS.find(t => t.id === 'email').steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol></div></details></div>`;
     }
 
-    if (sec === 'ai') return `<div class="stack">${deviceCard()}${freeAICard()}${geminiKeyCard()}<form class="card" data-gemini-form><div class="card-h"><span class="card-t">AI answers</span><span class="aside tnum">${fmt(g.gemini_answers_today || 0)} today · ~${fmt(g.saved_minutes || 0)} min saved</span></div>
+    if (sec === 'ai') return `<div class="stack">${deviceCard()}${IN_SHELL ? '' : freeAICard()}${geminiKeyCard()}<form class="card" data-gemini-form><div class="card-h"><span class="card-t">AI answers</span><span class="aside tnum">${fmt(g.gemini_answers_today || 0)} today · ~${fmt(g.saved_minutes || 0)} min saved</span></div>
         <div class="set-list"><label class="set-row hv"><div class="grow">Draft answers for new questions<small>Grounded only in your verified facts. Drafts wait in Needs you › AI drafts.</small></div><span class="toggle"><input type="checkbox" name="gemini_auto_answer_enabled" ${g.gemini_auto_answer_enabled ? 'checked' : ''}><i></i></span></label></div>
         <div class="card-b form-grid card-sep">
           <div class="field"><label for="g-conf">Minimum confidence</label><div class="range-row"><input type="range" id="g-conf" name="gemini_min_confidence" min="0.5" max="1" step="0.01" value="${g.gemini_min_confidence ?? 0.85}"><output>${Math.round((g.gemini_min_confidence ?? 0.85) * 100)}%</output></div></div>
@@ -1830,6 +1831,7 @@
     async backup(btn) { await run(btn, () => api('/backup', { method: 'POST' }), 'Backup created'); },
     async 'device-download'(btn) {
       const mobile = !!($('#device-mobile') && $('#device-mobile').checked);
+      try { localStorage.removeItem(DEVICE_AUTO); } catch (e) {}
       try { await deviceAI('download', { model: btn.dataset.model, allowMobileData: mobile }); await refreshDevice(); toast('Downloading — you can keep using the app'); }
       catch (e) { toast(e.message, true); }
     },
@@ -1837,6 +1839,7 @@
     async 'device-delete'(btn) {
       const ok = await confirmModal({ title: 'Delete the on-device model?', body: 'Frees its storage. The assistant will use the online AI until you download it again.', ok: 'Delete', danger: true });
       if (!ok) return;
+      try { localStorage.setItem(DEVICE_AUTO, 'off'); } catch (e) {}
       try { await deviceAI('delete', { model: btn.dataset.model }); setTimeout(refreshDevice, 500); toast('Model deleted'); } catch (e) { toast(e.message, true); }
     },
     async 'copy-signin'() {
@@ -2292,6 +2295,23 @@
     if (draw && S.view === 'settings' && S.set.section === 'ai') { S.lastHtml = ''; render(); }
     return S.device;
   }
+  // The built-in AI sets itself up: the small model downloads in the background the first time
+  // the phone is on Wi-Fi. Deleting it in Settings stops this until it's downloaded again by hand.
+  const DEVICE_AUTO = 'ap_device_auto';
+  async function setupDeviceAI() {
+    if (!IN_SHELL) return;
+    try { if (localStorage.getItem(DEVICE_AUTO) === 'off') return; } catch (e) {}
+    const D = await refreshDevice(false);
+    if (!D || D.unavailable || !D.supported || !D.wifi) return; // no Wi-Fi now: try again next launch
+    const models = D.models || [];
+    if (models.some(m => m.installed) || (D.download || {}).status === 'downloading') return;
+    const pick = models.find(m => m.id === 'lite' && m.fits) || models.find(m => m.fits);
+    if (!pick) return;
+    try {
+      await deviceAI('download', { model: pick.id, allowMobileData: false });
+      toast(`Setting up the built-in AI on this phone (${pick.size_mb} MB, Wi-Fi only). Keep using the app`);
+    } catch (e) {}
+  }
   const devicePrefOn = () => { try { return localStorage.getItem(DEVICE_PREF) !== '0'; } catch (e) { return true; } };
   const deviceReady = () => !!(S.device && !S.device.unavailable && devicePrefOn() && (S.device.models || []).some(m => m.installed && m.fits));
   function drawDeviceProgress() {
@@ -2303,10 +2323,10 @@
   function deviceCard() {
     if (!IN_SHELL) return '';
     const D = S.device;
-    if (!D) return `<section class="card"><div class="card-h"><span class="card-t">AI on this phone</span><span class="aside">Checking…</span></div></section>`;
-    if (D.unavailable) return `<section class="card"><div class="card-h"><span class="card-t">AI on this phone</span><span class="aside"><span class="dot slate"></span>Needs the latest app</span></div>
+    if (!D) return `<section class="card"><div class="card-h"><span class="card-t">Built-in AI</span><span class="aside">Checking…</span></div></section>`;
+    if (D.unavailable) return `<section class="card"><div class="card-h"><span class="card-t">Built-in AI</span><span class="aside"><span class="dot slate"></span>Needs the latest app</span></div>
       <div class="card-b"><p class="muted small">Update the ApplyPilot app to run AI directly on this phone.</p></div></section>`;
-    if (!D.supported) return `<section class="card"><div class="card-h"><span class="card-t">AI on this phone</span><span class="aside"><span class="dot slate"></span>Not enough memory</span></div>
+    if (!D.supported) return `<section class="card"><div class="card-h"><span class="card-t">Built-in AI</span><span class="aside"><span class="dot slate"></span>Not enough memory</span></div>
       <div class="card-b"><p class="muted small">This phone has ${D.ram_gb} GB of memory — too little to run a model smoothly, so the online AI is used instead.</p></div></section>`;
     const dl = D.download || {}, busy = dl.status === 'downloading';
     const installed = (D.models || []).filter(m => m.installed);
@@ -2315,9 +2335,9 @@
         <small>${m.size_mb} MB${m.fits ? '' : ' · needs more memory than this phone has'}</small></div>
       ${m.installed ? `<button type="button" class="btn sm ghost hv" data-act="device-delete" data-model="${m.id}">Delete</button>`
         : `<button type="button" class="btn sm hv ${m.recommended ? 'primary' : ''}" data-act="device-download" data-model="${m.id}" ${!m.fits || busy ? 'disabled' : ''}>${icon('download')}Download</button>`}</div>`;
-    return `<section class="card"><div class="card-h"><span class="card-t">AI on this phone</span><span class="aside"><span class="dot ${state[0]}"></span>${state[1]}</span></div>
+    return `<section class="card"><div class="card-h"><span class="card-t">Built-in AI</span><span class="aside"><span class="dot ${state[0]}"></span>${state[1]}</span></div>
       <div class="card-b stack">
-        <p class="muted small">Runs the assistant right on your phone — free, private and works offline. It only uses memory while answering and is released a minute later, so it won't slow your phone down.</p>
+        <p class="muted small">Built into the app and runs on this phone: free for everyone, private, and it works offline. It sets itself up on Wi-Fi the first time (Lite, about 330 MB). It only uses memory while answering and lets go of it a minute later, so your phone stays fast.</p>
         <span class="faint small">This phone: ${D.ram_gb} GB memory · ${Math.round(D.free_mb / 1024 * 10) / 10} GB free right now${D.wifi ? ' · on Wi-Fi' : ' · on mobile data'}</span>
       </div>
       <div class="set-list card-sep">${(D.models || []).map(row).join('')}</div>

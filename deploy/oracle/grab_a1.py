@@ -28,6 +28,28 @@ def log(msg: str) -> None:
     print(f"{datetime.now():%Y-%m-%d %H:%M:%S}  {msg}", flush=True)
 
 
+_LOCK = None
+
+
+def single_instance() -> bool:
+    """Only one copy may run (it starts at every login); a held file lock means another is running."""
+    global _LOCK
+    path = STATE_FILE.parent / "grab_a1.lock"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    _LOCK = open(path, "a+")
+    try:
+        if sys.platform == "win32":
+            import msvcrt
+            _LOCK.seek(0)
+            msvcrt.locking(_LOCK.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(_LOCK, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return True
+    except OSError:
+        return False
+
+
 def clients():
     cfg = oci.config.from_file()
     oci.config.validate_config(cfg)
@@ -97,7 +119,18 @@ def main():
     ap.add_argument("--memory", type=float, default=24)
     ap.add_argument("--disk", type=int, default=100)
     ap.add_argument("--open-ports", action="store_true")
+    ap.add_argument("--log", help="append output to this file (for running hidden at login)")
     a = ap.parse_args()
+
+    if a.log:
+        f = open(a.log, "a", encoding="utf-8", buffering=1)
+        sys.stdout = sys.stderr = f
+    if not a.open_ports and STATE_FILE.exists():
+        log(f"Server already set up ({STATE_FILE}); nothing to do.")
+        return
+    if not single_instance():
+        log("Another copy is already asking Oracle; this one exits.")
+        return
 
     cfg, compute, net, ident = clients()
     comp = cfg["tenancy"]
