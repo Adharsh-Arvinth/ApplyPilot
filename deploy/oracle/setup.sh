@@ -28,6 +28,21 @@ echo "== Browser for applying (Chromium + its system libraries)"
 sudo "$APP/venv/bin/python" -m playwright install-deps chromium
 "$APP/venv/bin/python" -m playwright install chromium
 
+echo "== Free AI on the server (Ollama + Qwen 4B: no keys, no cost; used when Gemini has no key or quota)"
+if ! command -v ollama >/dev/null; then curl -fsSL https://ollama.com/install.sh | sh; fi
+sudo mkdir -p /etc/systemd/system/ollama.service.d
+# Local-only, one model at a time, released after 10 idle minutes so the browser always has memory
+sudo tee /etc/systemd/system/ollama.service.d/applypilot.conf >/dev/null <<'EOF'
+[Service]
+Environment=OLLAMA_HOST=127.0.0.1:11434
+Environment=OLLAMA_KEEP_ALIVE=10m
+Environment=OLLAMA_NUM_PARALLEL=1
+Environment=OLLAMA_MAX_LOADED_MODELS=1
+EOF
+sudo systemctl daemon-reload && sudo systemctl enable --now ollama >/dev/null && sudo systemctl restart ollama
+for i in $(seq 1 30); do curl -fsS http://127.0.0.1:11434/api/tags >/dev/null 2>&1 && break; sleep 2; done
+ollama pull "${AI_MODEL:-qwen3.5:4b}"
+
 echo "== HTTPS (Caddy: free automatic certificates from Let's Encrypt, renewed on its own)"
 if ! command -v caddy >/dev/null; then
   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor --yes -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg

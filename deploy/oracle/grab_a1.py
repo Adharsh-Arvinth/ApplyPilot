@@ -10,9 +10,13 @@ key in ~/.oci/config (Profile -> Tokens and keys -> API keys). Everything it cre
 """
 import argparse
 import json
+import os
 import random
+import shutil
+import subprocess
 import sys
 import time
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 
@@ -21,7 +25,10 @@ import oci
 NAME = "applypilot-server"
 SHAPE = "VM.Standard.A1.Flex"
 STATE_FILE = Path.home() / ".applypilot" / "oracle-server.json"
+SSH_KEY = Path.home() / ".ssh" / "applypilot_oracle"
 SSH_PUB = Path.home() / ".ssh" / "applypilot_oracle.pub"
+REPO = Path(__file__).resolve().parents[2]
+USER = "ubuntu"
 
 
 def log(msg: str) -> None:
@@ -113,6 +120,120 @@ def open_web_ports(net, subnet):
         return
 
 
+# ───────────────────────── Install everything once the server exists ─────────────────────────
+def _ssh(ip: str, command: str, timeout: int = 3600) -> subprocess.CompletedProcess:
+    return subprocess.run(["ssh", "-i", str(SSH_KEY), "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=15",
+                           "-o", "BatchMode=yes", f"{USER}@{ip}", command],
+                          capture_output=True, text=True, timeout=timeout, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+
+
+def _bash() -> str:
+    for c in (r"C:\Program Files\Git\bin\bash.exe", r"C:\Program Files (x86)\Git\bin\bash.exe", shutil.which("bash") or ""):
+        if c and Path(c).exists():
+            return c
+    raise RuntimeError("Git Bash not found (needed to copy the app to the server)")
+
+
+def _tail(text: str, n: int = 12) -> str:
+    return "\n".join((text or "").strip().splitlines()[-n:])
+
+
+def deploy(ip: str) -> str:
+    """Copy the app + data, run the server setup (HTTPS, free AI, service) and start it with autopilot PAUSED,
+    so the laptop and the server never both apply. Returns the https address."""
+    log("Waiting for SSH on the new server...")
+    for _ in range(60):
+        try:
+            if _ssh(ip, "cloud-init status --wait >/dev/null 2>&1; echo up", timeout=900).stdout.strip().endswith("up"):
+                break
+        except subprocess.TimeoutExpired:
+            pass
+        time.sleep(10)
+    else:
+        raise RuntimeError("SSH never came up")
+
+    log("Copying the app and your data to the server...")
+    env = {**os.environ, "SSH_KEY": SSH_KEY.as_posix()}
+    r = subprocess.run([_bash(), "deploy/oracle/push.sh", f"{USER}@{ip}", "--with-data"], cwd=REPO, env=env,
+                       capture_output=True, text=True, timeout=1800, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    if r.returncode != 0:
+        raise RuntimeError("copy failed:\n" + _tail(r.stdout + r.stderr))
+
+    log("Installing on the server (packages, browser, free AI model, HTTPS) - about 15 minutes...")
+    r = _ssh(ip, "bash /opt/applypilot/deploy/oracle/setup.sh 2>&1", timeout=5400)
+    if r.returncode != 0:
+        raise RuntimeError("setup failed:\n" + _tail(r.stdout + r.stderr, 25))
+    domain = next((l.split("https://", 1)[1].strip() for l in r.stdout.splitlines() if "https://" in l and "address" in l.lower()), "")
+
+    log("Starting ApplyPilot on the server (autopilot paused until you switch over)...")
+    r = _ssh(ip, "sudo mkdir -p /etc/systemd/system/applypilot.service.d && "
+                 "printf '[Service]\\nEnvironment=AUTOPILOT_ENABLED=false\\n' | sudo tee /etc/systemd/system/applypilot.service.d/paused.conf >/dev/null && "
+                 "sudo systemctl daemon-reload && sudo systemctl restart applypilot && sleep 8 && systemctl is-active applypilot", timeout=300)
+    if "active" not in r.stdout:
+        raise RuntimeError("service didn't start:\n" + _tail(r.stdout + r.stderr))
+
+    url = f"https://{domain}" if domain else f"https://{ip.replace('.', '-')}.sslip.io"
+    for _ in range(30):  # first certificate can take a minute
+        try:
+            urllib.request.urlopen(url + "/api/v1/health", timeout=10)
+            break
+        except Exception as e:
+            if getattr(e, "code", None) in (401, 403):  # reachable over HTTPS, and locked as it should be
+                break
+            time.sleep(10)
+    return url
+
+
+def notify(title: str, body: str) -> None:
+    """A Windows notification plus a note on the Desktop, so the news reaches you without Claude Code."""
+    note = Path.home() / "Desktop" / "ApplyPilot server.txt"
+    try:
+        note.write_text(f"{title}\n\n{body}\n", encoding="utf-8")
+    except Exception:
+        pass
+    ps = ("[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] > $null;"
+          "$t = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02);"
+          "$x = $t.GetElementsByTagName('text'); $x.Item(0).AppendChild($t.CreateTextNode($env:AP_T)) > $null;"
+          "$x.Item(1).AppendChild($t.CreateTextNode($env:AP_B)) > $null;"
+          "$id = '{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe';"
+          "[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($id).Show([Windows.UI.Notifications.ToastNotification]::new($t))")
+    try:
+        subprocess.run(["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps], timeout=30,
+                       env={**os.environ, "AP_T": title, "AP_B": body[:200]}, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except Exception:
+        pass
+
+
+def load_state() -> dict:
+    try:
+        return json.loads(STATE_FILE.read_text())
+    except Exception:
+        return {}
+
+
+def save_state(**kw) -> dict:
+    st = {**load_state(), **kw}
+    STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    STATE_FILE.write_text(json.dumps(st, indent=2))
+    return st
+
+
+def finish(ip: str) -> None:
+    try:
+        url = deploy(ip)
+    except Exception as e:
+        save_state(deploy_error=str(e)[:2000])
+        log(f"SETUP PROBLEM  {e}")
+        notify("ApplyPilot: server created, setup needs a hand",
+               f"The free Oracle server ({ip}) exists, but installing hit a problem. Open Claude Code and say: finish the Oracle server setup.")
+        return
+    save_state(deployed=True, url=url, deploy_error="")
+    log(f"DEPLOYED  {url}  (autopilot paused until you switch over)")
+    notify("ApplyPilot server is ready",
+           f"{url} is set up with HTTPS and free AI. To switch: in Claude Code say 'switch to the Oracle server' "
+           f"(or run deploy/oracle/switch_over.sh), then sign in on the phone with this address.")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ocpus", type=float, default=4)
@@ -125,11 +246,16 @@ def main():
     if a.log:
         f = open(a.log, "a", encoding="utf-8", buffering=1)
         sys.stdout = sys.stderr = f
-    if not a.open_ports and STATE_FILE.exists():
-        log(f"Server already set up ({STATE_FILE}); nothing to do.")
+    if not a.open_ports and load_state().get("deployed"):
+        log(f"Server already set up ({load_state().get('url')}); nothing to do.")
         return
     if not single_instance():
         log("Another copy is already asking Oracle; this one exits.")
+        return
+    st = load_state()
+    if not a.open_ports and st.get("public_ip"):
+        log(f"Server exists at {st['public_ip']} but isn't set up yet; setting it up now.")
+        finish(st["public_ip"])
         return
 
     cfg, compute, net, ident = clients()
@@ -188,10 +314,11 @@ def main():
     inst = oci.wait_until(compute, compute.get_instance(inst.id), "lifecycle_state", "RUNNING", max_wait_seconds=1200).data
     ip = public_ip(compute, net, comp, inst)
     open_web_ports(net, subnet)
-    STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    STATE_FILE.write_text(json.dumps({"name": NAME, "id": inst.id, "public_ip": ip, "shape": inst.shape,
-                                      "created": str(inst.time_created)}, indent=2))
+    save_state(name=NAME, id=inst.id, public_ip=ip, shape=inst.shape, created=str(inst.time_created))
     log(f"READY  {NAME} is running at {ip}  (saved to {STATE_FILE})")
+    if not a.open_ports:
+        notify("ApplyPilot: got the free Oracle server!", f"Server {ip} created. Installing everything now (about 20 minutes)...")
+        finish(ip)
 
 
 if __name__ == "__main__":

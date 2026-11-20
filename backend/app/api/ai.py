@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -324,3 +324,72 @@ def chat_prompt_for_device(req: ChatRequest, db: Session = Depends(get_db), toke
     _profile, db_stats = _assistant_state(db, req)
     system, prompt = GeminiService.chat_prompt(req.message, req.history, db_stats, compact=True)
     return {"system": system, "prompt": prompt}
+
+
+DEVICE_TAG = "device:"  # gemini_reason prefix for questions the phone's model has already looked at
+
+
+@router.get("/device-tasks")
+def device_tasks(limit: int = 5, db: Session = Depends(get_db), token: str = Depends(verify_token)):
+    """Waiting questions the phone's built-in AI can draft (free, on the phone), each with its own grounded prompt.
+    Sensitive questions are never handed out; each question is offered to the phone once."""
+    rows = (db.query(NeedsInput)
+            .filter(NeedsInput.status == "pending", (NeedsInput.suggested_answer == "") | (NeedsInput.suggested_answer.is_(None)))
+            .order_by(NeedsInput.created_at.asc()).all())
+    tasks = []
+    for n in rows:
+        if (n.gemini_reason or "").startswith(DEVICE_TAG):
+            continue
+        sensitive, _ = GeminiService.is_sensitive_question(n.question_text, field_type=n.field_type or "text")
+        if sensitive:
+            continue
+        try:
+            options = [o for o in json.loads(n.options_json or "[]") if o]
+        except Exception:
+            options = []
+        job = n.job
+        system, prompt = GeminiService.question_prompt_compact(n.question_text, n.field_type or "text", options,
+                                                               job.company if job else "", job.title if job else "")
+        tasks.append({"id": n.id, "question": n.question_text, "options": options, "system": system, "prompt": prompt})
+        if len(tasks) >= max(1, min(limit, 20)):
+            break
+    return {"tasks": tasks}
+
+
+class DeviceAnswer(BaseModel):
+    id: int
+    answer: str = ""
+
+
+@router.post("/device-answers")
+def device_answers(items: List[DeviceAnswer], db: Session = Depends(get_db), token: str = Depends(verify_token)):
+    """Drafts from the phone's model. They become the question's suggestion in Needs You — the user confirms with
+    one tap, so a small model's guess is never sent to an employer on its own."""
+    from backend.app.services.answer_service import match_option_with_confidence
+    saved, skipped = 0, 0
+    for it in items[:20]:
+        n = db.query(NeedsInput).filter(NeedsInput.id == it.id, NeedsInput.status == "pending").first()
+        if not n or (n.suggested_answer or "").strip():
+            continue
+        text = (it.answer or "").strip().strip('"').strip()
+        text = text.split("</think>")[-1].strip()
+        try:
+            options = [o for o in json.loads(n.options_json or "[]") if o]
+        except Exception:
+            options = []
+        if options and text:
+            exact = next((o for o in options if o.strip().lower() == text.lower()), None)
+            if not exact:
+                exact, conf = match_option_with_confidence(text, options)
+                exact = exact if conf >= 0.8 else None
+            text = exact or ""
+        if not text or text.upper().startswith("UNKNOWN") or len(text) > 1200:
+            n.gemini_reason = DEVICE_TAG + " the phone's AI didn't know"
+            skipped += 1
+        else:
+            n.suggested_answer = text
+            n.gemini_reason = DEVICE_TAG + " drafted by the built-in AI on your phone — check it before saving"
+            n.gemini_confidence = 0.6
+            saved += 1
+    db.commit()
+    return {"saved": saved, "skipped": skipped}

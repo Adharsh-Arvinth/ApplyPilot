@@ -582,7 +582,8 @@
         try { await loaders[v](); S.fresh[v] = Date.now(); } catch (e) {}
         await new Promise(r => setTimeout(r, 150)); // stay out of the way of scrolling
       }
-      setupDeviceAI();
+      await setupDeviceAI();
+      draftWithDevice();
     }, { timeout: 2500 });
   }
   function render({ poll = false } = {}) {
@@ -922,7 +923,7 @@
         <div class="who">${art(q.company, 'lg')}<div class="min0"><div class="strong">${esc(q.company)}</div><div class="muted small">${esc(q.role)}</div></div>
           <span class="chip ml-auto">Question ${I.sel + 1} of ${S.needs.length}</span></div>
         <h2>${esc(q.question_text)}</h2>
-        ${q.suggested_answer ? `<div class="suggest">${icon('auto_awesome')} Suggested: ${esc(q.suggested_answer)}</div>` : ''}
+        ${q.suggested_answer ? `<div class="suggest">${icon('auto_awesome')} ${String(q.gemini_reason || '').startsWith('device:') ? 'Drafted by the built-in AI on your phone, so check it' : 'Suggested'}: ${esc(q.suggested_answer)}</div>` : ''}
         ${input}
         <label class="remember"><div class="grow">Remember for future applications<small>Saves to the Answer Bank so similar fields are filled automatically</small></div>
           <span class="toggle"><input type="checkbox" id="q-remember" ${I.remember ? 'checked' : ''}><i></i></span></label>
@@ -2285,7 +2286,7 @@
     if (e.type === 'token' && deviceStream && e.data && e.data.id === deviceStream.id) deviceStream.onToken(e.data.text || '');
     if (e.type === 'download' && S.device) {
       S.device.download = e.data;
-      if (e.data.status === 'done' || e.data.status === 'idle' || e.data.status === 'error') refreshDevice();
+      if (e.data.status === 'done' || e.data.status === 'idle' || e.data.status === 'error') refreshDevice().then(() => { if (e.data.status === 'done') draftWithDevice(); });
       else if (S.view === 'settings' && S.set.section === 'ai') drawDeviceProgress();
     }
   };
@@ -2311,6 +2312,30 @@
       await deviceAI('download', { model: pick.id, allowMobileData: false });
       toast(`Setting up the built-in AI on this phone (${pick.size_mb} MB, Wi-Fi only). Keep using the app`);
     } catch (e) {}
+  }
+  // Waiting questions get a free first draft from the phone's own model (shown as a suggestion in Needs You;
+  // nothing is sent until the user saves it). A few per session, one at a time, stopping if the phone is busy.
+  let deviceDrafting = false;
+  async function draftWithDevice() {
+    if (!IN_SHELL || deviceDrafting) return;
+    if (!S.device) await refreshDevice(false);
+    if (!deviceReady()) return;
+    deviceDrafting = true;
+    try {
+      const { tasks } = await api('/ai/device-tasks', { query: { limit: 5 } });
+      const out = [];
+      for (const t of tasks || []) {
+        try { out.push({ id: t.id, answer: (await deviceAI('generate', { id: 'q' + t.id + '-' + Date.now(), system: t.system, prompt: t.prompt, temperature: 0.2 })) || '' }); }
+        catch (e) { break; } // low memory or busy: the rest wait for next time
+      }
+      if (!out.length) return;
+      const r = await api('/ai/device-answers', { method: 'POST', body: out });
+      if (r.saved) {
+        toast(`Built-in AI drafted ${r.saved} answer${r.saved === 1 ? '' : 's'}. Check ${r.saved === 1 ? 'it' : 'them'} in Needs You`);
+        if (loaders.inbox) { try { await loaders.inbox(); S.fresh.inbox = Date.now(); } catch (e) {} }
+        if (S.view === 'inbox' || S.view === 'home') { S.lastHtml = ''; render(); }
+      }
+    } catch (e) {} finally { deviceDrafting = false; }
   }
   const devicePrefOn = () => { try { return localStorage.getItem(DEVICE_PREF) !== '0'; } catch (e) { return true; } };
   const deviceReady = () => !!(S.device && !S.device.unavailable && devicePrefOn() && (S.device.models || []).some(m => m.installed && m.fits));

@@ -19,6 +19,12 @@ let the script ask for you (it retries about once a minute and stops as soon as 
 
 Everything it creates is Always Free (A1: 4 OCPU / 24 GB in total; 200 GB of disk in total).
 
+**Hands-off:** `grab_a1.py` also does steps 2 and 3 below by itself once it gets the server: it copies the app
+and your data, runs `setup.sh` (HTTPS + the free Qwen model) and starts ApplyPilot with **autopilot paused**, then shows
+a Windows notification and leaves `ApplyPilot server.txt` on the Desktop. It is started at every login by a shortcut in
+the Windows Startup folder and stops for good once the server is set up. To switch over for real:
+`bash deploy/oracle/switch_over.sh` (copies your latest data and turns the server's autopilot on; close the PC backend first).
+
 ## 2. Install (from this PC, Git Bash, repo root)
 ```bash
 bash deploy/oracle/push.sh ubuntu@<public-ip> --with-data   # code + your data (once)

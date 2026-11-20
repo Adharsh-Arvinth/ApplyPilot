@@ -1,6 +1,6 @@
 [Unit]
 Description=ApplyPilot backend (API, cockpit, autopilot)
-After=network-online.target
+After=network-online.target ollama.service
 Wants=network-online.target
 
 [Service]

@@ -131,6 +131,16 @@ class GeminiService:
             ]
         }
 
+        # Identity numbers and bank details never go to any AI model, whatever the user's category settings
+        government_id = [
+            r"\bssn\b", r"\bsocial\s*security\b", r"\bpassport\s*(number|no\.?|#)", r"\baadhaa?r\b",
+            r"\bpan\s*(card|number|no\.?)\b", r"\bnational\s*(id|identity|insurance)\b", r"\btax\s*(id|identification)\b",
+            r"\bdriv\w*\s*licen[cs]e\s*(number|no\.?|#)", r"\bbank\s*account\b", r"\b(ifsc|iban|routing\s*number)\b",
+            r"\bdate\s*of\s*birth\b", r"\bmother'?s\s*maiden\b",
+        ]
+        if any(re.search(pat, q_lower) for pat in government_id):
+            return True, "government_id"
+
         active_cats = custom_categories if custom_categories is not None else list(categories.keys())
 
         for cat_key in active_cats:
@@ -273,6 +283,20 @@ class GeminiService:
             return False, "Answer claims years of experience candidate does not possess"
 
         return True, ""
+
+    @classmethod
+    def question_prompt_compact(cls, question_text: str, field_type: str = "text", options: Optional[List[str]] = None,
+                                company: str = "", role: str = "") -> Tuple[str, str]:
+        """(system, prompt) for a small on-device model: plain-text reply, no JSON, grounded in the facts."""
+        system = ("You fill in one job application question for the candidate below. Use ONLY these facts; never invent "
+                  "experience, employers, numbers or dates. If the facts don't answer it, reply exactly UNKNOWN.\n"
+                  + cls.get_candidate_facts_prompt(question_text))
+        if options:
+            ask = "Reply with exactly one of these options, copied as written, and nothing else:\n" + "\n".join(f"- {o}" for o in options)
+        else:
+            ask = "Reply with only the answer as it should appear on the form: first person, honest, under 80 words."
+        prompt = f"Company: {company}\nRole: {role}\nQuestion: {question_text}\n\n{ask}"
+        return system, prompt
 
     @classmethod
     def auto_answer_question(

@@ -112,6 +112,8 @@ class LocalAI:
     def recommended(cls) -> str:
         hw = cls.hardware()
         for tag, _size, gpu_min, ram_min in MODELS:
+            if tag == MODELS[0][0] and not hw.get("gpu_gb"):
+                continue  # without a graphics card the 9B model is too slow to be useful; 4B is the sweet spot
             if (gpu_min and hw["gpu_gb"] >= gpu_min) or (ram_min and hw["ram_gb"] >= ram_min) or (not gpu_min and not ram_min):
                 return tag
         return MODELS[-1][0]
