@@ -313,9 +313,10 @@ class GeminiService:
             logger.info(f"Gemini auto-answer cache hit for '{question_text[:30]}' at {company}")
             return cls._question_cache[cache_key]
 
-        # 3. Circuit Breaker Check
+        # 3. Circuit Breaker Check (Gemini errors) — the free model can still answer while Gemini is paused
         tripped, remaining = cls.is_circuit_breaker_active()
-        if tripped:
+        from backend.app.services.local_ai import LocalAI
+        if tripped and not LocalAI.available():
             return {
                 "success": False,
                 "answer": "",
@@ -446,6 +447,12 @@ Respond ONLY with a JSON object matching this schema:
     _user_key_loaded: bool = False
 
     @classmethod
+    def available(cls) -> bool:
+        """True when some AI can answer: Gemini (your key or the server's) or the free model."""
+        from backend.app.services.local_ai import LocalAI
+        return cls.get_client() is not None or LocalAI.available()
+
+    @classmethod
     def active_key(cls) -> Optional[str]:
         if not cls._user_key_loaded:
             cls.reload_user_key()
@@ -490,10 +497,14 @@ Respond ONLY with a JSON object matching this schema:
     def _call_model(cls, prompt: str, system_instruction: Optional[str] = None, json_mode: bool = False,
                     timeout: float = 30.0) -> Optional[str]:
         """Call Gemini (primary, then fallback model) within one overall deadline, so a slow or overloaded
-        model never leaves the user waiting; callers fall back to their templates on None."""
-        client = cls.get_client()
+        model never leaves the user waiting. When Gemini is missing, over quota or down — or Settings say to use
+        only the free model — the free model (local Ollama / free cloud) answers. None → callers use templates."""
+        from backend.app.services.local_ai import LocalAI
+        mode = LocalAI.status()["mode"]
+        client = cls.get_client() if mode != "local" else None
         if not client:
-            return None
+            return LocalAI.chat(prompt, system_instruction, json_mode, timeout=max(timeout, 20))
+        started = time.time()
 
         # Check prompt cache
         cache_key = hashlib.sha256(f"{prompt}_{system_instruction}_{json_mode}".encode()).hexdigest()
@@ -536,7 +547,11 @@ Respond ONLY with a JSON object matching this schema:
                 logger.warning(f"Gemini call to {model_name} failed: {e}. Trying fallback if available...")
 
         logger.error(f"All Gemini models failed: {last_error}")
-        return None
+        free = LocalAI.chat(prompt, system_instruction, json_mode, timeout=max(20.0, timeout - (time.time() - started)))
+        if free:
+            logger.info("Answered by the free model because Gemini was unavailable.")
+            cls._cache[cache_key] = free
+        return free
 
     @classmethod
     def analyze_job_description(cls, title: str, company: str, description: str) -> Dict[str, Any]:
@@ -896,7 +911,7 @@ Respond ONLY with a JSON object:
             lines += ["", f"I'd welcome the chance to discuss how I can contribute to {company}.", "", "Best regards,", name]
             return "\n".join(lines)
 
-        if cls.get_client() is None or cls.is_circuit_breaker_active()[0]:
+        if not cls.available():
             return {"cover_letter": template(), "source": "template"}
         prompt = (f"Write a concise cover letter (170-230 words, 3 short paragraphs, no placeholders, no headers) for the "
                   f"{title} role at {company} ({job_dict.get('location', '')}). Job notes: {job_dict.get('notes', '')[:600]}\n"
@@ -1018,7 +1033,7 @@ If the user asks what to do, give at most 3 concrete next steps that refer to th
         prompt = json.dumps({"company": company, "role": role, "page_errors": errors[:20], "fields": fields[:25]}, ensure_ascii=False)
         prompt += ('\nReply only with JSON: {"fixes": [{"label": "<field label exactly as given>", "value": "<value>"}], '
                    '"ask_user": "<question or null>", "reason": "<one sentence on what went wrong>"}')
-        data = cls._json(cls._call_model(prompt, system, json_mode=True)) if cls.get_client() else None
+        data = cls._json(cls._call_model(prompt, system, json_mode=True)) if cls.available() else None
         if not isinstance(data, dict):
             missing = [f["label"] for f in fields if f.get("required") and not f.get("current")]
             return {"fixes": [], "ask_user": (f"The form needs: {', '.join(missing[:3])}" if missing else None),
@@ -1039,7 +1054,7 @@ If the user asks what to do, give at most 3 concrete next steps that refer to th
     @classmethod
     def choose_page_action(cls, actions: List[Dict[str, Any]], page_title: str = "", company: str = "") -> Optional[int]:
         """The page is not an application form yet. Pick the one button/link that leads to the form (or None)."""
-        if not cls.get_client() or not actions:
+        if not cls.available() or not actions:
             return None
         system = ("You guide a browser toward a company's own job application form. Pick the single button or link that "
                   "opens or continues the application on this site (e.g. 'Apply', 'Apply for this job', 'Accept cookies' "

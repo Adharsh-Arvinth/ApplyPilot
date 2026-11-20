@@ -388,3 +388,15 @@ Resumes, screenshots and evidence under `output/` are also kept out of git. Emai
 ## Autopilot
 
 When the backend starts, a background loop discovers roles, scores them, applies to the best ones within your daily/hourly limits and active hours, checks your inbox for employer confirmations, and resumes by itself the day after a daily limit is reached. It starts in **dry run**; turn on Live submissions in Settings › Autopilot. LinkedIn, Indeed, Naukri and Workday stay assist-only.
+
+## AI: bring your own key, or use the free model
+
+Every AI feature (form answers, form-error recovery, cover letters, interview prep, fit scores, the assistant) works with any of these, chosen in **Settings › AI answers**:
+
+| Option | Cost | Setup |
+| :--- | :--- | :--- |
+| **Your own Gemini key** (recommended) | Free tier from Google | Paste a key from [Google AI Studio](https://aistudio.google.com/apikey). It's tested before saving and stored encrypted. |
+| **Free local model** (Qwen3.5 via [Ollama](https://ollama.com)) | Free, unlimited, private | Install Ollama, then press **Download model**. The size is picked for the computer: 9B (8 GB GPU / 24 GB RAM), 4B (4 GB GPU / 12 GB RAM), 2B (6 GB RAM) or 0.8B (anything). |
+| **Free cloud model** | Free tier | Any OpenAI-compatible endpoint (e.g. Groq, OpenRouter free models) with a free key, for computers that can't run a local model. |
+
+In **Auto** mode Gemini is used first, and the free model takes over whenever Gemini has no key, runs out of quota or is down. Phones use whichever AI the ApplyPilot server provides.

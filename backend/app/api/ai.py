@@ -278,3 +278,34 @@ def cover_letter(
         {"title": job.title, "company": job.company, "location": job.location, "notes": job.score_reason or ""},
         {"full_name": profile.full_name} if profile else None,
     )
+
+
+# ── Free AI (no Gemini key needed): local Ollama model sized for this computer, or a free cloud endpoint ──
+class LocalAIConfigIn(BaseModel):
+    mode: Optional[str] = None          # auto | local | gemini
+    model: Optional[str] = None         # "auto" or an Ollama tag
+    url: Optional[str] = None           # Ollama address (default http://127.0.0.1:11434)
+    cloud: Optional[Dict[str, Any]] = None  # {url, model, key, clear_key}
+
+
+@router.get("/local")
+def local_ai_status(token: str = Depends(verify_token)):
+    from backend.app.services.local_ai import LocalAI
+    return LocalAI.status(fresh=True)
+
+
+@router.put("/local")
+def local_ai_config(cfg: LocalAIConfigIn, token: str = Depends(verify_token)):
+    from backend.app.services.local_ai import LocalAI
+    LocalAI.save_config(cfg.model_dump(exclude_none=True))
+    return LocalAI.status(fresh=True)
+
+
+@router.post("/local/pull")
+def local_ai_pull(body: Dict[str, Any] = None, token: str = Depends(verify_token)):
+    """Download the chosen (or recommended) model in the background; poll GET /ai/local for progress."""
+    from backend.app.services.local_ai import LocalAI
+    try:
+        return LocalAI.start_pull((body or {}).get("model"))
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e))

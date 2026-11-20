@@ -1292,3 +1292,10 @@ html.lite .toolbar > .hint, html.lite .kbd { display: none; }
 @media (max-width: 767px) { .proj-row { grid-template-columns: minmax(0, 1fr); } .sticky-save { bottom: 96px; } }
 /* Keep sticky save buttons clear of the floating assistant button */
 .sticky-save { padding-right: 72px; }
+
+/* Free AI download progress */
+.pull { display: flex; flex-direction: column; gap: var(--s1); }
+
+/* A closed panel must be gone, not just transparent (it was swallowing taps underneath it) */
+[hidden] { display: none !important; }
+.ai-panel:not(.on) { pointer-events: none; }

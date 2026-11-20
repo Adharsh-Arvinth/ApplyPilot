@@ -537,7 +537,7 @@
     async settings() {
       await settle({ profile: api('/profile'), gemini: api('/profile/gemini-settings'), resumes: api('/resumes'),
         automation: api('/automation/status'), autopilot: api('/autopilot'), proofStatus: api('/proofs/status'),
-        resume: api('/profile/resume'), answers: api('/answer-bank'), avatar: api('/profile/avatar/meta'), facts: api('/profile/facts') });
+        resume: api('/profile/resume'), answers: api('/answer-bank'), avatar: api('/profile/avatar/meta'), facts: api('/profile/facts'), localAI: api('/ai/local') });
     },
   };
 
@@ -1263,6 +1263,12 @@
       'Answer once and keep “Remember” on — it’s reused automatically from then on.',
       'AI drafts are answers Gemini wrote from your verified facts. Approve or edit them.',
       'Sensitive questions (visa, salary, legal, identity) always come to you.'] },
+    { id: 'ai', icon: 'auto_awesome', title: 'AI: your own Gemini key or the free model', to: ['Open AI settings', 'settings/ai'], steps: [
+      'ApplyPilot uses AI to answer form questions, fix form errors, write cover letters, prep interviews and power the assistant.',
+      'Best: paste your own free Gemini key (Settings › AI answers › Gemini API key). Get one at aistudio.google.com/apikey.',
+      'No key, or out of quota? The free model takes over automatically. Install Ollama (free) from ollama.com, then press Download model — the right size for your computer is picked for you.',
+      'Want everything private? Set “When to use it” to Always: nothing leaves your computer.',
+      'Computer too slow for a local model? Use a free cloud model (Groq or OpenRouter) with a free key.'] },
     { id: 'email', icon: 'mail', title: 'Email proof and your Gmail app password', to: ['Open Email proof', 'settings/email'], steps: [
       'Turn on 2-Step Verification for your Google account (app passwords need it).',
       'Visit myaccount.google.com/apppasswords, create one called “ApplyPilot” and copy the 16 characters.',
@@ -1344,6 +1350,57 @@
   }
 
   // ── Gemini key: everyone uses their own (free from Google AI Studio); the PC's .env key is only a fallback ──
+
+  // ── Free AI: an open model on this computer (sized for its hardware), or a free cloud model ──
+  const CLOUD_PRESETS = [
+    ['', 'Choose a free provider…', ''],
+    ['https://api.groq.com/openai/v1', 'Groq (free tier)', 'llama-3.1-8b-instant'],
+    ['https://openrouter.ai/api/v1', 'OpenRouter (free models)', 'qwen/qwen3-8b:free'],
+  ];
+  function freeAICard() {
+    const L = S.localAI || {}, hw = L.hardware || {}, pull = L.pull || {}, cloud = L.cloud || {};
+    const size = (tag) => ((L.choices || []).find(c => c.tag === tag) || {}).size || '';
+    const state = L.ready ? ['teal', `Ready · ${esc(L.model)}`] : L.installed ? ['amber', 'Model not downloaded yet'] : cloud.ready ? ['teal', 'Using the free cloud model'] : ['slate', 'Not set up'];
+    const pulling = pull.status === 'pulling';
+    const pct = pull.total ? Math.round(pull.done / pull.total * 100) : 0;
+    const hwLine = `This computer: ${hw.ram_gb || '?'} GB memory${hw.gpu ? ` · ${esc(hw.gpu)} (${hw.gpu_gb} GB)` : ' · no graphics card found'}`;
+    const setup = !L.installed
+      ? `<ol class="steps small"><li>Install <b>Ollama</b> — free, from <a href="https://ollama.com/download" target="_blank" rel="noopener">ollama.com/download</a>.</li><li>Come back here and press <b>Download model</b>. The right size for this computer is chosen for you.</li></ol>
+         <div class="row-end"><button type="button" class="btn sm hv" data-act="local-ai-refresh">${icon('refresh')}I've installed it</button></div>`
+      : !L.ready ? `${pulling ? `<div class="pull"><div class="bar thin"><i style="width:${pct}%"></i></div><span class="small faint tnum">Downloading ${esc(pull.model || '')} · ${pct}%</span></div>`
+          : pull.status === 'error' ? `<p class="small bad">${esc(pull.error)}</p>` : ''}
+         <div class="row-end"><button type="button" class="btn primary hv" data-act="local-ai-pull" ${pulling ? 'disabled' : ''}>${icon('download')}Download ${esc(L.model || 'model')} · ${esc(size(L.model))}</button></div>` : '';
+    return `<form class="card" data-local-ai-form><div class="card-h"><span class="card-t">Free AI · no key needed</span><span class="aside"><span class="dot ${state[0]}"></span>${state[1]}</span></div>
+      <div class="card-b stack">
+        <p class="muted small">An open model (Qwen3.5) runs on the computer that runs ApplyPilot — free, unlimited and private. It takes over whenever Gemini has no key, runs out of quota or is down. Phones use it through this computer.</p>
+        <div class="form-grid">
+          <div class="field"><label for="la-mode">When to use it</label><select class="select" id="la-mode" name="mode">
+            ${[['auto', 'Automatically when Gemini is unavailable'], ['local', 'Always (private — nothing leaves this computer)'], ['gemini', 'Never (Gemini only)']].map(([v, l]) => `<option value="${v}" ${L.mode === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+          <div class="field"><label for="la-model">Model</label><select class="select" id="la-model" name="model">
+            <option value="auto" ${(L.model_setting || 'auto') === 'auto' ? 'selected' : ''}>Best for this computer (${esc(L.recommended || '')})</option>
+            ${(L.choices || []).map(c => `<option value="${esc(c.tag)}" ${L.model_setting === c.tag ? 'selected' : ''}>${esc(c.tag)} · ${esc(c.size)}</option>`).join('')}</select></div>
+        </div>
+        <span class="faint small">${hwLine}</span>
+        ${setup}
+        <details class="collapse plain"><summary class="small muted">Computer too slow for a local model? Use a free cloud model ${icon('expand_more', 'chev')}</summary>
+          <div class="form-grid mt-3">
+            <div class="field"><label for="la-preset">Provider</label><select class="select" id="la-preset" data-cloud-preset>${CLOUD_PRESETS.map(([u, l]) => `<option value="${esc(u)}" ${cloud.url === u && u ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>
+            <div class="field"><label for="la-cmodel">Model</label><input class="input" id="la-cmodel" name="cloud_model" value="${esc(cloud.model || '')}" placeholder="e.g. llama-3.1-8b-instant"></div>
+            <div class="field full"><label for="la-curl">Endpoint (OpenAI-compatible)</label><input class="input" id="la-curl" name="cloud_url" value="${esc(cloud.url || '')}" placeholder="https://…/v1"></div>
+            <div class="field full"><label for="la-ckey">Free API key ${cloud.has_key ? '<small class="faint">· saved (leave empty to keep)</small>' : ''}</label><input class="input" id="la-ckey" name="cloud_key" type="password" autocomplete="off" placeholder="Paste the free key from the provider"></div>
+          </div></details>
+        <div class="row-end"><button class="btn primary hv" type="submit">Save</button></div>
+      </div></form>`;
+  }
+  let localPullTimer = 0;
+  function watchLocalPull() {
+    clearTimeout(localPullTimer);
+    if (!S.localAI || !S.localAI.pull || S.localAI.pull.status !== 'pulling') return;
+    localPullTimer = setTimeout(async () => {
+      try { S.localAI = await api('/ai/local'); if (S.view === 'settings' && S.set.section === 'ai') { S.lastHtml = ''; render(); } } catch (e) {}
+      watchLocalPull();
+    }, 1500);
+  }
   function geminiKeyCard() {
     const g = S.gemini || {}, src = g.key_source || 'none';
     const state = src === 'yours' ? ['teal', `Using your key ${esc(g.key_hint || '')}`]
@@ -1467,7 +1524,7 @@
           <div class="card-b"><ol class="steps">${TUTORIALS.find(t => t.id === 'email').steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol></div></details></div>`;
     }
 
-    if (sec === 'ai') return `<div class="stack">${geminiKeyCard()}<form class="card" data-gemini-form><div class="card-h"><span class="card-t">AI answers</span><span class="aside tnum">${fmt(g.gemini_answers_today || 0)} today · ~${fmt(g.saved_minutes || 0)} min saved</span></div>
+    if (sec === 'ai') return `<div class="stack">${freeAICard()}${geminiKeyCard()}<form class="card" data-gemini-form><div class="card-h"><span class="card-t">AI answers</span><span class="aside tnum">${fmt(g.gemini_answers_today || 0)} today · ~${fmt(g.saved_minutes || 0)} min saved</span></div>
         <div class="set-list"><label class="set-row hv"><div class="grow">Draft answers for new questions<small>Grounded only in your verified facts. Drafts wait in Needs you › AI drafts.</small></div><span class="toggle"><input type="checkbox" name="gemini_auto_answer_enabled" ${g.gemini_auto_answer_enabled ? 'checked' : ''}><i></i></span></label></div>
         <div class="card-b form-grid card-sep">
           <div class="field"><label for="g-conf">Minimum confidence</label><div class="range-row"><input type="range" id="g-conf" name="gemini_min_confidence" min="0.5" max="1" step="0.01" value="${g.gemini_min_confidence ?? 0.85}"><output>${Math.round((g.gemini_min_confidence ?? 0.85) * 100)}%</output></div></div>
@@ -1495,6 +1552,9 @@
     const r = $('#g-conf');
     r && r.addEventListener('input', () => { r.nextElementSibling.value = Math.round(r.value * 100) + '%'; });
     if (S.set.section === 'answers') afterRender.answers();
+    const preset = $('[data-cloud-preset]');
+    if (preset) preset.addEventListener('change', () => { const p = CLOUD_PRESETS.find(x => x[0] === preset.value); if (p && p[0]) { $('#la-curl').value = p[0]; $('#la-cmodel').value = p[2]; } });
+    if (S.set.section === 'ai') watchLocalPull();
     const pic = $('#avatar-file');
     if (pic) pic.addEventListener('change', () => pic.files[0] && uploadAvatar(pic.files[0]));
     const input = $('#resume-file'), zone = $('[data-dropzone]');
@@ -1753,6 +1813,14 @@
       S.answers = S.answers.filter(x => x.id !== id); render();
     },
     async backup(btn) { await run(btn, () => api('/backup', { method: 'POST' }), 'Backup created'); },
+    async 'local-ai-pull'(btn) {
+      try { await api('/ai/local/pull', { method: 'POST', body: {} }); S.localAI = await api('/ai/local'); S.lastHtml = ''; render(); watchLocalPull(); toast('Downloading the free model — you can keep using the app'); }
+      catch (e) { toast(e.message, true); }
+    },
+    async 'local-ai-refresh'() {
+      try { S.localAI = await api('/ai/local'); S.lastHtml = ''; render(); toast(S.localAI.installed ? 'Ollama found' : "Ollama isn't running yet — open it after installing", !S.localAI.installed); }
+      catch (e) { toast(e.message, true); }
+    },
     async 'gemini-key-remove'() {
       const ok = await confirmModal({ title: 'Stop using your key?', body: "AI features will use this computer's key if it has one, otherwise simple built-in fallbacks.", ok: 'Remove key', danger: true });
       if (!ok) return;
@@ -1877,6 +1945,13 @@
         const r = await run(btn, () => api(`/answer-bank/${id}`, { method: 'PUT', body: fd }), 'Answer saved');
         if (r) { S.answers = S.answers.map(a => a.id === r.id ? r : a); S.ans.editing = null; render(); }
       }
+      return;
+    }
+    if (form.hasAttribute('data-local-ai-form')) {
+      const el = form.elements, body = { mode: el.mode.value, model: el.model.value, cloud: { url: el.cloud_url.value.trim(), model: el.cloud_model.value.trim() } };
+      if (el.cloud_key.value.trim()) body.cloud.key = el.cloud_key.value.trim();
+      const r = await run(btn, () => api('/ai/local', { method: 'PUT', body }), 'Saved');
+      if (r) { S.localAI = r; S.lastHtml = ''; render(); }
       return;
     }
     if (form.hasAttribute('data-gemini-key-form')) {

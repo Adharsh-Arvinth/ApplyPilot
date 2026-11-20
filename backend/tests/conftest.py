@@ -18,6 +18,9 @@ def setup_test_database():
         AnswerService.seed_initial_data(db)
     finally:
         db.close()
+    # Tests are deterministic: no free local model unless a test turns it on (test_local_ai does)
+    from backend.app.services.local_ai import LocalAI
+    LocalAI.save_config({"mode": "gemini"})
     yield
     # Cleanup test db after session if needed
     db.close()
