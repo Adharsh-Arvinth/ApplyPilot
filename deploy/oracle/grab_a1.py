@@ -31,7 +31,9 @@ def log(msg: str) -> None:
 def clients():
     cfg = oci.config.from_file()
     oci.config.validate_config(cfg)
-    return cfg, oci.core.ComputeClient(cfg), oci.core.VirtualNetworkClient(cfg), oci.identity.IdentityClient(cfg)
+    kw = {"timeout": (15, 90), "retry_strategy": oci.retry.DEFAULT_RETRY_STRATEGY}
+    return (cfg, oci.core.ComputeClient(cfg, **kw), oci.core.VirtualNetworkClient(cfg, **kw),
+            oci.identity.IdentityClient(cfg, **kw))
 
 
 def existing(compute, comp):
@@ -111,6 +113,15 @@ def main():
         attempt = 0
         while True:
             attempt += 1
+            # A request that timed out may still have created the server: never make a second one
+            try:
+                inst = existing(compute, comp)
+            except Exception as e:  # network hiccup while checking: just try again later
+                log(f"Couldn't check for the server ({type(e).__name__}); retrying")
+            if inst:
+                log("The server exists (an earlier request went through)")
+                break
+            wait = 60
             for d in ad:
                 try:
                     inst = compute.launch_instance(oci.core.models.LaunchInstanceDetails(
@@ -120,6 +131,10 @@ def main():
                         create_vnic_details=oci.core.models.CreateVnicDetails(subnet_id=subnet.id, assign_public_ip=True),
                         metadata={"ssh_authorized_keys": key})).data
                     break
+                except (oci.exceptions.RequestException, oci.exceptions.ConnectTimeout, ConnectionError, OSError) as e:
+                    wait = 90
+                    log(f"Attempt {attempt}: network problem talking to Oracle ({type(e).__name__}); retrying")
+                    continue
                 except oci.exceptions.ServiceError as e:
                     text = f"{e.code}: {e.message}"
                     if e.status == 429:
