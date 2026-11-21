@@ -209,8 +209,12 @@ class Autopilot:
                 if job.status == "applying":  # engine returned early without moving the job on
                     job.status = "queued" if isinstance(result, dict) and result.get("status") == "paused" else "needs_review"
                     db.commit()
+                res = result if isinstance(result, dict) else {}
+                reason = (job.skip_reason or job.blocked_reason or res.get("reason") or res.get("message") or "")
                 Autopilot._save_state(db, last_apply_at=_now(), last_apply_job=f"{job.company} — {job.title}",
-                                      last_apply_result=(result or {}).get("status") if isinstance(result, dict) else str(result))
+                                      last_apply_job_id=job.id, last_apply_status=job.status,
+                                      last_apply_reason=str(reason)[:240],
+                                      last_apply_result=res.get("status") if res else str(result))
                 did["applied"] = job.id
 
         Autopilot._save_state(db, last_tick_at=_now(), status=Autopilot.describe(db, profile, cfg), last_error="")

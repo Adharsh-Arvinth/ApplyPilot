@@ -1008,6 +1008,49 @@
     ${art(p.company, 'sm')}<span class="grow"><span class="main-t">${esc(p.subject || p.company)}</span><span class="sub-t">${esc(p.company)}${p.role ? ' · ' + esc(p.role) : ''}</span></span>
     <span class="end"><span class="chip ${PROOF_KIND[p.kind] ? PROOF_KIND[p.kind][1] : ''}">${PROOF_KIND[p.kind] ? PROOF_KIND[p.kind][0] : esc(p.kind)}</span><span class="faint small tnum">${rel(p.received_at)}</span></span></button>`;
 
+  // What the autopilot is doing right now and what happened on its last try, in plain words
+  function activityCard() {
+    const ap = S.autopilot || {}, st = ap.state || {}, ps = S.proofStatus || {};
+    const clock = (iso) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); };
+    const hrs = (S.profile && S.profile.active_hours_start != null) ? `${S.profile.active_hours_start}:00–${S.profile.active_hours_end}:00` : 'your active hours';
+    const nextIn = ap.next_apply_at ? Math.max(0, Math.round((new Date(ap.next_apply_at) - Date.now()) / 60000)) : 0;
+    const now = {
+      running: ap.queued ? [`Next application ${nextIn > 0 ? `in about ${nextIn} min` : 'any moment now'}`, `One every ${ap.apply_gap_minutes || '?'} min, to stay under your hourly limit · ${fmt(ap.queued)} ready to apply`]
+        : ['Looking for roles it can apply to', `Next search ${ap.next_discovery_at ? 'at ' + clock(ap.next_discovery_at) : 'soon'} · it checks ${fmt(45)}+ company career pages`],
+      sleeping: ['Resting outside your active hours', `It applies between ${hrs}. Change this in Settings › Autopilot`],
+      paused: ['Paused', 'Tap Resume above to continue'],
+      off: ['Autopilot is off', 'Turn it on in Settings › Autopilot'],
+      circuit_broken: ['Paused for safety', 'A job site failed several times in a row; it retries automatically soon'],
+    }[ap.status] || ['Getting ready', ''];
+    const res = st.last_apply_status || st.last_apply_result || '';
+    const outcome = {
+      applied: ['teal', 'check_circle', 'Sent to the employer'], submitted: ['teal', 'check_circle', 'Sent to the employer'],
+      dry_run: ['violet', 'science', "Filled the whole form, didn't send (dry run)"],
+      skipped: ['slate', 'block', 'Skipped'], needs_input: ['amber', 'help', 'Needs your answer in Needs You'],
+      needs_review: ['amber', 'visibility', 'Needs a look from you'], expired: ['slate', 'event_busy', 'Posting had closed'],
+      failed: ['coral', 'error', "Couldn't finish"], blocked: ['slate', 'block', 'Not possible on that site'],
+      needs_attention: ['amber', 'help', 'Needs a look from you'], unverified: ['teal', 'check_circle', 'Sent, waiting for the employer\'s email'],
+    }[res] || ['slate', 'schedule', res ? res.replace(/_/g, ' ') : 'No applications tried yet'];
+    const plain = (r) => String(r || '')
+      .replace(/30-day company cooldown active/i, 'you applied there in the last 30 days')
+      .replace(/Location '([^']+)' is outside India/i, "it's in $1, outside India")
+      .replace(/Seniority keyword '([^']+)' in title/i, "it's a $1 role")
+      .replace(/Requires Senior seniority level.*/i, 'it asks for more experience');
+    const reason = st.last_apply_reason ? ` · ${plain(st.last_apply_reason)}` : '';
+    const live = !!(S.stats && S.stats.go_live);
+    const row = (ic, color, t, d) => `<div class="act-row"><span class="act-ic ${color}">${icon(ic, 'fill')}</span><div class="min0"><div class="act-t">${t}</div>${d ? `<div class="act-d">${d}</div>` : ''}</div></div>`;
+    return `<section class="card act-card block">
+      <div class="card-h"><span class="card-t">What it's doing</span><button type="button" class="btn sm ghost hv" data-act="run-now">${icon('bolt')}Run now</button></div>
+      <div class="act-list">
+        ${row('radio_button_checked', ap.status === 'running' ? 'teal pulse' : 'slate', esc(now[0]), esc(now[1]))}
+        ${row(outcome[1], outcome[0], `Last try${st.last_apply_at ? ` · ${esc(clock(st.last_apply_at))}` : ''}: ${esc(outcome[2])}`, esc((st.last_apply_job || '') + (res === 'skipped' || res === 'failed' || res === 'blocked' ? reason : '')))}
+        ${row('travel_explore', 'sky', `Last search${st.last_discovery_at ? ` · ${esc(clock(st.last_discovery_at))}` : ''}`, st.last_discovered != null ? `Found ${fmt(st.last_discovered)} new role${st.last_discovered === 1 ? '' : 's'} that fit your filters` : 'Not yet')}
+        ${row('mark_email_read', 'violet', `Email check${ps.last_sync ? ` · ${esc(rel(ps.last_sync))}` : ''}`, ps.connected ? 'Employer replies become proof automatically' : 'Connect Gmail in Settings › Email proof')}
+      </div>
+      ${live ? '' : `<button type="button" class="dry-banner hv" data-nav="settings/autopilot">${icon('science')}<span class="grow"><b>Dry run is on.</b> It fills every form and stops before Submit, so nothing reaches employers yet. Turn on Live in Settings › Autopilot when you're ready.</span>${icon('chevron_right')}</button>`}
+    </section>`;
+  }
+
   // Daily goal ring + streak (applications prepared or sent; dry runs count while you practise)
   function goalCard() {
     const st = S.stats || {};
@@ -1059,7 +1102,7 @@
       <div class="card list">${recent.map(proofRow).join('')}</div></section>` : '';
     return `<header class="view-head greet"><div class="min0"><div class="eyebrow">${esc(today())}</div><h1>${esc(greeting())}</h1><p class="sub">${esc(summary)}</p></div>
       <button class="greet-me" data-nav="settings/profile" title="Your profile">${me('lg')}</button></header>
-      ${hero}${notifyNudge()}${goalCard()}${checklist()}${forYou}${dashboard()}${recentHtml}${topShelf(8)}`;
+      ${hero}${notifyNudge()}${activityCard()}${goalCard()}${checklist()}${forYou}${dashboard()}${recentHtml}${topShelf(8)}`;
   };
 
   // ───────────────────────── View: Proof ─────────────────────────
@@ -2162,6 +2205,10 @@
       if (!ok) return;
       try { localStorage.setItem(DEVICE_AUTO, 'off'); } catch (e) {}
       try { await deviceAI('delete', { model: btn.dataset.model }); setTimeout(refreshDevice, 500); toast('Model deleted'); } catch (e) { toast(e.message, true); }
+    },
+    async 'run-now'(btn) {
+      await run(btn, () => api('/autopilot/run-now', { method: 'POST' }), 'Running a cycle now. This card updates in a moment');
+      setTimeout(async () => { try { S.autopilot = await api('/autopilot'); S.lastHtml = ''; if (S.view === 'home') render(); } catch (e) {} }, 8000);
     },
     async 'show-qr'() {
       try {

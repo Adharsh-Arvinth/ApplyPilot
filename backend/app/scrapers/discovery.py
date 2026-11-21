@@ -27,6 +27,20 @@ TARGET_TITLE_KEYWORDS = [
     "intern", "associate", "graduate", "engineer", "analyst"
 ]
 
+# Board IDs -> how the company writes its own name
+COMPANY_NAMES = {
+    "razorpaysoftwareprivatelimited": "Razorpay", "zetaglobal": "Zeta Global", "highradius": "HighRadius",
+    "mongodb": "MongoDB", "purestorage": "Pure Storage", "abnormalsecurity": "Abnormal Security", "observeai": "Observe.AI",
+    "newrelic": "New Relic", "sumologic": "Sumo Logic", "gitlab": "GitLab", "openai": "OpenAI", "elevenlabs": "ElevenLabs",
+    "fampay": "FamPay", "cred": "CRED", "paytm": "Paytm", "sarvam": "Sarvam AI", "zscaler": "Zscaler", "okta": "Okta",
+    "datadog": "Datadog", "coinbase": "Coinbase", "airbnb": "Airbnb", "databricks": "Databricks", "fivetran": "Fivetran",
+}
+
+
+def company_display(board: str) -> str:
+    return COMPANY_NAMES.get(board.lower(), board[:1].upper() + board[1:])
+
+
 def normalize_job_title(title: str) -> str:
     if not title:
         return ""
@@ -71,7 +85,7 @@ class JobDiscoveryService:
                         if JobDiscoveryService.is_target_title(title) and JobDiscoveryService.is_eligible_location(loc):
                             jobs.append({
                                 "source": "greenhouse",
-                                "company": board_name.capitalize(),
+                                "company": company_display(board_name),
                                 "title": title,
                                 "url": job_url,
                                 "location": loc,
@@ -105,7 +119,7 @@ class JobDiscoveryService:
                         if JobDiscoveryService.is_target_title(title) and JobDiscoveryService.is_eligible_location(loc):
                             jobs.append({
                                 "source": "lever",
-                                "company": board_name.capitalize(),
+                                "company": company_display(board_name),
                                 "title": title,
                                 "url": job_url,
                                 "location": loc,
@@ -138,7 +152,7 @@ class JobDiscoveryService:
                         if JobDiscoveryService.is_target_title(title) and JobDiscoveryService.is_eligible_location(loc):
                             jobs.append({
                                 "source": "ashby",
-                                "company": board_name.capitalize(),
+                                "company": company_display(board_name),
                                 "title": title,
                                 "url": job_url,
                                 "location": loc,
@@ -525,7 +539,14 @@ class JobDiscoveryService:
 
         # 1. Fetch live jobs from real Greenhouse, Lever, and Ashby boards
         live_jobs = []
-        live_boards_greenhouse = ["canonical", "cloudflare", "elastic", "gitlab", "figma"]
+        # Company boards that post roles in India (checked 21 Nov 2026: each had India openings, most non-senior).
+        # All are Greenhouse / Lever / Ashby, which allow automated applying; LinkedIn/Indeed stay assist-only.
+        live_boards_greenhouse = [
+            "highradius", "stripe", "mongodb", "zscaler", "rubrik", "purestorage", "okta", "twilio", "zetaglobal",
+            "databricks", "gitlab", "datadog", "groww", "roblox", "abnormalsecurity", "razorpaysoftwareprivatelimited",
+            "elastic", "agoda", "coinbase", "toast", "observeai", "airbnb", "anthropic", "samsara", "fivetran", "sumologic",
+            "druva", "commvault", "netskope", "newrelic", "canonical", "cloudflare", "figma",
+        ]
         for gh in live_boards_greenhouse:
             try:
                 res = await JobDiscoveryService.fetch_greenhouse_board(gh)
@@ -533,13 +554,21 @@ class JobDiscoveryService:
             except Exception as e:
                 logger.warning(f"Error scraping live Greenhouse {gh}: {e}")
 
-        live_boards_lever = ["palantir", "spotify"]
+        live_boards_lever = ["paytm", "zeta", "fampay", "cred", "palantir", "spotify"]
         for lev in live_boards_lever:
             try:
                 res = await JobDiscoveryService.fetch_lever_board(lev)
                 live_jobs.extend(res)
             except Exception as e:
                 logger.warning(f"Error scraping live Lever {lev}: {e}")
+
+        live_boards_ashby = ["sarvam", "plane", "notion", "openai", "elevenlabs", "composio", "atlan", "ramp"]
+        for ab in live_boards_ashby:
+            try:
+                res = await JobDiscoveryService.fetch_ashby_board(ab)
+                live_jobs.extend(res)
+            except Exception as e:
+                logger.warning(f"Error scraping live Ashby {ab}: {e}")
 
         # Live Easy Apply discovery from LinkedIn and Indeed
         is_testing = bool(os.environ.get("PYTEST_CURRENT_TEST"))

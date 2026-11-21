@@ -1446,3 +1446,41 @@ html[data-motion="reduce"] .tabbar button .ms, html[data-motion="reduce"] .set-n
 .qr-frame svg { display: block; width: 100%; height: 100%; border-radius: 10px; }
 .qr-modal .acts { justify-content: center; }
 .qr-modal p .ms { font-size: 14px; vertical-align: -2px; }
+
+/* ── Home: what it's doing ── */
+.act-card .card-h { padding-bottom: var(--s1); }
+.act-list { display: flex; flex-direction: column; gap: var(--s3); padding: var(--s2) var(--s4) var(--s4); }
+.act-row { display: flex; align-items: flex-start; gap: var(--s3); }
+.act-ic { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; flex: none; background: var(--surface-2); color: var(--ink-3); }
+.act-ic .ms { font-size: 18px; }
+.act-ic.teal { color: var(--teal); background: color-mix(in srgb, var(--teal) 14%, transparent); }
+.act-ic.amber { color: var(--amber); background: color-mix(in srgb, var(--amber) 14%, transparent); }
+.act-ic.coral { color: var(--coral); background: color-mix(in srgb, var(--coral) 14%, transparent); }
+.act-ic.violet { color: var(--violet); background: color-mix(in srgb, var(--violet) 14%, transparent); }
+.act-ic.sky { color: var(--sky); background: color-mix(in srgb, var(--sky) 14%, transparent); }
+.act-ic.pulse .ms { animation: act-pulse 2s ease-in-out infinite; }
+@keyframes act-pulse { 50% { opacity: .45; } }
+.act-t { font-size: .875rem; font-weight: 600; line-height: 1.35; }
+.act-d { font-size: .8125rem; color: var(--ink-2); line-height: 1.4; margin-top: 1px; overflow-wrap: anywhere; }
+.dry-banner { display: flex; align-items: center; gap: var(--s3); width: calc(100% - 2 * var(--s3)); margin: 0 var(--s3) var(--s3); padding: var(--s3);
+  border-radius: var(--r-md); text-align: left; font-size: .8125rem; line-height: 1.45; color: var(--ink);
+  background: color-mix(in srgb, var(--violet) 12%, transparent); }
+.dry-banner > .ms:first-child { color: var(--violet); }
+@media (prefers-reduced-motion: reduce) { .act-ic.pulse .ms { animation: none; } }
+
+/* ── Assistant panel: proper spacing on phones ── */
+.ai-tools { padding: var(--s3) var(--s4) 0; }
+.ai-tool { min-height: 64px; justify-content: center; padding: var(--s2) 4px; line-height: 1.25; }
+.ai-chips { padding: var(--s3) var(--s4) var(--s3); scroll-padding-inline: var(--s4);
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+.ai-chips .chip-btn { flex: none; }
+.ai-compose { padding: var(--s3); }
+@media (max-width: 767px) {
+  /* A clean sheet resting just above the tab bar, page dimmed behind it; the round button hides while it's open */
+  .ai-panel { bottom: calc(max(var(--s3), env(safe-area-inset-bottom)) + 96px); height: min(600px, calc(100dvh - 180px));
+    box-shadow: var(--rim), 0 24px 60px -18px rgba(0, 0, 0, .45), 0 0 0 100vmax rgba(0, 0, 0, 0); transition: opacity .22s var(--ease-out), transform .34s var(--ease-sheet), box-shadow .3s; }
+  .ai-panel.on { box-shadow: var(--rim), 0 24px 60px -18px rgba(0, 0, 0, .45), 0 0 0 100vmax rgba(0, 0, 0, .38); }
+  .ai-fab.open { opacity: 0; pointer-events: none; transform: scale(.8); }
+  .ai-empty { padding: var(--s5) var(--s3); }
+}
+.act-card .card-h > .btn { margin-left: auto; }
