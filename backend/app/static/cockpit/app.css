@@ -1333,3 +1333,25 @@ html.lite .toolbar > .hint, html.lite .kbd { display: none; }
   .set-nav .set-link:active .ms { transform: scale(.86); transition-duration: var(--t-press); }
   .set-nav .glide.held { scale: 1.1 1.14; }
 }
+
+/* ── Glass lens with depth ──
+   --lift (0 → 1) raises the glass when pressed: it grows, its shadow deepens and softens, its highlight brightens.
+   --sx/--sy are the spring's squash & stretch; --mag magnifies icons the glass passes over. */
+@property --lift { syntax: '<number>'; inherits: false; initial-value: 0; }
+.glide { --lift: 0; --lift-s: 1; scale: calc(var(--sx, 1) * var(--lift-s)) calc(var(--sy, 1) * var(--lift-s)); will-change: translate, width, scale; }
+.glide.moving { scale: calc(var(--sx, 1) * var(--lift-s)) calc(var(--sy, 1) * var(--lift-s)); }
+.tabbar .glide, .set-nav .glide {
+  box-shadow: var(--rim),
+    0 calc(1px + 1px * var(--lift)) 2px rgba(0, 0, 0, calc(.10 + .04 * var(--lift))),
+    0 calc(4px + 8px * var(--lift)) calc(12px + 20px * var(--lift)) calc(-4px - 2px * var(--lift)) rgba(0, 0, 0, calc(.22 + .16 * var(--lift)));
+}
+.tabbar .glide::before, .set-nav .glide::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, calc(.20 + .14 * var(--lift))) 0%, rgba(255, 255, 255, 0) 52%),
+              radial-gradient(120% 80% at 50% 115%, rgba(255, 255, 255, calc(.05 + .07 * var(--lift))), transparent 60%);
+}
+.tabbar .glide.held, .set-nav .glide.held { --lift: 1; --lift-s: 1.09; scale: calc(var(--sx, 1) * var(--lift-s)) calc(var(--sy, 1) * var(--lift-s)); }
+.tabbar button .ms, .set-nav .set-link .ms { scale: var(--mag, 1); }
+.tabbar button.hot .ms, .set-nav .set-link.hot .ms { transform: none; }
+@media (prefers-reduced-motion: reduce) { .tabbar button .ms, .set-nav .set-link .ms { scale: 1; } }
+html[data-motion="reduce"] .tabbar button .ms, html[data-motion="reduce"] .set-nav .set-link .ms { scale: 1; }

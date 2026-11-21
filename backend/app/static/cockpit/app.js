@@ -239,6 +239,55 @@
   // ("moving") while it travels — position uses `translate`, the stretch uses `scale`,
   // so the two never fight and both stay on the compositor.
   const glidePos = {};
+  // ── Spring physics for the glass lens ──
+  // Position and size follow a slightly under-damped spring (momentum, a soft settle), integrated by
+  // time so it feels the same at 60, 90 or 120 Hz. Speed squashes and stretches the glass along its
+  // path, and icons near it magnify (dock-style), which gives the motion its depth.
+  const springs = new WeakMap();
+  const SPRING_K = 700, SPRING_C = 40; // stiffness, damping
+  const SPRING_KEYS = [['x', 'vx'], ['y', 'vy'], ['w', 'vw'], ['h', 'vh']];
+  function lensPaint(ind, st) {
+    ind.style.translate = `${st.x.toFixed(2)}px ${st.y.toFixed(2)}px`;
+    ind.style.width = `${Math.max(0, st.w).toFixed(2)}px`; ind.style.height = `${Math.max(0, st.h).toFixed(2)}px`;
+    const v = Math.abs(st.vx) > Math.abs(st.vy) ? st.vx : st.vy, stretch = Math.min(0.2, Math.abs(v) / 3200);
+    const horiz = Math.abs(st.vx) >= Math.abs(st.vy);
+    ind.style.setProperty('--sx', (horiz ? 1 + stretch : 1 - stretch * 0.4).toFixed(3));
+    ind.style.setProperty('--sy', (horiz ? 1 - stretch * 0.4 : 1 + stretch).toFixed(3));
+    const items = st.items;
+    if (items && items.length) { // magnify what the glass passes over
+      const cx = st.x + st.w / 2, reach = Math.max(st.w, 40) * 1.15, lift = ind.classList.contains('held') ? 0.2 : 0.08;
+      for (const it of items) {
+        const d = Math.abs(it.offsetLeft + it.offsetWidth / 2 - cx), m = Math.max(0, 1 - d / reach);
+        it.style.setProperty('--mag', (1 + lift * m * m).toFixed(3));
+      }
+    }
+  }
+  function lensStep(ind, st, now) {
+    const dt = st.t ? (now - st.t) / 1000 : 1 / 60; st.t = now;
+    const stalled = dt > 0.12; // the device paused drawing: don't leave the glass half-way, just land it
+    const n = Math.max(1, Math.ceil(dt * 240)), h = dt / n; // small fixed steps keep the spring stable at any refresh rate
+    if (!stalled) for (let i = 0; i < n; i++) {
+      for (const [p, v] of SPRING_KEYS) { st[v] += (SPRING_K * (st.to[p] - st[p]) - SPRING_C * st[v]) * h; st[p] += st[v] * h; }
+    }
+    const still = stalled || SPRING_KEYS.every(([p, v]) => Math.abs(st.to[p] - st[p]) < 0.25 && Math.abs(st[v]) < 4);
+    if (still) { for (const [p, v] of SPRING_KEYS) { st[p] = st.to[p]; st[v] = 0; } lensPaint(ind, st); st.raf = 0; return; }
+    lensPaint(ind, st);
+    st.raf = requestAnimationFrame((n) => lensStep(ind, st, n));
+  }
+  function lensTo(ind, to, snap = false) {
+    let st = springs.get(ind);
+    if (!st) { st = { ...to, vx: 0, vy: 0, vw: 0, vh: 0, raf: 0, t: 0 }; springs.set(ind, st); snap = true; }
+    st.to = { ...to };
+    const root = ind.parentElement;
+    st.items = root && (root.id === 'tabbar' || root.classList.contains('set-nav')) ? Array.from(root.querySelectorAll(':scope > button, :scope > .set-link')) : null;
+    ind.style.transition = 'opacity 200ms, scale 260ms var(--ease-sheet), --lift 260ms var(--ease-sheet)';
+    if (snap || reduceMotion()) {
+      cancelAnimationFrame(st.raf); st.raf = 0;
+      Object.assign(st, to, { vx: 0, vy: 0, vw: 0, vh: 0 }); lensPaint(ind, st); return;
+    }
+    if (!st.raf) { st.t = 0; st.raf = requestAnimationFrame((n) => lensStep(ind, st, n)); }
+  }
+  const lensState = (ind) => springs.get(ind);
   function glide(root, key, activeSel = '.on') {
     if (!root || !root.getClientRects().length) return;
     let ind = root.querySelector(':scope > .glide');
@@ -248,13 +297,9 @@
     if (!on || !on.offsetWidth) { ind.style.opacity = '0'; return; }
     const to = { x: on.offsetLeft, y: on.offsetTop, w: on.offsetWidth, h: on.offsetHeight };
     const from = glidePos[key];
-    const place = (p) => { ind.style.translate = `${p.x}px ${p.y}px`; ind.style.width = `${p.w}px`; ind.style.height = `${p.h}px`; };
-    if (fresh) { ind.style.transition = 'none'; place(from || to); void ind.offsetWidth; ind.style.transition = ''; }
-    if (from && (from.x !== to.x || from.y !== to.y)) {
-      ind.classList.add('moving');
-      clearTimeout(ind.__t); ind.__t = setTimeout(() => ind.classList.remove('moving'), 200);
-    }
-    place(to); ind.style.opacity = '1';
+    if (fresh) lensTo(ind, from || to, true);
+    lensTo(ind, to);
+    ind.style.opacity = '1';
     glidePos[key] = to;
   }
 
@@ -432,11 +477,13 @@
     const tick = () => { try { navigator.vibrate && navigator.vibrate(6); } catch (e) {} };
     const follow = (x) => {
       const l = lens(); if (!l) return;
-      const br = bar.getBoundingClientRect(), w = l.offsetWidth;
+      const st = lensState(l); if (!st) return;
+      const br = bar.getBoundingClientRect(), w = st.to.w;
       const left = Math.max(0, Math.min(br.width - w, x - br.left - w / 2));
-      l.style.translate = `${left}px ${l.style.translate.split(' ')[1] || '0px'}`;
+      lensTo(l, { ...st.to, x: left });
     };
     const hot = (btn) => tabs().forEach(b => b.classList.toggle('hot', b === btn));
+    // (icons near the glass are magnified by the spring itself; see lensPaint)
     bar.addEventListener('pointerdown', (e) => {
       const btn = e.target.closest('button[data-nav]');
       if (!btn || (e.pointerType === 'mouse' && e.button !== 0)) return;
@@ -491,11 +538,11 @@
     const hot = (nav, btn) => links(nav).forEach(b => b.classList.toggle('hot', b === btn));
     const follow = () => {
       const l = lens(d.nav); if (!l) return;
+      const st = lensState(l); if (!st) return;
       const nr = d.nav.getBoundingClientRect(), over = linkAt(d.nav, d.x);
-      const w = over ? over.offsetWidth : l.offsetWidth;
-      l.style.width = `${w}px`;
+      const w = over ? over.offsetWidth : st.to.w;
       const left = Math.max(0, Math.min(d.nav.scrollWidth - w, d.x - nr.left + d.nav.scrollLeft - w / 2));
-      l.style.translate = `${left}px ${l.style.translate.split(' ')[1] || '0px'}`;
+      lensTo(l, { ...st.to, x: left, w });
       if (over && over !== d.over) { d.over = over; hot(d.nav, over); tick(); }
     };
     const loop = (now) => { // keep gliding past the visible edge: the row scrolls under your finger
