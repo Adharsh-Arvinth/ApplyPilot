@@ -498,11 +498,12 @@
       l.style.translate = `${left}px ${l.style.translate.split(' ')[1] || '0px'}`;
       if (over && over !== d.over) { d.over = over; hot(d.nav, over); tick(); }
     };
-    const loop = () => { // keep gliding past the visible edge: the row scrolls under your finger
+    const loop = (now) => { // keep gliding past the visible edge: the row scrolls under your finger
       if (!d || !d.armed) return;
-      const nr = d.nav.getBoundingClientRect(), edge = 44;
-      const v = d.x < nr.left + edge ? -(nr.left + edge - d.x) / 4 : d.x > nr.right - edge ? (d.x - nr.right + edge) / 4 : 0;
-      if (v) { d.nav.scrollLeft += v; follow(); }
+      const dt = Math.min(100, now - (d.t || now)); d.t = now; // by time, not frames: same speed at 60 or 120 Hz
+      const nr = d.nav.getBoundingClientRect(), edge = 56;
+      const depth = d.x < nr.left + edge ? -(nr.left + edge - d.x) : d.x > nr.right - edge ? d.x - nr.right + edge : 0;
+      if (depth && dt) { d.nav.scrollLeft += Math.sign(depth) * Math.min(1, Math.abs(depth) / edge) * 1.25 * dt; follow(); }
       d.raf = requestAnimationFrame(loop);
     };
     const arm = () => {
@@ -510,7 +511,7 @@
       d.armed = true;
       try { d.nav.setPointerCapture(d.id); } catch (e) {}
       const l = lens(d.nav); if (l) l.classList.add('held', 'gliding');
-      hot(d.nav, d.over); tick(); follow(); loop();
+      hot(d.nav, d.over); tick(); follow(); d.raf = requestAnimationFrame(loop);
     };
     const stop = () => {
       if (!d) return;
