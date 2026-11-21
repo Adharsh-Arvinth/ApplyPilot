@@ -1363,3 +1363,70 @@ html[data-motion="reduce"] .tabbar button .ms, html[data-motion="reduce"] .set-n
   .set-nav .set-link { height: 34px; transition: color .3s var(--ease-out); }
   .set-nav.is-gliding { -webkit-mask-image: none !important; mask-image: none !important; }
 }
+
+/* ── Toast actions (Undo) ── */
+.toasts .toast.has-act { pointer-events: auto; }
+.toast-act { margin-left: var(--s2); padding: 4px 10px; border-radius: var(--r-pill); font-weight: 700; color: var(--accent); background: var(--accent-soft); }
+
+/* ── Swipeable triage cards ── */
+.tcard { position: relative; touch-action: pan-y; will-change: transform; transition: transform .38s var(--ease-sheet), opacity .3s; }
+.tcard.dragging { transition: none; }
+.tcard.flying { transition: transform .32s cubic-bezier(.4, 0, 1, 1), opacity .32s; opacity: 0; }
+.tcard .stamp { position: absolute; top: var(--s4); z-index: 2; display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px;
+  border-radius: var(--r-pill); font-size: .75rem; font-weight: 800; letter-spacing: .02em; pointer-events: none; opacity: 0; transform: scale(.9); }
+.tcard .stamp.yes { right: var(--s4); color: #fff; background: var(--teal); opacity: var(--yes, 0); transform: scale(calc(.9 + .1 * var(--yes, 0))) rotate(6deg); }
+.tcard .stamp.no { left: var(--s4); color: #fff; background: var(--coral); opacity: var(--no, 0); transform: scale(calc(.9 + .1 * var(--no, 0))) rotate(-6deg); }
+.tcard .stamp .ms { font-size: 16px; }
+.swipe-tip { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: var(--s3); }
+
+/* ── Pull to refresh ── */
+.ptr { --p: 0; position: fixed; left: 50%; top: calc(var(--topbar-h, 56px) - 36px); z-index: var(--z-overlay); pointer-events: none;
+  translate: -50% calc(var(--p) * 1px); opacity: min(1, calc(var(--p) / 40)); transition: translate .3s var(--ease-sheet), opacity .2s; }
+.ptr-ball { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; color: var(--ink);
+  background: var(--sheen), var(--glass-strong); box-shadow: var(--rim), var(--shadow-float); }
+.ptr-ball .ms { font-size: 20px; rotate: calc(var(--p) * 2.8deg); transition: rotate .2s var(--ease-out); }
+.ptr.ready .ptr-ball .ms { rotate: 180deg; color: var(--accent); }
+.ptr.spin .ptr-ball .ms { animation: ptr-spin .8s linear infinite; }
+@keyframes ptr-spin { to { rotate: 360deg; } }
+
+/* ── Daily goal ring + streak ── */
+.goal-card { display: flex; align-items: center; gap: var(--s4); padding: var(--s4); }
+.goal-ring { position: relative; width: 56px; height: 56px; flex: none; display: grid; place-items: center; }
+.goal-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; rotate: -90deg; }
+.goal-ring circle { fill: none; stroke-width: 6; }
+.goal-ring .track { stroke: var(--surface-3); }
+.goal-ring .fill { stroke: var(--teal); stroke-linecap: round; stroke-dasharray: var(--c); stroke-dashoffset: var(--o); transition: stroke-dashoffset 1s var(--ease-sheet); }
+.goal-ring > span { font: 700 1rem/1 var(--font-display); }
+.goal-t { font-weight: 700; } .goal-t .faint { font-weight: 500; margin-left: 4px; }
+.goal-s { font-size: .8125rem; color: var(--ink-2); margin-top: 2px; }
+.streak { display: flex; flex-direction: column; align-items: center; gap: 0; color: var(--ink-3); min-width: 44px; }
+.streak .ms { font-size: 26px; }
+.streak > span.tnum { font: 700 1rem/1.1 var(--font-display); color: var(--ink); }
+.streak small { font-size: .625rem; color: var(--ink-3); }
+.streak.on .ms { color: var(--amber); }
+.streak.on.live .ms { animation: flame 2.4s ease-in-out infinite; }
+@keyframes flame { 0%, 100% { scale: 1; } 50% { scale: 1.08; } }
+@media (prefers-reduced-motion: reduce) { .streak.on.live .ms, .ptr.spin .ptr-ball .ms { animation: none; } }
+
+/* ── Apple-style lens (overrides the earlier depth look) ──
+   Light, translucent glass with a bright rim and a soft contact shadow; pressing makes it bigger and
+   clearer rather than darker. Only transform/opacity change per frame, so it stays on the GPU. */
+.tabbar .glide, .set-nav .glide {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .62), rgba(255, 255, 255, .40));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), inset 0 -1px 0 rgba(0, 0, 0, .04), inset 0 0 0 .5px rgba(0, 0, 0, .06),
+              0 1px 2px rgba(0, 0, 0, .06), 0 6px 16px -8px rgba(0, 0, 0, .18);
+  transition: opacity 200ms, scale 320ms cubic-bezier(.32, .72, 0, 1), background 220ms, box-shadow 220ms;
+}
+[data-theme="neutral-dark"] .tabbar .glide, [data-theme="neutral-dark"] .set-nav .glide, [data-theme="midnight"] .tabbar .glide, [data-theme="midnight"] .set-nav .glide, [data-theme="rose"] .tabbar .glide, [data-theme="rose"] .set-nav .glide, [data-theme="ocean"] .tabbar .glide, [data-theme="ocean"] .set-nav .glide {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .20), rgba(255, 255, 255, .10));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28), inset 0 0 0 .5px rgba(255, 255, 255, .10), 0 6px 16px -8px rgba(0, 0, 0, .5);
+}
+.tabbar .glide::before, .set-nav .glide::before { content: none; }
+.tabbar .glide.held, .set-nav .glide.held {
+  --lift-s: 1.12;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .42), rgba(255, 255, 255, .24));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .95), inset 0 0 0 .5px rgba(0, 0, 0, .05), 0 10px 26px -12px rgba(0, 0, 0, .22);
+}
+[data-theme="neutral-dark"] .tabbar .glide.held, [data-theme="neutral-dark"] .set-nav .glide.held, [data-theme="midnight"] .tabbar .glide.held, [data-theme="midnight"] .set-nav .glide.held, [data-theme="rose"] .tabbar .glide.held, [data-theme="rose"] .set-nav .glide.held, [data-theme="ocean"] .tabbar .glide.held, [data-theme="ocean"] .set-nav .glide.held { background: linear-gradient(180deg, rgba(255, 255, 255, .28), rgba(255, 255, 255, .14)); }
+.tabbar button .ms, .set-nav .set-link .ms { scale: 1; }
+.tabbar button, .set-nav .set-link { transition: color 240ms cubic-bezier(.32, .72, 0, 1); }

@@ -74,12 +74,14 @@
   const debounce = (fn, ms = 200) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
   const isTyping = () => { const a = document.activeElement; return a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT' || a.isContentEditable); };
 
-  function toast(msg, err = false) {
+  function toast(msg, err = false, action = null) {
     const el = document.createElement('div');
-    el.className = 'toast' + (err ? ' err' : '');
-    el.innerHTML = icon(err ? 'error' : 'check_circle') + `<span>${esc(msg)}</span>`;
+    el.className = 'toast' + (err ? ' err' : '') + (action ? ' has-act' : '');
+    el.innerHTML = icon(err ? 'error' : 'check_circle') + `<span>${esc(msg)}</span>` + (action ? `<button type="button" class="toast-act">${esc(action.label)}</button>` : '');
     $('#toasts').appendChild(el);
-    setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 320); }, err ? 5200 : 3000);
+    const close = () => { if (el.__closed) return; el.__closed = true; el.classList.add('out'); setTimeout(() => el.remove(), 320); };
+    if (action) el.querySelector('.toast-act').addEventListener('click', () => { close(); action.fn(); });
+    setTimeout(close, action ? 5200 : (err ? 5200 : 3000));
   }
 
   async function run(btn, fn, okMsg) {
@@ -244,40 +246,37 @@
   // time so it feels the same at 60, 90 or 120 Hz. Speed squashes and stretches the glass along its
   // path, and icons near it magnify (dock-style), which gives the motion its depth.
   const springs = new WeakMap();
-  const SPRING_K = 700, SPRING_C = 40; // stiffness, damping
+  // Like iOS: under the finger an interactive spring (response 0.15 s, damping 0.86) that tracks
+  // closely; to settle a smooth one (response 0.4 s, damping 0.84) with only a hint of bounce.
+  const springOf = (response, damping) => { const w = 2 * Math.PI / response; return { k: w * w, c: 2 * damping * w }; };
+  const SPRING_SETTLE = springOf(0.40, 0.84), SPRING_DRAG = springOf(0.15, 0.86);
   const SPRING_KEYS = [['x', 'vx'], ['y', 'vy'], ['w', 'vw'], ['h', 'vh']];
   function lensPaint(ind, st) {
     ind.style.translate = `${st.x.toFixed(2)}px ${st.y.toFixed(2)}px`;
     ind.style.width = `${Math.max(0, st.w).toFixed(2)}px`; ind.style.height = `${Math.max(0, st.h).toFixed(2)}px`;
-    const v = Math.abs(st.vx) > Math.abs(st.vy) ? st.vx : st.vy, stretch = Math.min(0.2, Math.abs(v) / 3200);
+    const v = Math.abs(st.vx) > Math.abs(st.vy) ? st.vx : st.vy, stretch = Math.min(0.06, Math.abs(v) / 9000);
     const horiz = Math.abs(st.vx) >= Math.abs(st.vy);
     ind.style.setProperty('--sx', (horiz ? 1 + stretch : 1 - stretch * 0.4).toFixed(3));
     ind.style.setProperty('--sy', (horiz ? 1 - stretch * 0.4 : 1 + stretch).toFixed(3));
-    const items = st.items, centers = st.centers;
-    if (items && centers) { // magnify what the glass passes over (positions measured once, not per frame)
-      const cx = st.x + st.w / 2, reach = Math.max(st.w, 40) * 1.15, lift = ind.classList.contains('held') ? 0.2 : 0.08;
-      for (let i = 0; i < items.length; i++) {
-        const m = Math.max(0, 1 - Math.abs(centers[i] - cx) / reach), mag = (1 + lift * m * m).toFixed(3);
-        if (items[i].__mag !== mag) { items[i].__mag = mag; items[i].style.setProperty('--mag', mag); }
-      }
-    }
+
   }
   function lensStep(ind, st, now) {
     const dt = st.t ? (now - st.t) / 1000 : 1 / 60; st.t = now;
     const stalled = dt > 0.12; // the device paused drawing: don't leave the glass half-way, just land it
     const n = Math.max(1, Math.ceil(dt * 240)), h = dt / n; // small fixed steps keep the spring stable at any refresh rate
     if (!stalled) for (let i = 0; i < n; i++) {
-      for (const [p, v] of SPRING_KEYS) { st[v] += (SPRING_K * (st.to[p] - st[p]) - SPRING_C * st[v]) * h; st[p] += st[v] * h; }
+      for (const [p, v] of SPRING_KEYS) { st[v] += (st.k * (st.to[p] - st[p]) - st.c * st[v]) * h; st[p] += st[v] * h; }
     }
     const still = stalled || SPRING_KEYS.every(([p, v]) => Math.abs(st.to[p] - st[p]) < 0.25 && Math.abs(st[v]) < 4);
     if (still) { for (const [p, v] of SPRING_KEYS) { st[p] = st.to[p]; st[v] = 0; } lensPaint(ind, st); st.raf = 0; return; }
     lensPaint(ind, st);
     st.raf = requestAnimationFrame((n) => lensStep(ind, st, n));
   }
-  function lensTo(ind, to, snap = false) {
+  function lensTo(ind, to, snap = false, drag = false) {
     let st = springs.get(ind);
     if (!st) { st = { ...to, vx: 0, vy: 0, vw: 0, vh: 0, raf: 0, t: 0 }; springs.set(ind, st); snap = true; }
     st.to = { ...to };
+    const sp = drag ? SPRING_DRAG : SPRING_SETTLE; st.k = sp.k; st.c = sp.c;
     const root = ind.parentElement;
     if (st.root !== root || !st.items) { // measure the items once per render; content positions don't change while scrolling
       st.root = root;
@@ -485,7 +484,7 @@
       const st = lensState(l); if (!st) return;
       const br = bar.getBoundingClientRect(), w = st.to.w;
       const left = Math.max(0, Math.min(br.width - w, x - br.left - w / 2));
-      lensTo(l, { ...st.to, x: left });
+      lensTo(l, { ...st.to, x: left }, false, true);
     };
     const hot = (btn) => tabs().forEach(b => b.classList.toggle('hot', b === btn));
     // (icons near the glass are magnified by the spring itself; see lensPaint)
@@ -547,7 +546,7 @@
       const nr = d.nav.getBoundingClientRect(), over = linkAt(d.nav, d.x);
       const w = over ? over.offsetWidth : st.to.w;
       const left = Math.max(0, Math.min(d.nav.scrollWidth - w, d.x - nr.left + d.nav.scrollLeft - w / 2));
-      lensTo(l, { ...st.to, x: left, w });
+      lensTo(l, { ...st.to, x: left, w }, false, true);
       if (over && over !== d.over) { d.over = over; hot(d.nav, over); tick(); }
     };
     const loop = (now) => { // keep gliding past the visible edge: the row scrolls under your finger
@@ -954,6 +953,24 @@
     ${art(p.company, 'sm')}<span class="grow"><span class="main-t">${esc(p.subject || p.company)}</span><span class="sub-t">${esc(p.company)}${p.role ? ' · ' + esc(p.role) : ''}</span></span>
     <span class="end"><span class="chip ${PROOF_KIND[p.kind] ? PROOF_KIND[p.kind][1] : ''}">${PROOF_KIND[p.kind] ? PROOF_KIND[p.kind][0] : esc(p.kind)}</span><span class="faint small tnum">${rel(p.received_at)}</span></span></button>`;
 
+  // Daily goal ring + streak (applications prepared or sent; dry runs count while you practise)
+  function goalCard() {
+    const st = S.stats || {};
+    const target = Math.max(1, st.daily_target || 1), done = (st.real_applied_today || 0) + (st.dry_run_today || 0);
+    const pct = Math.min(1, done / target), R = 26, C = 2 * Math.PI * R;
+    const streak = st.streak_days || 0, live = !!st.streak_active_today;
+    const line = done >= target ? 'Goal reached. Nice work today.'
+      : done ? `${fmt(target - done)} to go to reach today's goal`
+      : streak ? 'Apply to one role today to keep your streak' : 'Your first application today starts a streak';
+    return `<section class="card goal-card block">
+      <div class="goal-ring" style="--c:${C.toFixed(1)};--o:${(C * (1 - pct)).toFixed(1)}">
+        <svg viewBox="0 0 64 64" aria-hidden="true"><circle class="track" cx="32" cy="32" r="${R}"/><circle class="fill" cx="32" cy="32" r="${R}"/></svg>
+        <span class="tnum">${fmt(done)}</span></div>
+      <div class="grow min0"><div class="goal-t">Today <span class="faint tnum">${fmt(done)} of ${fmt(target)}</span></div><div class="goal-s">${esc(line)}</div></div>
+      <div class="streak ${streak ? 'on' : ''} ${live ? 'live' : ''}" title="Days in a row with an application">${icon('local_fire_department', streak ? 'fill' : '')}<span class="tnum">${fmt(streak)}</span><small>day${streak === 1 ? '' : 's'}</small></div>
+    </section>`;
+  }
+
   renderers.home = () => {
     const st = S.stats || {}, ap = S.autopilot || {}, ps = S.proofStatus || {};
     const es = engineStatus(), items = attentionItems();
@@ -987,7 +1004,7 @@
       <div class="card list">${recent.map(proofRow).join('')}</div></section>` : '';
     return `<header class="view-head greet"><div class="min0"><div class="eyebrow">${esc(today())}</div><h1>${esc(greeting())}</h1><p class="sub">${esc(summary)}</p></div>
       <button class="greet-me" data-nav="settings/profile" title="Your profile">${me('lg')}</button></header>
-      ${hero}${checklist()}${forYou}${dashboard()}${recentHtml}${topShelf(8)}`;
+      ${hero}${goalCard()}${checklist()}${forYou}${dashboard()}${recentHtml}${topShelf(8)}`;
   };
 
   // ───────────────────────── View: Proof ─────────────────────────
@@ -1094,13 +1111,14 @@
 
   function inboxTriage() {
     if (!S.triage.length) return emptyCard('done_all', 'Triage is clear', 'Borderline matches (between your maybe and minimum fit scores) show up here for a quick yes / no.');
-    return `<div class="triage">${S.triage.map(j => `<div class="card tcard lift" data-tcard="${j.id}">
+    const tip = matchMedia('(pointer: coarse)').matches ? `<p class="faint small swipe-tip">${icon('swipe')}Swipe right to queue, left to skip</p>` : '';
+    return `<div class="triage">${S.triage.map(j => `<div class="card tcard lift" data-tcard="${j.id}"><span class="stamp yes">${icon('playlist_add')}Queue</span><span class="stamp no">${icon('close')}Skip</span>
       <div class="top">${art(j.company)}<div class="grow"><div class="strong">${esc(j.company)}</div><div class="muted small ellipsis">${esc(j.title)}</div></div>${scoreTag(j.score)}</div>
       <div class="tags"><span class="chip">${esc(j.location)}</span><span class="chip cap">${esc(j.source)}</span>${j.salary_raw ? `<span class="chip">${esc(j.salary_raw)}</span>` : ''}${j.is_assist_only ? '<span class="chip violet">Assist only</span>' : ''}</div>
       <div class="reason">${esc(j.score_reason || j.eligibility_reason || 'No scoring notes')}</div>
       <div class="acts"><button class="btn hv" data-act="swipe" data-action="dismiss" data-id="${j.id}">${icon('close')}Dismiss</button>
         <button class="btn primary hv" data-act="swipe" data-action="queue" data-id="${j.id}">${icon('playlist_add')}Queue</button>
-        <button class="btn icon hv" data-job="${j.id}" title="Details">${icon('open_in_full')}</button></div></div>`).join('')}</div>`;
+        <button class="btn icon hv" data-job="${j.id}" title="Details">${icon('open_in_full')}</button></div></div>`).join('')}</div>${tip}`;
   }
 
   // ───────────────────────── View: Pipeline ─────────────────────────
@@ -1807,6 +1825,114 @@
   };
 
   // ───────────────────────── Actions ─────────────────────────
+  // Queue / skip a triage card (buttons and swipes), with a few seconds to undo it
+  async function triageDecide(id, action, card, btn = null) {
+    const idx = S.triage.findIndex(j => String(j.id) === String(id)), job = S.triage[idx];
+    const prev = job ? job.status : 'maybe';
+    let ok = false;
+    try {
+      if (btn) { btn.classList.add('busy'); btn.disabled = true; }
+      await api(`/jobs/${id}/swipe`, { method: 'POST', body: { action } }); ok = true;
+    } catch (e) { toast(e.message, true); }
+    finally { if (btn) { btn.classList.remove('busy'); btn.disabled = false; } }
+    if (!ok) { if (card) card.style.removeProperty('transform'), card.classList.remove('flying'); return; }
+    if (card && !card.classList.contains('flying')) { card.classList.add(action === 'queue' ? 'out-r' : 'out-l'); await new Promise(res => setTimeout(res, 220)); }
+    S.triage = S.triage.filter(j => String(j.id) !== String(id));
+    if (S.jobId === Number(id)) openJob(id);
+    refreshAfterJobChange();
+    const label = { queue: 'Queued', dismiss: 'Skipped', exclude: 'Company excluded' }[action];
+    if (action === 'exclude' || !job) { toast(label); return; }
+    toast(`${label} · ${job.company}`, false, { label: 'Undo', fn: async () => {
+      try {
+        await api(`/jobs/${id}/status`, { method: 'PUT', body: { status: prev } });
+        S.triage.splice(Math.min(idx, S.triage.length), 0, job);
+        S.lastHtml = ''; render(); refreshAfterJobChange();
+      } catch (e) { toast(e.message, true); }
+    } });
+  }
+
+  // ── Swipe triage cards: right to queue, left to skip (phones and touch screens) ──
+  (function swipeCards() {
+    let d = null;
+    const W = () => (d && d.card.offsetWidth) || 320;
+    document.addEventListener('pointerdown', (e) => {
+      const card = e.target.closest('.tcard');
+      if (!card || e.pointerType === 'mouse' || e.target.closest('button, a, input, textarea')) return;
+      d = { card, id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: performance.now(), dx: 0, on: false };
+    });
+    document.addEventListener('pointermove', (e) => {
+      if (!d || e.pointerId !== d.id) return;
+      const dx = e.clientX - d.x0, dy = e.clientY - d.y0;
+      if (!d.on) {
+        if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { d = null; return; } // scrolling the list
+        if (Math.abs(dx) < 8) return;
+        d.on = true; d.card.classList.add('dragging');
+      }
+      d.dx = dx;
+      const p = Math.max(-1, Math.min(1, dx / (W() * 0.42)));
+      d.card.style.transform = `translateX(${dx}px) rotate(${dx / 22}deg)`;
+      d.card.style.setProperty('--yes', Math.max(0, p).toFixed(3));
+      d.card.style.setProperty('--no', Math.max(0, -p).toFixed(3));
+      if (Math.abs(p) >= 1 && !d.ticked) { d.ticked = true; try { navigator.vibrate && navigator.vibrate(8); } catch (err) {} }
+      if (Math.abs(p) < 1) d.ticked = false;
+    });
+    const end = (e) => {
+      if (!d || (e && e.pointerId !== d.id)) return;
+      const { card, dx, on, t0 } = d; d = null;
+      card.classList.remove('dragging');
+      if (!on) return;
+      const v = dx / Math.max(1, performance.now() - t0); // px per ms
+      const go = Math.abs(dx) > card.offsetWidth * 0.42 || Math.abs(v) > 0.7;
+      if (!go) { card.style.removeProperty('transform'); card.style.setProperty('--yes', 0); card.style.setProperty('--no', 0); return; }
+      const right = dx > 0;
+      card.classList.add('flying');
+      card.style.transform = `translateX(${(right ? 1 : -1) * Math.round(window.innerWidth * 1.2)}px) rotate(${right ? 18 : -18}deg)`;
+      const swallow = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+      document.addEventListener('click', swallow, { capture: true, once: true });
+      setTimeout(() => document.removeEventListener('click', swallow, true), 0);
+      setTimeout(() => triageDecide(card.dataset.tcard, right ? 'queue' : 'dismiss', card), 260);
+    };
+    document.addEventListener('pointerup', end);
+    document.addEventListener('pointercancel', (e) => { if (d && d.card) { d.card.classList.remove('dragging'); d.card.style.removeProperty('transform'); } d = null; });
+  })();
+
+  // ── Pull to refresh (touch): pull down at the top of any screen ──
+  (function pullToRefresh() {
+    const content = $('#content');
+    if (!content) return;
+    const ind = document.createElement('div');
+    ind.className = 'ptr'; ind.setAttribute('aria-hidden', 'true');
+    ind.innerHTML = `<span class="ptr-ball">${icon('arrow_downward')}</span>`;
+    document.body.appendChild(ind);
+    let y0 = null, pull = 0, busy = false;
+    const set = (v) => { pull = v; ind.style.setProperty('--p', v.toFixed(1)); ind.classList.toggle('ready', v >= 64); };
+    content.addEventListener('touchstart', (e) => {
+      y0 = null;
+      if (busy || content.scrollTop > 0 || e.touches.length !== 1) return;
+      if (e.target.closest('.ai-panel, .modal-wrap, .sheet, .inspector, .set-nav, .shelf, .board, .tcard, input, textarea, select')) return;
+      y0 = e.touches[0].clientY; set(0);
+    }, { passive: true });
+    content.addEventListener('touchmove', (e) => {
+      if (y0 === null) return;
+      const dy = e.touches[0].clientY - y0;
+      if (dy <= 0 || content.scrollTop > 0) { set(0); return; }
+      const was = pull >= 64;
+      set(Math.min(96, dy * 0.45));
+      if (!was && pull >= 64) { try { navigator.vibrate && navigator.vibrate(6); } catch (err) {} }
+    }, { passive: true });
+    content.addEventListener('touchend', async () => {
+      if (y0 === null) return;
+      y0 = null;
+      if (pull < 64) { set(0); return; }
+      busy = true; ind.classList.add('spin'); set(64);
+      try {
+        S.fresh[S.view] = 0;
+        await Promise.allSettled([loadStats(), loaders[S.view] ? loaders[S.view]() : null]);
+        S.fresh[S.view] = Date.now(); S.lastHtml = ''; render();
+      } finally { busy = false; ind.classList.remove('spin'); set(0); }
+    });
+  })();
+
   async function refreshAfterJobChange() {
     loadStats();
     if (S.view === 'pipeline') { S.jobs = await api('/jobs', { query: { compact: 1 } }); $('#pipe-body') ? ($('#pipe-body').innerHTML = S.pipe.mode === 'table' ? pipeTable() : pipeBoard()) : render(); }
@@ -1874,13 +2000,7 @@
         const ok = await confirmModal({ title: 'Exclude this company?', body: 'The company is added to your never-apply list and this job is blocked.', ok: 'Exclude', danger: true });
         if (!ok) return;
       }
-      const card = btn.closest('[data-tcard]');
-      const r = await run(btn, () => api(`/jobs/${id}/swipe`, { method: 'POST', body: { action } }), { queue: 'Queued', dismiss: 'Dismissed', exclude: 'Company excluded' }[action]);
-      if (r === undefined) return;
-      if (card) { card.classList.add(action === 'queue' ? 'out-r' : 'out-l'); await new Promise(res => setTimeout(res, 220)); }
-      S.triage = S.triage.filter(j => String(j.id) !== String(id));
-      if (S.jobId === Number(id)) openJob(id);
-      refreshAfterJobChange();
+      await triageDecide(id, action, btn.closest('[data-tcard]'), btn);
     },
     async 'mark-applied'(btn) {
       await run(btn, () => api(`/jobs/${btn.dataset.id}/mark-applied`, { method: 'POST' }), 'Marked as applied');

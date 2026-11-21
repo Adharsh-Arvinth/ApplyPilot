@@ -156,3 +156,32 @@ def test_assistant_ready_check_lists_what_is_left():
         assert client.post("/api/v1/ai/job-help", headers=AUTH, json={"job_id": 99999999, "task": "ready"}).status_code == 404
     finally:
         db.close()
+
+
+def test_streak_counts_days_in_a_row():
+    """Home's streak: consecutive days (user time zone) with an application; today counts once it has one."""
+    import datetime, zoneinfo
+    from backend.app.api.jobs import _streak
+    from backend.app.core.database import SessionLocal
+    from backend.app.models import Job, Application
+    tz = zoneinfo.ZoneInfo("Asia/Kolkata")
+    now = datetime.datetime(2031, 3, 10, 15, 0, tzinfo=tz)  # far future: no real data on these days
+    db = SessionLocal()
+    try:
+        stamp = int(datetime.datetime.now().timestamp() * 1000)
+        made = []
+        for i, days_ago in enumerate((1, 2, 3, 5)):  # yesterday, -2, -3, then a gap
+            job = Job(source="greenhouse", company=f"StreakCo{i}", title="Engineer", status="applied",
+                      url=f"https://job-boards.greenhouse.io/streak/{stamp}{i}")
+            db.add(job); db.commit()
+            at = (now - datetime.timedelta(days=days_ago)).astimezone(datetime.timezone.utc)
+            db.add(Application(job_id=job.id, resume_file="x", status="dry_run", submitted_at=at)); db.commit()
+            made.append(job.id)
+        assert _streak(db, tz, now) == (3, False)  # nothing yet today: yesterday's streak is still alive
+        job = Job(source="greenhouse", company="StreakToday", title="Engineer", status="applied",
+                  url=f"https://job-boards.greenhouse.io/streak/{stamp}t")
+        db.add(job); db.commit()
+        db.add(Application(job_id=job.id, resume_file="x", status="submitted", submitted_at=now.astimezone(datetime.timezone.utc))); db.commit()
+        assert _streak(db, tz, now) == (4, True)
+    finally:
+        db.close()

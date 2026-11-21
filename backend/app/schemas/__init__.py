@@ -292,6 +292,8 @@ class HealthOut(BaseModel):
 
 class StatsOut(BaseModel):
     daily_applied: int # Submitted applications count today (authoritative for cap)
+    streak_days: int = 0  # days in a row with an application prepared or sent
+    streak_active_today: bool = False
     real_applied_today: int = 0
     dry_run_today: int = 0
     daily_cap: int

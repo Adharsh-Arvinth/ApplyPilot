@@ -451,6 +451,32 @@ def trigger_backup(db: Session = Depends(get_db)):
     res = BackupService.create_nightly_backup(db)
     return res
 
+STREAK_STATUSES = ("submitted", "applied", "unverified", "dry_run", "needs_attention")
+
+
+def _streak(db: Session, user_tz, now_local) -> tuple:
+    """Days in a row (in the user's time zone) with at least one application prepared or sent.
+    Today counts once it has one; until then the streak from yesterday is still alive."""
+    since = (now_local - datetime.timedelta(days=120)).astimezone(datetime.timezone.utc)
+    rows = db.query(Application.submitted_at).filter(Application.submitted_at >= since,
+                                                    Application.status.in_(STREAK_STATUSES)).all()
+    days = set()
+    for (ts,) in rows:
+        if ts is None:
+            continue
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=datetime.timezone.utc)
+        days.add(ts.astimezone(user_tz).date())
+    today = now_local.date()
+    active_today = today in days
+    day = today if active_today else today - datetime.timedelta(days=1)
+    streak = 0
+    while day in days:
+        streak += 1
+        day -= datetime.timedelta(days=1)
+    return streak, active_today
+
+
 @router.get("/stats", response_model=StatsOut, summary="Dashboard Stat Counters")
 def get_stats(db: Session = Depends(get_db)):
     profile = db.query(Profile).first()
@@ -533,7 +559,10 @@ def get_stats(db: Session = Depends(get_db)):
 
     paused_at_str = profile.paused_at.strftime("%I:%M %p • %d %b") if profile and profile.paused_at else None
 
+    streak_days, active_today = _streak(db, user_tz, now_local)
     return {
+        "streak_days": streak_days,
+        "streak_active_today": active_today,
         "daily_applied": real_applied_today,
         "real_applied_today": real_applied_today,
         "dry_run_today": dry_run_today,
