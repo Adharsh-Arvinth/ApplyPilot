@@ -136,3 +136,23 @@ def test_phone_ai_drafts_waiting_questions_safely():
         assert not (again & {free.id, pick.id, unsure.id})  # each question is offered once
     finally:
         db.close()
+
+
+def test_assistant_ready_check_lists_what_is_left():
+    """'Ready to submit?' gives an honest checklist for one job without needing any AI."""
+    import datetime
+    from backend.app.core.database import SessionLocal
+    from backend.app.models import Job, NeedsInput
+    db = SessionLocal()
+    try:
+        job = Job(source="greenhouse", company="ReadyCo", title="ML Engineer", status="queued", score=4.2,
+                  url=f"https://job-boards.greenhouse.io/readyco/{int(datetime.datetime.now().timestamp() * 1000)}")
+        db.add(job); db.commit()
+        db.add(NeedsInput(job_id=job.id, question_text="Why ReadyCo?", field_type="text", status="pending")); db.commit()
+        md = client.post("/api/v1/ai/job-help", headers=AUTH, json={"job_id": job.id, "task": "ready"}).json()["markdown"]
+        assert "ML Engineer at ReadyCo" in md and "Answer 1 question" in md
+        assert "Dry run" in md or "Live is on" in md
+        assert client.post("/api/v1/ai/job-help", headers=AUTH, json={"job_id": job.id, "task": "nope"}).status_code == 400
+        assert client.post("/api/v1/ai/job-help", headers=AUTH, json={"job_id": 99999999, "task": "ready"}).status_code == 404
+    finally:
+        db.close()

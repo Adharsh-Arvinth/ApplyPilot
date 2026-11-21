@@ -474,6 +474,81 @@
     bar.addEventListener('contextmenu', (e) => e.preventDefault()); // long-press shouldn't open a menu
   })();
 
+  // ── Settings tabs: press, hold and glide ──
+  // The row scrolls sideways with a normal swipe. Press and hold a tab (about a quarter second) and the
+  // glass lens lifts: slide to move it across the tabs (ticking on each, scrolling the row at the edges),
+  // lift to open the tab under your finger. Works with a mouse too (hold, then drag).
+  (function setNavGlide() {
+    let d = null;
+    const links = (nav) => $$('.set-link', nav);
+    const linkAt = (nav, x) => {
+      const l = links(nav);
+      return l.find(b => { const r = b.getBoundingClientRect(); return x >= r.left && x < r.right; })
+        || (x < nav.getBoundingClientRect().left + 8 ? l[0] : l[l.length - 1]);
+    };
+    const lens = (nav) => nav.querySelector(':scope > .glide');
+    const tick = () => { try { navigator.vibrate && navigator.vibrate(6); } catch (e) {} };
+    const hot = (nav, btn) => links(nav).forEach(b => b.classList.toggle('hot', b === btn));
+    const follow = () => {
+      const l = lens(d.nav); if (!l) return;
+      const nr = d.nav.getBoundingClientRect(), over = linkAt(d.nav, d.x);
+      const w = over ? over.offsetWidth : l.offsetWidth;
+      l.style.width = `${w}px`;
+      const left = Math.max(0, Math.min(d.nav.scrollWidth - w, d.x - nr.left + d.nav.scrollLeft - w / 2));
+      l.style.translate = `${left}px ${l.style.translate.split(' ')[1] || '0px'}`;
+      if (over && over !== d.over) { d.over = over; hot(d.nav, over); tick(); }
+    };
+    const loop = () => { // keep gliding past the visible edge: the row scrolls under your finger
+      if (!d || !d.armed) return;
+      const nr = d.nav.getBoundingClientRect(), edge = 44;
+      const v = d.x < nr.left + edge ? -(nr.left + edge - d.x) / 4 : d.x > nr.right - edge ? (d.x - nr.right + edge) / 4 : 0;
+      if (v) { d.nav.scrollLeft += v; follow(); }
+      d.raf = requestAnimationFrame(loop);
+    };
+    const arm = () => {
+      if (!d) return;
+      d.armed = true;
+      try { d.nav.setPointerCapture(d.id); } catch (e) {}
+      const l = lens(d.nav); if (l) l.classList.add('held', 'gliding');
+      hot(d.nav, d.over); tick(); follow(); loop();
+    };
+    const stop = () => {
+      if (!d) return;
+      clearTimeout(d.timer); cancelAnimationFrame(d.raf);
+      const l = lens(d.nav); if (l) l.classList.remove('held', 'gliding');
+      hot(d.nav, null);
+    };
+    document.addEventListener('pointerdown', (e) => {
+      const btn = e.target.closest('.set-nav .set-link');
+      if (!btn || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      d = { nav: btn.closest('.set-nav'), id: e.pointerId, x: e.clientX, x0: e.clientX, over: btn, armed: false };
+      d.timer = setTimeout(arm, 240);
+    });
+    document.addEventListener('pointermove', (e) => {
+      if (!d || e.pointerId !== d.id) return;
+      d.x = e.clientX;
+      if (!d.armed) { if (Math.abs(d.x - d.x0) > 8) { stop(); d = null; } return; } // a swipe: let the row scroll
+      follow();
+    });
+    // Once armed, the finger glides the lens instead of scrolling the page or the row
+    document.addEventListener('touchmove', (e) => { if (d && d.armed && e.cancelable) e.preventDefault(); }, { passive: false });
+    const end = (e, cancel) => {
+      if (!d || (e && e.pointerId !== d.id)) return;
+      const { armed, over, nav } = d; stop(); d = null;
+      if (!armed) return; // a plain tap: the normal click handler opens the tab
+      const swallow = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+      document.addEventListener('click', swallow, { capture: true, once: true });
+      setTimeout(() => {
+        document.removeEventListener('click', swallow, true);
+        if (!cancel && over && !over.classList.contains('on')) over.click();
+        else glide(nav, 'settings', '.set-link.on');
+      }, 0);
+    };
+    document.addEventListener('pointerup', (e) => end(e, false));
+    document.addEventListener('pointercancel', (e) => end(e, true));
+    document.addEventListener('contextmenu', (e) => { if (e.target.closest('.set-nav')) e.preventDefault(); });
+  })();
+
   function renderEngine() {
     const st = S.stats;
     const [label, color] = engineLabel(st);
@@ -2409,14 +2484,44 @@
   panel.className = 'ai-panel'; panel.id = 'ai-panel'; panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', 'Assistant'); panel.hidden = true;
   document.body.appendChild(panel);
   let aiBusy = false;
+  const AI_TOOLS = [['tailor', 'description', 'Tailor resume'], ['cover', 'edit_note', 'Cover letter'], ['prep', 'school', 'Interview prep'], ['ready', 'task_alt', 'Ready to submit?']];
+  const TOOL_ASK = { tailor: 'Tailor my resume for', cover: 'Write a cover letter for', prep: 'Prep me for an interview at', ready: 'Am I ready to submit to' };
+  // Tools act on the open job; otherwise the assistant offers your best roles to choose from
+  async function aiTool(task, jobId) {
+    if (aiBusy) return;
+    let job = jobId ? (S.jobs || []).find(j => j.id === Number(jobId)) || (S.job && S.job.id === Number(jobId) ? S.job : null) : S.job;
+    if (!job && !jobId) {
+      if (!S.jobs) { try { S.jobs = await api('/jobs', { query: { compact: 1 } }); } catch (e) { S.jobs = []; } }
+      const rank = { queued: 0, needs_input: 1, maybe: 2, evaluated: 3, applied: 4, submitted: 4 };
+      const top = (S.jobs || []).filter(j => j.status in rank && !j.is_expired)
+        .sort((a, b) => (rank[a.status] - rank[b.status]) || ((b.score || 0) - (a.score || 0))).slice(0, 5);
+      S.chat.push(top.length ? { role: 'assistant', content: 'Which role?', picker: { task, jobs: top.map(j => ({ id: j.id, title: j.title, company: j.company })) } }
+        : { role: 'assistant', content: 'Open a job from **Jobs** first, then tap this again.' });
+      drawChat(); return;
+    }
+    const title = job ? `${job.title} at ${job.company}` : 'this job';
+    S.chat.push({ role: 'user', content: `${TOOL_ASK[task]} ${title}` }); aiBusy = true; drawChat();
+    try {
+      const timeout = new Promise((_, no) => setTimeout(() => no(new Error('it took too long, please try again')), 60000));
+      const r = await Promise.race([timeout, api('/ai/job-help', { method: 'POST', body: { job_id: Number(jobId || job.id), task } })]);
+      S.chat.push({ role: 'assistant', content: r.markdown || 'No answer this time.', copy: r.copy || '' });
+    } catch (e) { S.chat.push({ role: 'assistant', content: `Couldn't do that right now: ${e.message}` }); }
+    aiBusy = false; drawChat();
+  }
   function drawChat() {
-    const msgs = S.chat.map(m => `<div class="ai-msg ${m.role}${m.device ? ' device' : ''}">${m.role === 'user' ? `<p>${esc(m.content)}</p>` : md(m.content)}</div>`).join('');
+    const msgs = S.chat.map((m, i) => {
+      if (m.picker) return `<div class="ai-msg assistant"><p>${esc(m.content)}</p><div class="ai-pick">${m.picker.jobs.map(j =>
+        `<button class="chip-btn hv" data-ai-tool="${m.picker.task}" data-ai-job="${j.id}">${esc(j.company)} · ${esc(j.title)}</button>`).join('')}</div></div>`;
+      const copy = m.copy ? `<button class="btn sm ghost hv ai-copy" data-ai-copy="${i}">${icon('content_copy')}Copy</button>` : '';
+      return `<div class="ai-msg ${m.role}${m.device ? ' device' : ''}">${m.role === 'user' ? `<p>${esc(m.content)}</p>` : md(m.content)}${copy}</div>`;
+    }).join('');
     const empty = `<div class="ai-empty"><div class="ai-orb">${icon('auto_awesome', 'fill')}</div><b>${esc(greeting())}</b><span>Ask anything about your search. I only use your verified facts and the app's live data.</span></div>`;
     panel.innerHTML = `<header class="ai-head"><span class="ai-title">${icon('auto_awesome', 'fill')}Assistant</span>
         ${S.chat.length ? `<button class="btn sm ghost hv" data-ai="clear">New chat</button>` : ''}
         <button class="btn icon ghost hv" data-ai="close" aria-label="Close">${icon('close')}</button></header>
       <div class="ai-body" id="ai-body">${S.chat.length ? msgs : empty}${aiBusy ? '<div class="ai-msg assistant typing"><i></i><i></i><i></i></div>' : ''}</div>
-      ${aiBusy ? '' : `<div class="ai-chips">${aiSuggestions().map(q => `<button class="chip-btn hv" data-ai-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>`}
+      ${aiBusy ? '' : `<div class="ai-tools">${AI_TOOLS.map(([id, ic, label]) => `<button class="ai-tool hv" data-ai-tool="${id}">${icon(ic)}<span>${label}</span></button>`).join('')}</div>
+      <div class="ai-chips">${aiSuggestions().map(q => `<button class="chip-btn hv" data-ai-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>`}
       <form class="ai-compose" data-ai-form><textarea id="ai-input" rows="1" placeholder="Ask the assistant…" aria-label="Message"></textarea>
         <button class="btn primary icon hv" type="submit" aria-label="Send" ${aiBusy ? 'disabled' : ''}>${icon('arrow_upward')}</button></form>`;
     const body = $('#ai-body'); body.scrollTop = body.scrollHeight;
@@ -2470,6 +2575,10 @@
   panel.addEventListener('click', (e) => {
     const a = e.target.closest('[data-ai]'); const q = e.target.closest('[data-ai-q]');
     if (q) { askAI(q.dataset.aiQ); return; }
+    const tool = e.target.closest('[data-ai-tool]');
+    if (tool) { aiTool(tool.dataset.aiTool, tool.dataset.aiJob); return; }
+    const cp = e.target.closest('[data-ai-copy]');
+    if (cp) { const m = S.chat[Number(cp.dataset.aiCopy)]; if (m && m.copy) copyText(m.copy).then(() => toast('Copied')); return; }
     if (!a) return;
     if (a.dataset.ai === 'close') closeAI();
     if (a.dataset.ai === 'clear') { S.chat = []; drawChat(); }

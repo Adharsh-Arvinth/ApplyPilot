@@ -1305,3 +1305,19 @@ html.lite .toolbar > .hint, html.lite .kbd { display: none; }
 /* On-device AI */
 #device-progress:empty { display: none; }
 .ai-msg.assistant.device::after { content: 'on this phone'; display: block; margin-top: 6px; font-size: .6875rem; color: var(--ink-3); }
+
+/* Settings tabs: press, hold and glide (same feel as the tab bar) */
+.set-nav .glide.held { scale: 1.06 1.12; transition: translate 560ms var(--ease-sheet), width 560ms var(--ease-sheet), height 560ms var(--ease-sheet), scale 220ms var(--ease-sheet), opacity 200ms; }
+.set-nav .glide.gliding { transition: translate 70ms linear, width 180ms var(--ease-sheet), height 180ms var(--ease-sheet), scale 220ms var(--ease-sheet), opacity 200ms; }
+.set-nav .set-link.hot { color: var(--accent); }
+.set-nav .set-link.hot .ms { transform: scale(1.12); transition: transform 180ms var(--ease-out); }
+.set-nav .set-link { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+
+/* Assistant tools: tailor, cover letter, prep, ready check */
+.ai-tools { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s2); padding: var(--s2) var(--s4) 0; }
+.ai-tool { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: var(--s2) var(--s1); border-radius: var(--r-md);
+  background: var(--surface-2); color: var(--ink); font-size: .6875rem; font-weight: 600; line-height: 1.2; text-align: center; }
+.ai-tool .ms { font-size: 20px; color: var(--ink-2); }
+.ai-pick { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s2); margin-top: var(--s2); }
+.ai-pick .chip-btn { max-width: 100%; text-align: left; white-space: normal; }
+.ai-msg .ai-copy { margin-top: var(--s2); }

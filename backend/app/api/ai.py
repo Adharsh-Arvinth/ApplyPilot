@@ -393,3 +393,102 @@ def device_answers(items: List[DeviceAnswer], db: Session = Depends(get_db), tok
             saved += 1
     db.commit()
     return {"saved": saved, "skipped": skipped}
+
+
+# ───────────────────────── Assistant actions on one job ─────────────────────────
+class JobHelpRequest(BaseModel):
+    job_id: int
+    task: str  # tailor | cover | prep | ready
+
+
+def _profile_dict(profile) -> Dict[str, Any]:
+    return {"education": profile.education if profile else "", "proof_points_text": profile.proof_points_text if profile else "",
+            "target_roles_json": profile.target_roles_json if profile else "[]", "locations_json": profile.locations_json if profile else "[]"}
+
+
+def _readiness(job: Job, profile, db: Session) -> str:
+    """Plain checklist of what stands between this job and a clean submission."""
+    from backend.app.models import ResumeVersion
+    ok, todo = [], []
+    resume = db.query(ResumeVersion).filter(ResumeVersion.pdf_path.isnot(None), ResumeVersion.pdf_path != "").first()
+    (ok if resume else todo).append("Resume uploaded" if resume else "Upload your resume in **Settings › Resume**")
+    if profile:
+        missing = [label for label, v in (("email", profile.email), ("phone", profile.phone), ("LinkedIn", profile.linkedin),
+                                          ("work authorization", profile.work_authorization)) if not (v or "").strip()]
+        (todo if missing else ok).append(f"Add your {', '.join(missing)} in **Settings › Profile**" if missing else "Contact details and work authorization filled in")
+    waiting = db.query(NeedsInput).filter(NeedsInput.job_id == job.id, NeedsInput.status == "pending").count()
+    (todo if waiting else ok).append(f"Answer {waiting} question{'s' if waiting != 1 else ''} in **Needs You** for this job" if waiting else "No open questions for this job")
+    if job.is_expired:
+        todo.append("This posting looks **expired**: it may no longer accept applications")
+    elig = (job.eligibility_status or "").replace("_", " ")
+    if elig and elig != "eligible":
+        todo.append(f"Eligibility: **{elig}**. {job.eligibility_reason or 'check the requirements'}")
+    else:
+        ok.append(f"Fit score {job.score:.1f} / 5" if job.score else "Eligible")
+    live = bool(profile and profile.go_live)
+    mode = "Live is on, so it will really be sent" if live else "Dry run is on: it will fill the form but not submit (turn on Live in **Settings › Autopilot** to send)"
+    lines = [f"**Ready check: {job.title} at {job.company}**", ""]
+    lines += [f"- ✅ {x}" for x in ok] + [f"- ⬜ {x}" for x in todo]
+    lines += ["", ("You're set. " if not todo else f"{len(todo)} thing{'s' if len(todo) != 1 else ''} to do first. ") + mode + "."]
+    return "\n".join(lines)
+
+
+@router.post("/job-help")
+def job_help(req: JobHelpRequest, db: Session = Depends(get_db), token: str = Depends(verify_token)):
+    """One assistant action for one job, returned as short markdown for the chat."""
+    job = db.query(Job).filter(Job.id == req.job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    profile = db.query(Profile).first()
+    pd = _profile_dict(profile)
+    jd = {"title": job.title, "company": job.company, "location": job.location, "work_mode": job.work_mode,
+          "experience_required": job.experience_required, "salary_raw": job.salary_raw}
+    head = f"**{job.title} at {job.company}**"
+
+    if req.task == "ready":
+        return {"markdown": _readiness(job, profile, db)}
+
+    if req.task == "tailor":
+        r = GeminiService.tailor_resume_content(jd, pd) or {}
+        out = [f"**Resume tailoring for {job.title} at {job.company}**", ""]
+        if r.get("tailored_summary"):
+            out += ["**Summary to use**", r["tailored_summary"], ""]
+        if r.get("matched_keywords"):
+            out.append("**Already strong:** " + ", ".join(r["matched_keywords"][:8]))
+        if r.get("missing_keywords"):
+            out.append("**Worth adding (only if true):** " + ", ".join(r["missing_keywords"][:8]))
+        recs = r.get("bullet_recommendations") or []
+        if recs:
+            out += ["", "**Bullet rewrites**"]
+            for b in recs[:4]:
+                out.append(f"- {b.get('tailored', '')}" + (f"  \n  _{b.get('reason')}_" if b.get("reason") else ""))
+        out += ["", "Only claims from your own profile are used. Nothing is invented."]
+        return {"markdown": "\n".join(out)}
+
+    if req.task == "cover":
+        r = GeminiService.generate_cover_letter(jd, pd) or {}
+        letter = (r.get("cover_letter") or "").strip()
+        note = " _(template: AI wasn't available, so edit it before sending)_" if r.get("source") == "template" else ""
+        return {"markdown": f"**Cover letter for {job.title} at {job.company}**{note}\n\n{letter}", "copy": letter}
+
+    if req.task == "prep":
+        r = GeminiService.generate_interview_prep(jd, pd) or {}
+        out = [f"**Interview prep: {job.title} at {job.company}**", ""]
+        if r.get("company_overview"):
+            out += [r["company_overview"], ""]
+        tq = r.get("technical_questions") or []
+        if tq:
+            out.append("**Technical questions**")
+            for q in tq[:4]:
+                out.append(f"- **{q.get('question', '')}**" + (f"  \n  How to answer: {q.get('model_answer')}" if q.get("model_answer") else ""))
+        bq = r.get("behavioral_questions") or []
+        if bq:
+            out += ["", "**Behavioural (STAR)**"]
+            for q in bq[:3]:
+                star = " → ".join(x for x in (q.get("star_situation"), q.get("star_action"), q.get("star_result")) if x)
+                out.append(f"- **{q.get('question', '')}**" + (f"  \n  {star}" if star else ""))
+        if r.get("candidate_edge"):
+            out += ["", f"**Your edge:** {r['candidate_edge']}"]
+        return {"markdown": "\n".join(out)}
+
+    raise HTTPException(status_code=400, detail="task must be tailor, cover, prep or ready")
