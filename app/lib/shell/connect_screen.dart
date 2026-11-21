@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'scan_screen.dart';
 import 'shell_config.dart';
 import 'shell_theme.dart';
 
@@ -89,20 +90,29 @@ class _ConnectScreenState extends State<ConnectScreen> {
     });
   }
 
+  /// A sign-in link (https://server/app/?token=…) fills in both fields at once.
+  bool _applyLink(String text) {
+    final link = Uri.tryParse(text.trim());
+    if (link == null || !link.hasScheme || (link.queryParameters['token'] ?? '').isEmpty) return false;
+    _url.text = '${link.scheme}://${link.host}${link.hasPort ? ':${link.port}' : ''}';
+    _token.text = link.queryParameters['token']!;
+    setState(() { _editServer = false; _error = null; });
+    return true;
+  }
+
   Future<void> _paste() async {
     final data = await Clipboard.getData(Clipboard.kTextPlain);
     final text = (data?.text ?? '').trim();
     if (text.isEmpty) return;
-    // A sign-in link (https://server/app/?token=…) fills in both fields at once.
-    final link = Uri.tryParse(text);
-    if (link != null && link.hasScheme && link.queryParameters['token'] != null) {
-      _url.text = '${link.scheme}://${link.host}${link.hasPort ? ':${link.port}' : ''}';
-      _token.text = link.queryParameters['token']!;
-      setState(() => _editServer = false);
-    } else {
-      _token.text = text;
-    }
+    if (!_applyLink(text)) _token.text = text;
     HapticFeedback.selectionClick();
+  }
+
+  Future<void> _scan() async {
+    FocusScope.of(context).unfocus();
+    final link = await ScanScreen.open(context);
+    if (!mounted || link == null) return;
+    if (_applyLink(link)) _signIn(); // scanned = nothing to type: sign straight in
   }
 
   Future<void> _signIn() async {
@@ -141,8 +151,8 @@ class _ConnectScreenState extends State<ConnectScreen> {
                 style: TextStyle(color: ui.ink2, fontSize: 14, height: 1.45)),
             const SizedBox(height: 18),
             _helpStep('1', 'On the computer where ApplyPilot is set up, open the web app.'),
-            _helpStep('2', 'Go to Settings › Data & privacy and copy your access key.'),
-            _helpStep('3', 'Paste it here. The app remembers it, so you only do this once.'),
+            _helpStep('2', 'Go to Settings › Data & privacy › Sign in on your phone.'),
+            _helpStep('3', 'Tap Show QR code and scan it here, or copy the link and tap Paste.'),
             const SizedBox(height: 6),
             Text('Tip: copy the whole sign-in link and tap Paste. The server and key fill in together.',
                 style: TextStyle(color: ui.ink3, fontSize: 13, height: 1.4)),
@@ -388,6 +398,30 @@ class _ConnectScreenState extends State<ConnectScreen> {
                   : _done
                       ? Icon(Icons.check_rounded, key: const ValueKey('done'), color: ui.buttonInk)
                       : Text(widget.onCancel != null ? 'Connect' : 'Sign in', key: const ValueKey('idle')),
+            )),
+            const SizedBox(height: 14),
+            _Rise(delay: 280, child: Row(children: [
+              Expanded(child: Divider(color: ui.hair, height: 1)),
+              Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Text('or', style: TextStyle(color: ui.ink3, fontSize: 13))),
+              Expanded(child: Divider(color: ui.hair, height: 1)),
+            ])),
+            const SizedBox(height: 14),
+            _Rise(delay: 320, child: _PressScale(
+              onTap: _busy || _done ? null : _scan,
+              enabled: !_busy && !_done,
+              child: Container(
+                height: 54,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: ui.card, borderRadius: BorderRadius.circular(27),
+                  border: Border.all(color: ui.hair), boxShadow: ui.cardShadow,
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.qr_code_scanner_rounded, color: ui.ink, size: 22),
+                  const SizedBox(width: 10),
+                  Text('Scan QR code', style: TextStyle(color: ui.ink, fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: -0.1)),
+                ]),
+              ),
             )),
             const SizedBox(height: 8),
             Center(child: TextButton(

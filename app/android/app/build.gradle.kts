@@ -15,12 +15,14 @@ plugins {
 
 android {
     namespace = "org.applypilot.applypilot"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37 // notifications + androidx.core need 37; minSdk (oldest supported phone) is unchanged
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // Notifications use java.time on older Android versions
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -70,4 +72,5 @@ flutter {
 dependencies {
     // On-device AI (Google LiteRT-LM): runs a small open model inside the app, no server needed
     implementation("com.google.ai.edge.litertlm:litertlm-android:0.19.1")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

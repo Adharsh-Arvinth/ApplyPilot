@@ -678,9 +678,63 @@
     async settings() {
       await settle({ profile: api('/profile'), gemini: api('/profile/gemini-settings'), resumes: api('/resumes'),
         automation: api('/automation/status'), autopilot: api('/autopilot'), proofStatus: api('/proofs/status'),
-        resume: api('/profile/resume'), answers: api('/answer-bank'), avatar: api('/profile/avatar/meta'), facts: api('/profile/facts'), localAI: api('/ai/local') });
+        resume: api('/profile/resume'), answers: api('/answer-bank'), avatar: api('/profile/avatar/meta'), facts: api('/profile/facts'), localAI: api('/ai/local'),
+        notify: api('/notifications/settings') });
+      if (IN_SHELL) phoneNotify('status').then(r => { S.notifyPhone = r; if (S.view === 'settings') { S.lastHtml = ''; render(); } }).catch(() => {});
     },
   };
+
+  // ───────────────────────── Notifications (phone) ─────────────────────────
+  let notifyWait = null;
+  window.__apNotify = (r) => { if (notifyWait) { const w = notifyWait; notifyWait = null; w(r); } };
+  const phoneNotify = (op) => new Promise((resolve, reject) => {
+    if (!IN_SHELL) { reject(new Error('Only in the Android app')); return; }
+    notifyWait = resolve;
+    window.ApplyPilotShell.postMessage('notify:' + op);
+    setTimeout(() => { if (notifyWait === resolve) { notifyWait = null; reject(new Error('No answer from the app')); } }, 20000);
+  });
+  function notifyCard() {
+    const n = S.notify || {}, kinds = n.kinds || {}, phone = S.notifyPhone;
+    const status = !IN_SHELL ? ['slate', 'On phones with the app']
+      : !phone ? ['slate', 'Checking…'] : phone.granted ? ['teal', 'On for this phone'] : ['amber', 'Off on this phone'];
+    const hours = (v) => Array.from({ length: 24 }, (_, h) => `<option value="${h}" ${Number(v) === h ? 'selected' : ''}>${String(h).padStart(2, '0')}:00</option>`).join('');
+    return `<form class="card" data-notify-form><div class="card-h"><span class="card-t">Notifications</span><span class="aside"><span class="dot ${status[0]}"></span>${status[1]}</span></div>
+      <div class="card-b"><p class="muted small">Hear about the moments that matter: an interview invite, a strong new match, a question only you can answer. The app checks your server quietly about every 15 minutes, even when it's closed.</p>
+      ${IN_SHELL && phone && !phone.granted ? `<div class="row-end"><button type="button" class="btn primary hv" data-act="notify-allow">${icon('notifications_active')}Turn on for this phone</button></div>` : ''}</div>
+      <div class="set-list card-sep">
+        <label class="set-row hv"><div class="grow">Notifications<small>Master switch for every phone signed in to this server</small></div><span class="toggle"><input type="checkbox" name="enabled" ${n.enabled !== false ? 'checked' : ''}><i></i></span></label>
+        ${Object.entries(kinds).map(([k, label]) => `<label class="set-row hv ${n.enabled === false ? 'dim' : ''}"><div class="grow">${esc(label)}</div><span class="toggle"><input type="checkbox" name="${k}" ${n[k] ? 'checked' : ''}><i></i></span></label>`).join('')}
+        <div class="set-row"><div class="grow">Quiet hours<small>Delivered silently, no sound or buzz</small></div>
+          <select class="select sm" name="quiet_start" aria-label="Quiet from">${hours(n.quiet_start ?? 22)}</select><span class="faint small">to</span>
+          <select class="select sm" name="quiet_end" aria-label="Quiet until">${hours(n.quiet_end ?? 8)}</select></div>
+      </div>
+      ${IN_SHELL && phone && phone.granted ? `<div class="card-b row-end"><button type="button" class="btn sm ghost hv" data-act="notify-test">${icon('notifications')}Send a test</button></div>` : ''}
+    </form>`;
+  }
+  const NOTIFY_ASK = 'ap_notify_asked';
+  function notifyNudge() {
+    if (!IN_SHELL || !S.notifyPhone || S.notifyPhone.granted) return '';
+    try { if (localStorage.getItem(NOTIFY_ASK)) return ''; } catch (e) { return ''; }
+    return `<section class="card nudge block"><span class="nudge-ic">${icon('notifications_active', 'fill')}</span>
+      <div class="grow min0"><div class="strong">Know the moment an employer replies</div><div class="muted small">Interview invites and strong new matches, straight to your phone.</div></div>
+      <div class="nudge-acts"><button type="button" class="btn sm ghost hv" data-act="notify-later">Not now</button><button type="button" class="btn sm primary hv" data-act="notify-allow">Turn on</button></div></section>`;
+  }
+
+  // Sign-in QR code (drawn on this page; the code library loads only when asked)
+  let qrLib = null;
+  const loadQR = () => qrLib || (qrLib = new Promise((res, rej) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js';
+    sc.onload = () => res(window.qrcode); sc.onerror = () => { qrLib = null; rej(new Error("Couldn't load the QR code drawer. Check your internet.")); };
+    document.head.appendChild(sc);
+  }));
+  function qrSvg(text) {
+    const q = window.qrcode(0, 'M'); q.addData(text); q.make();
+    const n = q.getModuleCount(), pad = 2;
+    let d = '';
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) d += `M${c + pad} ${r + pad}h1v1h-1z`;
+    return `<svg viewBox="0 0 ${n + pad * 2} ${n + pad * 2}" shape-rendering="crispEdges" role="img" aria-label="Sign-in QR code"><rect width="100%" height="100%" fill="#fff"/><path d="${d}" fill="#111113"/></svg>`;
+  }
 
   // ───────────────────────── Router ─────────────────────────
   let viewToken = 0;
@@ -706,6 +760,7 @@
     if (my !== viewToken) return;
     render({ poll: cached });
     prefetchSoon();
+    if (IN_SHELL && !S.notifyPhone) phoneNotify('status').then(r => { S.notifyPhone = r; if (S.view === 'home') { S.lastHtml = ''; render(); } }).catch(() => {});
   }
   // Warm every other tab while the app is idle, so the first visit is instant too.
   let prefetched = false;
@@ -1004,7 +1059,7 @@
       <div class="card list">${recent.map(proofRow).join('')}</div></section>` : '';
     return `<header class="view-head greet"><div class="min0"><div class="eyebrow">${esc(today())}</div><h1>${esc(greeting())}</h1><p class="sub">${esc(summary)}</p></div>
       <button class="greet-me" data-nav="settings/profile" title="Your profile">${me('lg')}</button></header>
-      ${hero}${goalCard()}${checklist()}${forYou}${dashboard()}${recentHtml}${topShelf(8)}`;
+      ${hero}${notifyNudge()}${goalCard()}${checklist()}${forYou}${dashboard()}${recentHtml}${topShelf(8)}`;
   };
 
   // ───────────────────────── View: Proof ─────────────────────────
@@ -1645,7 +1700,7 @@
     if (sec === 'autopilot') {
       const ap = S.autopilot || {}, cfg = ap.config || {}, sta = ap.state || {}, es = engineStatus();
       const opt = (vals, cur, unit) => vals.map(v => `<option value="${v}" ${Number(cur) === v ? 'selected' : ''}>${v} ${unit}</option>`).join('');
-      return `<div class="stack">
+      return `<div class="stack">${notifyCard()}
         <form class="card" data-ap-form><div class="card-h"><span class="card-t">Autopilot</span><span class="aside"><span class="dot ${es.dot}"></span>${esc(es.label)}</span></div>
           <div class="set-list"><label class="set-row hv"><span class="grow">Apply automatically<small>Find, score and apply in the background, within your limits.</small></span>
             <span class="toggle"><input type="checkbox" name="enabled" ${cfg.enabled !== false ? 'checked' : ''}><i></i></span></label></div>
@@ -1711,6 +1766,7 @@
         <p>Everything is stored on your own ApplyPilot server. Data leaves it only to: the job sites you apply to, Google Gemini (questions and job text, to draft answers), and Gmail (read-only) if you connect it.</p>
         <p>Your email app password is encrypted on disk. Your access token is kept in a secure, script-proof cookie and never shown in the address bar.</p></div>`)}
       ${card('Sign in on your phone', '', `<div class="set-list">
+        <div class="set-row"><span class="grow">Scan to sign in<small>Open the ApplyPilot app, tap Scan QR code and point it here. Nothing to type</small></span><button type="button" class="btn sm primary hv" data-act="show-qr">${icon('qr_code_2')}Show QR code</button></div>
         <div class="set-row"><span class="grow">Sign-in link<small>Copy it, open the ApplyPilot app and tap Paste — the server and key fill in together</small></span><button type="button" class="btn sm hv" data-act="copy-signin">${icon('link')}Copy link</button></div>
         <div class="set-row"><span class="grow">Access key<small>The key that unlocks your server. Keep it private</small></span><button type="button" class="btn sm hv" data-act="copy-key">${icon('key')}Copy key</button></div>
         <div class="set-row"><span class="grow">New access key<small>Signs out every phone and browser; sign in again with the new key</small></span><button type="button" class="btn sm ghost hv" data-act="rotate-key">${icon('autorenew')}Replace</button></div>
@@ -1718,6 +1774,13 @@
       ${IN_SHELL ? card('Phone app', '', `<div class="set-list"><div class="set-row"><div class="grow">Connected to<small>${esc(location.host)}</small></div><button type="button" class="btn sm hv" data-act="shell-server">Change server</button></div></div>`) : ''}
     </div>`;
   }
+  document.addEventListener('change', async (e) => {
+    const f = e.target.closest('[data-notify-form]');
+    if (!f) return;
+    const fd = new FormData(f), body = { enabled: !!f.querySelector('[name=enabled]').checked, quiet_start: Number(fd.get('quiet_start')), quiet_end: Number(fd.get('quiet_end')) };
+    for (const k of Object.keys((S.notify || {}).kinds || {})) body[k] = !!f.querySelector(`[name="${k}"]`).checked;
+    try { S.notify = await api('/notifications/settings', { method: 'PUT', body }); toast('Saved'); S.lastHtml = ''; render(); } catch (err) { toast(err.message, true); }
+  });
   afterRender.settings = () => {
     const r = $('#g-conf');
     r && r.addEventListener('input', () => { r.nextElementSibling.value = Math.round(r.value * 100) + '%'; });
@@ -2099,6 +2162,38 @@
       if (!ok) return;
       try { localStorage.setItem(DEVICE_AUTO, 'off'); } catch (e) {}
       try { await deviceAI('delete', { model: btn.dataset.model }); setTimeout(refreshDevice, 500); toast('Model deleted'); } catch (e) { toast(e.message, true); }
+    },
+    async 'show-qr'() {
+      try {
+        const [r] = await Promise.all([api('/profile/phone-sign-in'), loadQR()]);
+        const wrap = document.createElement('div');
+        wrap.className = 'modal-wrap';
+        wrap.innerHTML = `<div class="modal qr-modal" role="dialog" aria-label="Scan to sign in">
+          <div class="qr-frame">${qrSvg(r.link)}</div>
+          <h3>Scan with the ApplyPilot app</h3>
+          <p>On your phone: open the app › <b>Scan QR code</b>. ${r.local_only ? '<br><span class="bad small">This page was opened on a local address, so the code only works on this computer\'s network. Open it through your server\'s https address for a code that works anywhere.</span>' : ''}</p>
+          <p class="faint small">${icon('lock')} Anyone who scans this can use your ApplyPilot. Only show it to your own phone.</p>
+          <div class="acts"><button type="button" class="btn primary hv" data-qr-close>Done</button></div></div>`;
+        const close = () => { wrap.remove(); document.removeEventListener('keydown', esc_); };
+        const esc_ = (e) => { if (e.key === 'Escape') close(); };
+        wrap.addEventListener('click', (e) => { if (e.target === wrap || e.target.closest('[data-qr-close]')) close(); });
+        document.addEventListener('keydown', esc_);
+        document.body.appendChild(wrap);
+        setTimeout(close, 120000); // don't leave a key on screen
+      } catch (e) { toast(e.message, true); }
+    },
+    async 'notify-allow'() {
+      try { localStorage.setItem(NOTIFY_ASK, '1'); } catch (e) {}
+      try {
+        const r = await phoneNotify('permission');
+        S.notifyPhone = { granted: !!r.granted };
+        toast(r.granted ? 'Notifications are on' : 'Notifications stay off. You can allow them in your phone settings any time', !r.granted);
+      } catch (e) { toast(e.message, true); }
+      S.lastHtml = ''; render();
+    },
+    'notify-later'() { try { localStorage.setItem(NOTIFY_ASK, '1'); } catch (e) {} S.lastHtml = ''; render(); },
+    async 'notify-test'() {
+      try { const r = await phoneNotify('test'); toast(r.granted ? 'Sent. Check your notifications' : 'Notifications are off on this phone', !r.granted); } catch (e) { toast(e.message, true); }
     },
     async 'copy-signin'() {
       try {

@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
+import 'notifier.dart';
 import 'shell_config.dart';
 import 'shell_theme.dart';
 
@@ -33,6 +34,8 @@ class _WebShellState extends State<WebShell> {
   @override
   void initState() {
     super.initState();
+    Notifier.onOpen = _openRoute; // a tapped notification opens its screen
+    Notifier.checkNow().catchError((_) => 0); // catch up right away (the first check only sets a baseline)
     // Start in the last theme the cockpit reported, so there is no colour flash on launch.
     ShellPalette.load().then((p) { if (mounted) _setPalette(p, persist: false); });
     _web = WebViewController()
@@ -41,6 +44,7 @@ class _WebShellState extends State<WebShell> {
       ..addJavaScriptChannel('ApplyPilotShell', onMessageReceived: (m) {
         if (m.message == 'change-server') { widget.onChangeServer(null); return; }
         if (m.message.startsWith('token:')) { ShellConfig.save(widget.config.serverUrl, m.message.substring(6)); return; }
+        if (m.message.startsWith('notify:')) { _onNotify(m.message.substring(7)); return; }
         if (m.message.startsWith('ai:')) { _onDeviceAI(m.message.substring(3)); return; }
         final p = ShellPalette.fromMessage(m.message);
         if (p != null) _setPalette(p);
@@ -48,6 +52,8 @@ class _WebShellState extends State<WebShell> {
       ..setNavigationDelegate(NavigationDelegate(
         onPageStarted: (_) { if (mounted) setState(() => _loading = true); },
         onPageFinished: (_) {
+          final pending = Notifier.pendingRoute;
+          if (pending != null) { Notifier.pendingRoute = null; _openRoute(pending); }
           if (!mounted) return;
           setState(() => _loading = false);
           // Give the page a moment to paint before lifting the cover, so there's no white flash.
@@ -110,6 +116,32 @@ class _WebShellState extends State<WebShell> {
   }
 
   void _toPage(String js) { if (mounted) _web.runJavaScript(js); }
+
+  // ── Notifications bridge: the cockpit asks, the phone answers on window.__apNotify(result) ──
+  Future<void> _onNotify(String op) async {
+    Map<String, dynamic> r;
+    try {
+      if (op == 'permission') {
+        final ok = await Notifier.requestPermission();
+        if (ok) { await Notifier.start(); await Notifier.checkNow(); }
+        r = {'op': op, 'granted': ok};
+      } else if (op == 'test') {
+        final ok = await Notifier.permitted();
+        if (ok) await Notifier.checkNow(test: true);
+        r = {'op': op, 'granted': ok};
+      } else {
+        r = {'op': 'status', 'granted': await Notifier.permitted()};
+      }
+    } catch (e) {
+      r = {'op': op, 'granted': false, 'error': e.toString()};
+    }
+    _toPage('window.__apNotify && window.__apNotify(${jsonEncode(r)})');
+  }
+
+  void _openRoute(String route) {
+    final safe = route.replaceAll(RegExp(r'[^a-z0-9/_-]'), '');
+    _toPage("location.hash = '#/$safe'");
+  }
 
   Future<List<String>> _pickFiles(FileSelectorParams params) async {
     // Profile picture → the photo picker; resume → documents.

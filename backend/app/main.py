@@ -26,6 +26,7 @@ from backend.app.api.analytics import router as analytics_router
 from backend.app.api.ai import router as ai_router
 from backend.app.api.firebase import router as firebase_router
 from backend.app.api.autopilot import router as autopilot_router
+from backend.app.api.notifications import router as notifications_router
 from backend.app.services.autopilot import Autopilot
 import sys
 
@@ -268,6 +269,7 @@ app.include_router(analytics_router, prefix="/api/v1")
 app.include_router(ai_router, prefix="/api/v1")
 app.include_router(firebase_router, prefix="/api/v1")
 app.include_router(autopilot_router, prefix="/api/v1")
+app.include_router(notifications_router, prefix="/api/v1")
 
 @app.get("/")
 def root(request: Request):

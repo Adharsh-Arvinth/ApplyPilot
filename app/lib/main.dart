@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'shell/connect_screen.dart';
+import 'shell/notifier.dart';
 import 'shell/shell_config.dart';
 import 'shell/shell_theme.dart';
 import 'shell/web_shell.dart';
@@ -12,6 +13,8 @@ void main() async {
   final config = await ShellConfig.load();
   final palette = await ShellPalette.load(); // the theme picked in the app last time (Neutral on a new install)
   SystemChrome.setSystemUIOverlayStyle(palette.overlay);
+  try { await Notifier.init(); } catch (_) {}
+  if (config.ready) Notifier.start();
   runApp(ApplyPilotApp(initialConfig: config, palette: palette));
 }
 
@@ -41,7 +44,10 @@ class _ApplyPilotAppState extends State<ApplyPilotApp> {
         palette: widget.palette,
         showIntro: !_config.ready,
         onCancel: _config.ready ? () => setState(() { _connecting = false; _message = null; }) : null,
-        onConnected: (cfg) => setState(() { _config = cfg; _connecting = false; _message = null; }),
+        onConnected: (cfg) {
+          setState(() { _config = cfg; _connecting = false; _message = null; });
+          Notifier.start();
+        },
       );
     } else {
       home = WebShell(
