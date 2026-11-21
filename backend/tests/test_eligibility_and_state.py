@@ -204,14 +204,18 @@ def test_candidate_records_crud_and_separation():
     res = client.get("/api/v1/profile/records", headers=AUTH_HEADERS)
     assert res.status_code == 200
     records = res.json()
-    assert len(records) >= 8
+    # Seeded from whichever facts file is present (the private one locally, the example one in CI)
+    from backend.app.core.facts import LOCKED_FACTS
+    from backend.app.services.answer_service import _default_candidate_records
+    seed = list(LOCKED_FACTS.get("candidate_records") or _default_candidate_records())
+    assert len(records) >= len(seed) >= 1
 
     # 2. Check Patents vs Benchmarks separation
     patent_records = [r for r in records if r["category"] == "patents"]
-    assert len(patent_records) >= 2
+    assert len(patent_records) >= len([r for r in seed if dict(r).get("category") == "patents"])
     for p in patent_records:
         assert p["subcategory"] == "published_patent"
-        assert "patent office" in p["source_evidence"].lower()
+        assert "patent" in p["source_evidence"].lower()  # "Patent office record" or "Patent publication"
 
     benchmark_records = [r for r in records if r["category"] == "projects"]
     assert len(benchmark_records) >= 1
