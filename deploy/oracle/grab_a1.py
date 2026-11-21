@@ -25,6 +25,7 @@ import oci
 NAME = "applypilot-server"
 SHAPE = "VM.Standard.A1.Flex"
 STATE_FILE = Path.home() / ".applypilot" / "oracle-server.json"
+SIZES = [(4, 24), (2, 12), (1, 6)]  # all Always Free; ApplyPilot runs on any of them
 SSH_KEY = Path.home() / ".ssh" / "applypilot_oracle"
 SSH_PUB = Path.home() / ".ssh" / "applypilot_oracle.pub"
 REPO = Path(__file__).resolve().parents[2]
@@ -240,6 +241,7 @@ def main():
     ap.add_argument("--memory", type=float, default=24)
     ap.add_argument("--disk", type=int, default=100)
     ap.add_argument("--open-ports", action="store_true")
+    ap.add_argument("--any-size", action="store_true", help="also try 2 OCPU / 12 GB and 1 OCPU / 6 GB (all free)")
     ap.add_argument("--log", help="append output to this file (for running hidden at login)")
     ap.add_argument("--create-only", action="store_true",
                     help="only get the server (e.g. from the always-on micro VM); the PC installs it at its next login")
@@ -283,11 +285,13 @@ def main():
                 log("The server exists (an earlier request went through)")
                 break
             wait = 60
+            # Rotate sizes: the full free allowance first, then smaller ones that Oracle has room for far more often
+            ocpus, mem = SIZES[(attempt - 1) % len(SIZES)] if a.any_size else (a.ocpus, a.memory)
             for d in ad:
                 try:
                     inst = compute.launch_instance(oci.core.models.LaunchInstanceDetails(
                         compartment_id=comp, availability_domain=d.name, display_name=NAME, shape=SHAPE,
-                        shape_config=oci.core.models.LaunchInstanceShapeConfigDetails(ocpus=a.ocpus, memory_in_gbs=a.memory),
+                        shape_config=oci.core.models.LaunchInstanceShapeConfigDetails(ocpus=ocpus, memory_in_gbs=mem),
                         source_details=oci.core.models.InstanceSourceViaImageDetails(image_id=image.id, boot_volume_size_in_gbs=a.disk),
                         create_vnic_details=oci.core.models.CreateVnicDetails(subnet_id=subnet.id, assign_public_ip=True),
                         metadata={"ssh_authorized_keys": key})).data

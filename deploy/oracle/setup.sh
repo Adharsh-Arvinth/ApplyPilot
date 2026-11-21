@@ -41,7 +41,9 @@ Environment=OLLAMA_MAX_LOADED_MODELS=1
 EOF
 sudo systemctl daemon-reload && sudo systemctl enable --now ollama >/dev/null && sudo systemctl restart ollama
 for i in $(seq 1 30); do curl -fsS http://127.0.0.1:11434/api/tags >/dev/null 2>&1 && break; sleep 2; done
-ollama pull "${AI_MODEL:-qwen3.5:4b}"
+MEM_GB=$(awk '/MemTotal/ {printf "%d", $2/1048576}' /proc/meminfo)
+DEFAULT_AI=$([ "$MEM_GB" -ge 10 ] && echo qwen3.5:4b || echo qwen3.5:2b)  # leave room for the browser on small servers
+ollama pull "${AI_MODEL:-$DEFAULT_AI}"
 
 echo "== HTTPS (Caddy: free automatic certificates from Let's Encrypt, renewed on its own)"
 if ! command -v caddy >/dev/null; then
