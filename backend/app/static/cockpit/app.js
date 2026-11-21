@@ -474,10 +474,10 @@
     bar.addEventListener('contextmenu', (e) => e.preventDefault()); // long-press shouldn't open a menu
   })();
 
-  // ── Settings tabs: press, hold and glide ──
-  // The row scrolls sideways with a normal swipe. Press and hold a tab (about a quarter second) and the
-  // glass lens lifts: slide to move it across the tabs (ticking on each, scrolling the row at the edges),
-  // lift to open the tab under your finger. Works with a mouse too (hold, then drag).
+  // ── Settings tabs: press and glide (same as the bottom tab bar) ──
+  // Press any tab and slide: the glass lens follows your finger, ticking on each tab; near an edge the
+  // row scrolls along so you can reach the last tab and come back; lift to open the tab under your finger.
+  // Holding still for a moment lifts the lens too. A tap opens a tab; the mouse wheel still scrolls the row.
   (function setNavGlide() {
     let d = null;
     const links = (nav) => $$('.set-link', nav);
@@ -522,13 +522,20 @@
     document.addEventListener('pointerdown', (e) => {
       const btn = e.target.closest('.set-nav .set-link');
       if (!btn || (e.pointerType === 'mouse' && e.button !== 0)) return;
-      d = { nav: btn.closest('.set-nav'), id: e.pointerId, x: e.clientX, x0: e.clientX, over: btn, armed: false };
+      const row = links(btn.closest('.set-nav'));
+      if (row.length > 1 && row[1].offsetTop !== row[0].offsetTop) return; // vertical list (wide screens): plain clicks
+      d = { nav: btn.closest('.set-nav'), id: e.pointerId, x: e.clientX, x0: e.clientX, y0: e.clientY, over: btn, armed: false };
       d.timer = setTimeout(arm, 240);
     });
     document.addEventListener('pointermove', (e) => {
       if (!d || e.pointerId !== d.id) return;
       d.x = e.clientX;
-      if (!d.armed) { if (Math.abs(d.x - d.x0) > 8) { stop(); d = null; } return; } // a swipe: let the row scroll
+      if (!d.armed) {
+        const dx = Math.abs(d.x - d.x0), dy = Math.abs(e.clientY - d.y0);
+        if (dy > 10 && dy > dx) { stop(); d = null; return; } // scrolling the page, not the tabs
+        if (dx > 6) { clearTimeout(d.timer); arm(); }       // slide straight away, like the bottom tab bar
+        return;
+      }
       follow();
     });
     // Once armed, the finger glides the lens instead of scrolling the page or the row

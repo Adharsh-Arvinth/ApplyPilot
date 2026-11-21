@@ -1321,3 +1321,6 @@ html.lite .toolbar > .hint, html.lite .kbd { display: none; }
 .ai-pick { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s2); margin-top: var(--s2); }
 .ai-pick .chip-btn { max-width: 100%; text-align: left; white-space: normal; }
 .ai-msg .ai-copy { margin-top: var(--s2); }
+
+/* Sideways drags on the settings tabs drive the glide (the row scrolls under the lens), vertical ones scroll the page */
+.set-nav { touch-action: pan-y; }
