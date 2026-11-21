@@ -156,6 +156,40 @@ def _facts(*path: str, default: str = "") -> str:
     return str(node) if node is not None else default
 
 
+MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+
+
+def _month_of(when: Optional[str]) -> Optional[str]:
+    """'Sep 2022' / '2027-05' / 'May 2027' -> 'September' / 'May' (None if unknown)."""
+    if not when:
+        return None
+    s = str(when).strip().lower()
+    m = re.search(r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*", s)
+    if m:
+        return next(x for x in MONTHS if x.lower().startswith(m.group(1)))
+    m = re.search(r"\d{4}[-/](\d{1,2})", s)
+    return MONTHS[int(m.group(1)) - 1] if m and 1 <= int(m.group(1)) <= 12 else None
+
+
+def _year_of(when: Optional[str]) -> Optional[str]:
+    m = re.search(r"(19|20)\d{2}", str(when or ""))
+    return m.group(0) if m else None
+
+
+def _graduation(profile) -> Optional[str]:
+    """Only a graduation date you entered (Settings › Your background); never guessed."""
+    return (getattr(profile, "graduation_date", None) or _facts("education", "expected_graduation") or None)
+
+
+def _degree_option() -> Optional[str]:
+    deg = (_facts("education", "degree") or "").lower()
+    if re.search(r"m\.?\s?tech|master|m\.?sc|m\.?e\b|mba", deg):
+        return "Master's Degree"
+    if re.search(r"b\.?\s?tech|bachelor|b\.?e\b|b\.?sc", deg):
+        return "Bachelor's Degree"
+    return None
+
+
 def profile_answer(label: str, profile) -> Optional[str]:
     """Deterministic answers from your profile/facts for common fields the Answer Bank may miss."""
     low = re.sub(r"\s+", " ", (label or "").lower()).strip()
@@ -169,6 +203,15 @@ def profile_answer(label: str, profile) -> Optional[str]:
         (r"\bwebsite\b|portfolio|personal (site|url)|other (website|link)", getattr(profile, "github", "") or getattr(profile, "linkedin", "")),
         (r"\btwitter\b|\bx\.com\b", None),
         (r"language skill|spoken language|languages? (you )?speak|^languages?$", "English"),
+        # Education section (Greenhouse/Lever ask these as searchable dropdowns; the filler types to find them)
+        (r"^(school|university|college|institution|school name|university name|college name)( name)?$|name of (your )?(school|university|college)",
+         institution),
+        (r"^degree( type| level)?$|^highest (degree|qualification)|level of education", _degree_option()),
+        (r"^(discipline|major|field of study|area of study|specialization|branch)$", "Computer Science"),
+        (r"^(education )?start (date )?month$", _month_of(_facts("education", "start_date"))),
+        (r"^(education )?start (date )?year$", _year_of(_facts("education", "start_date"))),
+        (r"^(education )?end (date )?month$|graduation month", _month_of(_graduation(profile))),
+        (r"^(education )?end (date )?year$|graduation year|year of graduation|expected graduation", _year_of(_graduation(profile))),
     ]
     for pattern, value in rules:
         if re.search(pattern, low):

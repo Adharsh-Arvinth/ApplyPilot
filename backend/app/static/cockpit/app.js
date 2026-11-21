@@ -1165,16 +1165,17 @@
     const list = S.needs.map((n, i) => `<button class="inbox-item hv ${i === I.sel ? 'sel' : ''}" data-q="${i}" ${i === I.sel ? 'aria-current="true"' : ''}>
       ${art(n.company, 'sm')}<div class="min0"><div class="q">${esc(n.question_text)}</div><div class="meta">${esc(n.company)} · ${esc(n.role)} · ${rel(n.created_at)}</div></div></button>`).join('');
     const pick = I.picks[q.id] ?? q.suggested_answer ?? '';
-    const opts = (q.options || []).filter(Boolean);
-    const input = opts.length
-      ? `<div class="opts" role="radiogroup">${opts.map(o => `<button role="radio" aria-checked="${pick === o}" class="opt ${pick === o ? 'on' : ''}" data-pick="${esc(o)}"><span>${esc(o)}</span>${icon('check_circle', 'fill')}</button>`).join('')}</div>`
-      : `<textarea class="textarea" id="q-answer" aria-label="Answer" placeholder="Type the answer exactly as it should appear on the form">${esc(pick)}</textarea>`;
+    if (I.qFor !== q.id) { I.qFor = q.id; I.filter = ''; }
+    const input = questionInput(q, pick);
+    const [secIc, secName] = questionSection(q), kind = answerKind(q);
     return `<div class="inbox">
       <div class="card inbox-list">${list}</div>
       <div class="card qcard">
         <div class="who">${art(q.company, 'lg')}<div class="min0"><div class="strong">${esc(q.company)}</div><div class="muted small">${esc(q.role)}</div></div>
           <span class="chip ml-auto">Question ${I.sel + 1} of ${S.needs.length}</span></div>
+        <div class="q-context">${icon(secIc)}<span><b>${esc(secName)}</b> · on ${esc(q.company)}’s application form${q.role ? ` for ${esc(q.role)}` : ''}</span></div>
         <h2>${esc(q.question_text)}</h2>
+        <p class="q-hint">${icon('info')}${esc(KIND_HINT[kind])}</p>
         ${q.suggested_answer ? `<div class="suggest">${icon('auto_awesome')} ${String(q.gemini_reason || '').startsWith('device:') ? 'Drafted by the built-in AI on your phone, so check it' : 'Suggested'}: ${esc(q.suggested_answer)}</div>` : ''}
         ${input}
         <label class="remember"><div class="grow">Remember for future applications<small>Saves to the Answer Bank so similar fields are filled automatically</small></div>
@@ -1206,6 +1207,90 @@
       </div></div></div>`;
     }).join('')}</div>`;
   }
+
+  // ── Needs You: understand each question before asking it ──
+  const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  function answerKind(q) {
+    const t = String(q.question_text || '').toLowerCase(), opts = (q.options || []).filter(Boolean);
+    if (opts.length) return q.field_type === 'checkbox' && opts.length <= 2 ? 'consent' : opts.length > 10 ? 'search' : 'choice';
+    if (/\bmonth\b/.test(t)) return 'month';
+    if (/\byear\b/.test(t) && !/years? of|how many years|number of years|in years/.test(t)) return 'year';
+    if (/\b(start|end|graduation|completion) date\b/.test(t) && questionSection(q)[1] === 'Education') return 'edudate';
+    if (/\bdate\b|when can you (start|join)|how soon|earliest start|joining|expect you to join|available to start|notice period/.test(t)) return 'when';
+    if (/years? of experience|how many years|number of years|experience in (number of )?years|\brating\b|\bctc\b|salary|stipend|\blpa\b|compensation|\bgpa\b|\bcgpa\b|percentage|duration/.test(t)) return 'number';
+    if (/describe|\bwhy\b|what excites|tell us|explain|share (your|an?)|walk us|how have you|cover letter|motivat/.test(t)) return 'long';
+    return 'short';
+  }
+  function questionSection(q) {
+    const t = String(q.question_text || '').toLowerCase();
+    return /school|university|college|degree|discipline|major|graduat|start date|end date|\bgpa\b|cgpa|education/.test(t) ? ['school', 'Education']
+      : /authori[sz]|visa|sponsor|right to work|citizen|work permit/.test(t) ? ['badge', 'Work authorization']
+      : /acknowledge|consent|privacy|agree|certify|i confirm|policy/.test(t) ? ['gavel', 'Consent']
+      : /start|join|notice|available|relocat|duration/.test(t) ? ['event', 'Availability']
+      : /\bctc\b|salary|stipend|compensation|\bpay\b|\blpa\b/.test(t) ? ['payments', 'Pay']
+      : /experience|internship|project|rating|codeforces|codechef|leetcode|github/.test(t) ? ['work', 'Experience']
+      : ['help', 'Application question'];
+  }
+  const KIND_HINT = {
+    month: 'Pick a month.', year: 'Pick a year.', edudate: 'Pick the month and year (it’s sent as e.g. “September 2022”).', choice: 'Pick one option.',
+    search: "Search the list and pick yours. If it isn't listed, type it and tap “Use”.",
+    consent: 'The form needs you to agree to this. Read it, then tick to agree.',
+    when: 'When could you start? Pick a date or a quick option, or type it (e.g. “Immediately”, “1 June 2027”).',
+    number: 'Just the number, no words (e.g. 0, 2, 1500). Not applicable? Tap “Don’t have one”.',
+    long: 'A few honest sentences in your own words (2–4). Tap “Draft it for me” for a start you can edit.',
+    short: 'A short answer, exactly as it should appear on the form.',
+  };
+  function questionInput(q, pick) {
+    const kind = answerKind(q), opts = (q.options || []).filter(Boolean);
+    const chip = (label, value) => `<button type="button" class="chip-btn hv" data-q-fill="${esc(value ?? label)}">${esc(label)}</button>`;
+    if (kind === 'choice' || kind === 'consent')
+      return `<div class="opts" role="radiogroup">${opts.map(o => `<button role="radio" aria-checked="${pick === o}" class="opt ${pick === o ? 'on' : ''}" data-pick="${esc(o)}"><span>${esc(o)}</span>${icon('check_circle', 'fill')}</button>`).join('')}</div>`;
+    if (kind === 'search')
+      return `<div class="q-search"><span class="q-search-in">${icon('search')}<input type="search" id="q-filter" class="input" placeholder="Search ${opts.length}+ options, or type yours" autocomplete="off" value="${esc(S.inbox.filter || '')}"></span>
+        <div class="opts q-opts" id="q-opts" role="radiogroup">${searchOptions(opts, S.inbox.filter || '', pick)}</div></div>`;
+    if (kind === 'month')
+      return `<select class="select" id="q-answer" aria-label="Month"><option value="">Choose a month</option>${MONTH_NAMES.map(m => `<option ${pick === m ? 'selected' : ''}>${m}</option>`).join('')}</select>`;
+    if (kind === 'year') {
+      const y = new Date().getFullYear();
+      return `<select class="select" id="q-answer" aria-label="Year"><option value="">Choose a year</option>${Array.from({ length: 17 }, (_, i) => y - 8 + i).map(v => `<option ${String(pick) === String(v) ? 'selected' : ''}>${v}</option>`).join('')}</select>`;
+    }
+    if (kind === 'edudate')
+      return `<div class="q-when"><input class="input" id="q-answer" value="${esc(pick)}" placeholder="e.g. September 2022"><input type="month" class="input" id="q-date" data-fmt="month" aria-label="Pick month and year"></div>`;
+    if (kind === 'when')
+      return `<div class="q-when"><input class="input" id="q-answer" value="${esc(pick)}" placeholder="e.g. Immediately"><input type="date" class="input" id="q-date" aria-label="Pick a date"></div>
+        <div class="q-chips">${chip('Immediately')}${chip('In 2 weeks')}${chip('In 1 month')}${chip('After my graduation')}</div>`;
+    if (kind === 'number')
+      return `<input class="input" id="q-answer" inputmode="decimal" value="${esc(pick)}" placeholder="Number only">
+        <div class="q-chips">${chip('Don’t have one', 'N/A')}${chip('0')}</div>`;
+    if (kind === 'long')
+      return `<textarea class="textarea tall" id="q-answer" aria-label="Answer" placeholder="Write 2–4 sentences">${esc(pick)}</textarea>
+        <div class="q-chips"><button type="button" class="chip-btn hv" data-act="q-draft" data-id="${q.id}">${icon('auto_awesome')}Draft it for me</button></div>`;
+    return `<input class="input" id="q-answer" value="${esc(pick)}" placeholder="Your answer">`;
+  }
+  function searchOptions(opts, filter, pick) {
+    const f = filter.trim().toLowerCase();
+    const hits = (f ? opts.filter(o => o.toLowerCase().includes(f)) : opts).slice(0, 60);
+    const exact = f && opts.some(o => o.toLowerCase() === f);
+    return hits.map(o => `<button role="radio" aria-checked="${pick === o}" class="opt ${pick === o ? 'on' : ''}" data-pick="${esc(o)}"><span>${esc(o)}</span>${icon('check_circle', 'fill')}</button>`).join('')
+      + (f && !exact ? `<button class="opt use ${pick === filter.trim() ? 'on' : ''}" data-pick="${esc(filter.trim())}"><span>Use “${esc(filter.trim())}”</span>${icon('check_circle', 'fill')}</button>` : '')
+      + (!hits.length && !f ? '<p class="faint small">No options</p>' : '');
+  }
+
+  function fmtPicked(v, monthOnly) {
+    const [y, m, d] = String(v).split('-').map(Number);
+    if (!y || !m) return '';
+    return monthOnly || !d ? `${MONTH_NAMES[m - 1]} ${y}` : `${d} ${MONTH_NAMES[m - 1]} ${y}`;
+  }
+  afterRender.inbox = () => {
+    const f = $('#q-filter');
+    if (f) f.addEventListener('input', () => {
+      S.inbox.filter = f.value;
+      const q = S.needs[S.inbox.sel]; if (!q) return;
+      $('#q-opts').innerHTML = searchOptions((q.options || []).filter(Boolean), f.value, S.inbox.picks[q.id] ?? '');
+    });
+    const d = $('#q-date');
+    if (d) d.addEventListener('change', () => { const a = $('#q-answer'); if (a && d.value) { a.value = fmtPicked(d.value, d.dataset.fmt === 'month'); a.focus(); } });
+  };
 
   function inboxTriage() {
     if (!S.triage.length) return emptyCard('done_all', 'Triage is clear', 'Borderline matches (between your maybe and minimum fit scores) show up here for a quick yes / no.');
@@ -2130,13 +2215,20 @@
     async 'q-resolve'(btn) {
       const id = Number(btn.dataset.id);
       const ta = $('#q-answer');
-      const answer = (ta ? ta.value : (S.inbox.picks[id] ?? (S.needs.find(n => n.id === id) || {}).suggested_answer ?? '')).trim();
+      const answer = (ta ? ta.value : (S.inbox.picks[id] ?? (S.needs.find(n => n.id === id) || {}).suggested_answer ?? S.inbox.filter ?? '')).trim();
       if (!answer) { toast('Pick or type an answer first', true); return; }
       const remember = $('#q-remember') ? $('#q-remember').checked : true;
       S.inbox.remember = remember;
       const r = await run(btn, () => api(`/needs-you/${id}/resolve`, { method: 'POST', body: { answer, save_to_answer_bank: remember, mode: 'always_use' } }), 'Answer saved · application resuming');
       if (r === undefined) return;
       S.needs = S.needs.filter(n => n.id !== id); render(); loadStats();
+    },
+    async 'q-draft'(btn) {
+      const q = S.needs.find(n => n.id === Number(btn.dataset.id)); if (!q) return;
+      const r = await run(btn, () => api('/ai/answer-suggest', { method: 'POST', body: { question_text: q.question_text, field_type: q.field_type || 'textarea', job_id: q.job_id } }), 'Draft ready, read it and make it yours');
+      const a = $('#q-answer');
+      if (r && r.suggested_answer && a) { a.value = r.suggested_answer; a.focus(); }
+      else if (r !== undefined) toast('Couldn’t draft this one, so please write a few lines', true);
     },
     async 'q-dismiss'(btn) {
       const id = Number(btn.dataset.id);
@@ -2347,6 +2439,8 @@
     if (it) { S.inbox.tab = it.dataset.inboxTab; S.inbox.chosen = true; render(); return; }
     const q = t.closest('[data-q]');
     if (q) { S.inbox.sel = Number(q.dataset.q); render(); return; }
+    const qf = t.closest('[data-q-fill]');
+    if (qf) { const a = $('#q-answer'); if (a) { a.value = qf.dataset.qFill; a.focus(); } $$('[data-q-fill]').forEach(c => c.classList.toggle('on', c === qf)); return; }
     const pick = t.closest('[data-pick]');
     if (pick) { const cur = S.needs[S.inbox.sel]; S.inbox.picks[cur.id] = pick.dataset.pick; $$('.opt').forEach(o => o.classList.toggle('on', o === pick)); return; }
     const sf = t.closest('[data-stage-f]');

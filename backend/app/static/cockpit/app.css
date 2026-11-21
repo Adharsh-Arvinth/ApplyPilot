@@ -601,6 +601,27 @@ select option:disabled { color: var(--ink-3); }
 .qcard h2 { margin: 0 0 var(--s5); font: 700 1.5rem/1.25 var(--font-display); letter-spacing: -0.025em; }
 .qcard .suggest { display: flex; align-items: center; gap: var(--s2); margin: calc(var(--s3) * -1) 0 var(--s3); font-size: 0.75rem; color: var(--ink-3); }
 .opts { display: flex; flex-direction: column; gap: var(--s2); margin-bottom: var(--s3); }
+.q-context { display: flex; align-items: center; gap: var(--s2); margin: 0 0 var(--s2); font-size: .75rem; color: var(--ink-3); }
+.q-context > :first-child { font-size: 16px; color: var(--accent); flex: none; }
+.q-context b { color: var(--ink-2); font-weight: 600; }
+.q-hint { display: flex; align-items: flex-start; gap: var(--s2); margin: calc(var(--s3) * -1) 0 var(--s4); font-size: .8125rem; line-height: 1.45; color: var(--ink-2); }
+.q-hint > :first-child { font-size: 16px; margin-top: 1px; color: var(--ink-3); flex: none; }
+.q-search { margin-bottom: var(--s3); }
+.q-search-in { position: relative; display: block; margin-bottom: var(--s2); }
+.q-search-in > :first-child { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 18px; color: var(--ink-3); pointer-events: none; }
+.q-search-in .input { padding-left: 38px; }
+.q-opts { max-height: min(46vh, 360px); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; margin-bottom: 0; padding: 2px; }
+.opt.use { box-shadow: inset 0 0 0 1px var(--accent); color: var(--accent); }
+.q-when { display: grid; grid-template-columns: 1fr auto; gap: var(--s2); margin-bottom: var(--s2); }
+.q-when input[type=date], .q-when input[type=month] { width: auto; min-width: 150px; }
+.q-chips { display: flex; flex-wrap: wrap; gap: var(--s2); margin: var(--s2) 0 var(--s3); }
+.q-chips .chip-btn { display: inline-flex; align-items: center; gap: 6px; transition: transform .25s cubic-bezier(.2,.8,.2,1), background-color .2s, color .2s; }
+.q-chips .chip-btn:active { transform: scale(.96); }
+.q-chips .chip-btn.on { color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-soft); }
+.q-chips .chip-btn > :first-child:not(:only-child) { font-size: 15px; }
+.qcard > .select, .qcard > .input { margin-bottom: var(--s3); }
+.textarea.tall { min-height: 140px; }
+@media (max-width: 560px) { .q-when { grid-template-columns: 1fr; } .q-when input[type=date], .q-when input[type=month] { width: 100%; } }
 .opt { display: flex; align-items: center; justify-content: space-between; height: 48px; padding: 0 var(--s4); border-radius: var(--r-md); text-align: left; color: var(--ink-2); background: var(--glass-tint); box-shadow: var(--rim-soft); transition: box-shadow .3s var(--ease-out), color .3s var(--ease-out); }
 .opt.on { color: var(--ink); box-shadow: inset 0 0 0 2px var(--accent); }
 .opt .ms { color: var(--accent); opacity: 0; transform: scale(.6); transition: opacity .3s var(--ease-out), transform .45s var(--ease-sheet); }
