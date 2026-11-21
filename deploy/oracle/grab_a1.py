@@ -241,6 +241,8 @@ def main():
     ap.add_argument("--memory", type=float, default=24)
     ap.add_argument("--disk", type=int, default=100)
     ap.add_argument("--open-ports", action="store_true")
+    ap.add_argument("--check", action="store_true",
+                    help="don't ask Oracle; only install the server if it now exists (the PC runs this every 10 min)")
     ap.add_argument("--any-size", action="store_true", help="also try 2 OCPU / 12 GB and 1 OCPU / 6 GB (all free)")
     ap.add_argument("--log", help="append output to this file (for running hidden at login)")
     ap.add_argument("--create-only", action="store_true",
@@ -267,6 +269,8 @@ def main():
     subnet = pick_subnet(net, comp)
     inst = existing(compute, comp)
 
+    if a.check and not inst:
+        return  # still waiting; nothing to log every 10 minutes
     if not inst and not a.open_ports:
         ad = ident.list_availability_domains(comp).data
         image = pick_image(compute, comp)

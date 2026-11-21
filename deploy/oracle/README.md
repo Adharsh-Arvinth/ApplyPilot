@@ -25,6 +25,8 @@ a Windows notification and leaves `ApplyPilot server.txt` on the Desktop. It is 
 the Windows Startup folder and stops for good once the server is set up. To switch over for real:
 `bash deploy/oracle/switch_over.sh` (copies your latest data and turns the server's autopilot on; close the PC backend first).
 
+**Who asks, who installs:** the micro VM does all the asking (so two askers don't trip Oracle's rate limit); the PC only runs `grab_a1.py --check` every 10 minutes (a per-user scheduled task) and at login, and installs the server once it exists.
+
 **While the PC is off:** the always-free micro VM runs the same script with `--create-only` as a systemd service
 (`applypilot-grab`, program in `/opt/apgrab` because SELinux blocks services from home folders). When it gets the
 server, the PC's script finds it by name at the next login and installs it.
