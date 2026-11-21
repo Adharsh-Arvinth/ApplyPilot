@@ -27,6 +27,16 @@ logger = logging.getLogger(__name__)
 _consecutive_failures = 0
 _recent_captcha_times = []
 
+# What ATS pages say once an application has really gone in (Greenhouse, Lever, Ashby, Workable, ...)
+CONFIRM_PHRASES = (
+    "thank you for applying", "thanks for applying", "application submitted", "application received",
+    "we have received your application", "we've received your application", "thanks for your application",
+    "thank you for your application", "your application has been submitted", "application has been received",
+    "successfully submitted", "application was submitted", "submitted successfully", "we'll contact you if there are next steps",
+    "we will be in touch", "your application is on its way", "thanks for your interest", "application complete",
+)
+
+
 class AutoApplyEngine:
     @classmethod
     def _record_captcha_challenge(cls, company: str):
@@ -394,7 +404,7 @@ class AutoApplyEngine:
                 return
             try:
                 body = (await page.inner_text("body")).lower()
-                if any(k in body for k in ("thank you for applying", "thanks for applying", "received your application", "application submitted", "this field is required")):
+                if any(k in body for k in CONFIRM_PHRASES + ("this field is required",)):
                     return
             except Exception:
                 pass
@@ -423,10 +433,7 @@ class AutoApplyEngine:
         except Exception:
             pass
         url = page.url.lower()
-        confirmed = any(k in url for k in ("confirmation", "thanks", "thank-you")) or any(k in text for k in (
-            "thank you for applying", "thanks for applying", "application submitted", "application received",
-            "we have received your application", "we've received your application", "thanks for your application",
-            "your application has been submitted", "application has been received"))
+        confirmed = any(k in url for k in ("confirmation", "thanks", "thank-you")) or any(k in text for k in CONFIRM_PHRASES)
         return bool(has_errors) and not confirmed, confirmed, text
 
     @staticmethod
