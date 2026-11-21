@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'shell_config.dart';
@@ -40,6 +41,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
   bool _showToken = false;
   late bool _editServer = widget.initial.serverUrl.isEmpty;
   String? _error;
+  int _shakes = 0;
 
   ShellUi get ui => ShellUi(widget.palette);
 
@@ -49,6 +51,8 @@ class _ConnectScreenState extends State<ConnectScreen> {
     _error = widget.message;
     _token.addListener(() => setState(() {}));
     _url.addListener(() => setState(() {}));
+    _urlFocus.addListener(() => setState(() {}));
+    _tokenFocus.addListener(() => setState(() {}));
   }
 
   @override
@@ -109,14 +113,15 @@ class _ConnectScreenState extends State<ConnectScreen> {
     if (!mounted) return;
     if (err != null) {
       HapticFeedback.heavyImpact();
-      setState(() { _busy = false; _error = err; if (err.contains('reach')) _editServer = true; });
+      setState(() { _busy = false; _error = err; _shakes++; if (err.contains('reach')) _editServer = true; });
       return;
     }
     final cfg = await ShellConfig.save(_url.text, _token.text);
     if (!mounted) return;
+    TextInput.finishAutofillContext(); // offers to save the server + key in the phone's password manager
     HapticFeedback.mediumImpact();
     setState(() { _busy = false; _done = true; });
-    await Future.delayed(const Duration(milliseconds: 700));
+    await Future.delayed(const Duration(milliseconds: 1650));
     if (mounted) widget.onConnected(cfg);
   }
 
@@ -161,22 +166,42 @@ class _ConnectScreenState extends State<ConnectScreen> {
       );
 
   // ───────────────────────── Shared pieces ─────────────────────────
-  Widget _primary(String label, VoidCallback? onTap, {Widget? child}) => SizedBox(
+  Widget _primary(String label, VoidCallback? onTap, {Widget? child}) {
+    final on = onTap != null || _busy || _done;
+    return _PressScale(
+      enabled: onTap != null,
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
         height: 56,
         width: double.infinity,
-        child: FilledButton(
-          style: FilledButton.styleFrom(
-            backgroundColor: _done ? ShellUi.teal : ui.button,
-            foregroundColor: ui.buttonInk,
-            disabledBackgroundColor: _done ? ShellUi.teal : ui.button.withValues(alpha: 0.28),
-            disabledForegroundColor: _done ? Colors.white : ui.buttonInk.withValues(alpha: 0.8),
-            shape: const StadiumBorder(),
-            textStyle: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w600, letterSpacing: -0.1),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          gradient: LinearGradient(
+            begin: Alignment.topCenter, end: Alignment.bottomCenter,
+            colors: on
+                ? (ui.dark ? const [Color(0xFFFFFFFF), Color(0xFFE4E4E7)] : const [Color(0xFF3A3A3D), Color(0xFF111113)])
+                : [ui.button.withValues(alpha: 0.16), ui.button.withValues(alpha: 0.16)],
           ),
-          onPressed: onTap,
+          boxShadow: on
+              ? [BoxShadow(color: Colors.black.withValues(alpha: ui.dark ? 0.45 : 0.22), blurRadius: 22, offset: const Offset(0, 10), spreadRadius: -8),
+                 BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 2, offset: const Offset(0, 1))]
+              : const [],
+        ),
+        foregroundDecoration: on ? BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.center,
+              colors: [Colors.white.withValues(alpha: ui.dark ? 0.0 : 0.10), Colors.white.withValues(alpha: 0.0)]),
+        ) : null,
+        child: DefaultTextStyle.merge(
+          style: TextStyle(color: on ? ui.buttonInk : ui.ink3, fontSize: 16.5, fontWeight: FontWeight.w600, letterSpacing: -0.1),
           child: AnimatedSwitcher(duration: const Duration(milliseconds: 220), child: child ?? Text(label, key: ValueKey(label))),
         ),
-      );
+      ),
+    );
+  }
 
   Widget _dots(int active) => Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -303,16 +328,30 @@ class _ConnectScreenState extends State<ConnectScreen> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            BrandMark(size: 52, dark: ui.dark),
+          child: AutofillGroup(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            _Rise(delay: 0, child: BrandMark(size: 56, dark: ui.dark)),
             const SizedBox(height: 24),
-            Text(widget.onCancel != null ? 'Switch server' : 'Sign in', style: TextStyle(color: ui.ink, fontSize: 32, height: 1.1, fontWeight: FontWeight.w700, letterSpacing: -0.9)),
+            _Rise(delay: 60, child: Text(widget.onCancel != null ? 'Switch server' : (widget.showIntro ? 'Sign in' : 'Welcome back'), style: TextStyle(color: ui.ink, fontSize: 32, height: 1.1, fontWeight: FontWeight.w700, letterSpacing: -0.9))),
             const SizedBox(height: 10),
-            Text('Enter your server and access key. The app remembers them, so you only do this once.',
-                style: TextStyle(color: ui.ink2, fontSize: 15.5, height: 1.45)),
+            _Rise(delay: 110, child: Text('Sign in with your server and access key. The app remembers them, so you only do this once.',
+                style: TextStyle(color: ui.ink2, fontSize: 15.5, height: 1.45))),
             const SizedBox(height: 28),
-            Container(
-              decoration: BoxDecoration(color: ui.card, borderRadius: BorderRadius.circular(22), boxShadow: ui.cardShadow, border: Border.all(color: ui.hair)),
+            _Rise(delay: 170, child: TweenAnimationBuilder<double>(
+              key: ValueKey(_shakes),
+              tween: Tween(begin: _shakes == 0 ? 1.0 : 0.0, end: 1.0),
+              duration: const Duration(milliseconds: 460),
+              builder: (_, t, child) => Transform.translate(offset: Offset(math.sin(t * math.pi * 5) * (1 - t) * 9, 0), child: child),
+              child: AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              decoration: BoxDecoration(
+                color: ui.card, borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: (_urlFocus.hasFocus || _tokenFocus.hasFocus) ? ui.ink.withValues(alpha: 0.28) : ui.hair, width: 1),
+                boxShadow: [
+                  ...ui.cardShadow,
+                  if (_urlFocus.hasFocus || _tokenFocus.hasFocus) BoxShadow(color: ui.ink.withValues(alpha: ui.dark ? 0.08 : 0.035), blurRadius: 0, spreadRadius: 3),
+                ],
+              ),
               child: Column(children: [
                 AnimatedSize(
                   duration: const Duration(milliseconds: 240),
@@ -322,7 +361,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
                 Divider(height: 1, thickness: 1, color: ui.hair, indent: 16, endIndent: 16),
                 _tokenField(),
               ]),
-            ),
+            ))),
             AnimatedSize(
               duration: const Duration(milliseconds: 240),
               curve: Curves.easeOutCubic,
@@ -341,18 +380,15 @@ class _ConnectScreenState extends State<ConnectScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            _primary(
+            _Rise(delay: 230, child: _primary(
               'Sign in',
               _canSubmit ? _signIn : null,
               child: _busy
                   ? SizedBox(key: const ValueKey('busy'), width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.4, color: ui.buttonInk))
                   : _done
-                      ? const Row(key: ValueKey('done'), mainAxisSize: MainAxisSize.min, children: [
-                          Icon(Icons.check_rounded, color: Colors.white), SizedBox(width: 8),
-                          Text('Signed in', style: TextStyle(color: Colors.white)),
-                        ])
+                      ? Icon(Icons.check_rounded, key: const ValueKey('done'), color: ui.buttonInk)
                       : Text(widget.onCancel != null ? 'Connect' : 'Sign in', key: const ValueKey('idle')),
-            ),
+            )),
             const SizedBox(height: 8),
             Center(child: TextButton(
               onPressed: _help,
@@ -362,13 +398,13 @@ class _ConnectScreenState extends State<ConnectScreen> {
             Row(mainAxisAlignment: MainAxisAlignment.center, children: [
               Icon(Icons.lock_outline_rounded, size: 14, color: ui.ink3),
               const SizedBox(width: 6),
-              Text('Secured with HTTPS · your key stays on this phone', style: TextStyle(color: ui.ink3, fontSize: 12.5)),
+              Flexible(child: Text('Secured with HTTPS · your key stays on this phone', textAlign: TextAlign.center, style: TextStyle(color: ui.ink3, fontSize: 12.5))),
             ]),
             if (firstRun && widget.onCancel == null) ...[
               const SizedBox(height: 18),
               _dots(2),
             ],
-          ]),
+          ])),
         ),
       ),
     ]);
@@ -411,7 +447,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
         textInputAction: TextInputAction.next,
         autocorrect: false,
         enableSuggestions: false,
-        autofillHints: const [AutofillHints.url],
+        autofillHints: const [AutofillHints.username, AutofillHints.url],
         style: TextStyle(color: ui.ink, fontSize: 16),
         cursorColor: ui.ink,
         decoration: _input('Server address', hint: 'https://your-server.sslip.io'),
@@ -448,19 +484,217 @@ class _ConnectScreenState extends State<ConnectScreen> {
       value: widget.palette.overlay,
       child: Scaffold(
         backgroundColor: ui.bg,
-        body: SafeArea(
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 380),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
-            transitionBuilder: (child, anim) => FadeTransition(
-              opacity: anim,
-              child: SlideTransition(position: Tween(begin: const Offset(0.06, 0), end: Offset.zero).animate(anim), child: child),
+        body: Stack(children: [
+          Positioned.fill(child: _Ambient(ui: ui)),
+          SafeArea(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 380),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, anim) => FadeTransition(
+                opacity: anim,
+                child: SlideTransition(position: Tween(begin: const Offset(0.06, 0), end: Offset.zero).animate(anim), child: child),
+              ),
+              child: _intro ? KeyedSubtree(key: const ValueKey('intro'), child: _introView()) : KeyedSubtree(key: const ValueKey('signin'), child: _signInView()),
             ),
-            child: _intro ? KeyedSubtree(key: const ValueKey('intro'), child: _introView()) : KeyedSubtree(key: const ValueKey('signin'), child: _signInView()),
           ),
+          if (_done) Positioned.fill(child: _SignedIn(ui: ui, host: _host)),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Fades and rises into place, a beat after the one before it (staggered entrance).
+class _Rise extends StatefulWidget {
+  final int delay;
+  final Widget child;
+  const _Rise({required this.delay, required this.child});
+  @override
+  State<_Rise> createState() => _RiseState();
+}
+
+class _RiseState extends State<_Rise> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 520));
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(Duration(milliseconds: widget.delay), () { if (mounted) _c.forward(); });
+  }
+  @override
+  void dispose() { _c.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) {
+    final a = CurvedAnimation(parent: _c, curve: Curves.easeOutCubic);
+    return FadeTransition(opacity: a, child: SlideTransition(position: Tween(begin: const Offset(0, 0.18), end: Offset.zero).animate(a), child: widget.child));
+  }
+}
+
+/// Sinks slightly under the finger and springs back, with a light tick: buttons feel physical.
+class _PressScale extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final bool enabled;
+  const _PressScale({required this.child, this.onTap, this.enabled = true});
+  @override
+  State<_PressScale> createState() => _PressScaleState();
+}
+
+class _PressScaleState extends State<_PressScale> {
+  bool _down = false;
+  @override
+  Widget build(BuildContext context) => Semantics(
+        button: true,
+        enabled: widget.enabled,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapDown: widget.enabled ? (_) { setState(() => _down = true); HapticFeedback.selectionClick(); } : null,
+          onTapCancel: () => setState(() => _down = false),
+          onTapUp: (_) => setState(() => _down = false),
+          onTap: widget.enabled ? widget.onTap : null,
+          child: AnimatedScale(
+            scale: _down ? 0.965 : 1,
+            duration: Duration(milliseconds: _down ? 90 : 260),
+            curve: _down ? Curves.easeOut : Curves.easeOutBack,
+            child: widget.child,
+          ),
+        ),
+      );
+}
+
+/// Two soft, slowly drifting glows behind the screen: depth without noise.
+class _Ambient extends StatefulWidget {
+  final ShellUi ui;
+  const _Ambient({required this.ui});
+  @override
+  State<_Ambient> createState() => _AmbientState();
+}
+
+class _AmbientState extends State<_Ambient> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(seconds: 14))..repeat(reverse: true);
+  @override
+  void dispose() { _c.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) {
+    final glow = widget.ui.dark ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.9);
+    final shade = widget.ui.dark ? const Color(0x22000000) : const Color(0x0C1C1C1E);
+    return IgnorePointer(
+      child: RepaintBoundary(
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (_, __) {
+            final t = Curves.easeInOut.transform(_c.value);
+            return DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(center: Alignment(0.9 - 0.3 * t, -1.0 + 0.2 * t), radius: 1.1, colors: [glow, glow.withValues(alpha: 0)]),
+              ),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(center: Alignment(-1.0 + 0.25 * t, 1.0 - 0.15 * t), radius: 1.0, colors: [shade, shade.withValues(alpha: 0)]),
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
   }
+}
+
+/// The moment you're in: a ring draws itself, a check ticks in, a soft glow blooms, then the app opens.
+class _SignedIn extends StatefulWidget {
+  final ShellUi ui;
+  final String host;
+  const _SignedIn({required this.ui, required this.host});
+  @override
+  State<_SignedIn> createState() => _SignedInState();
+}
+
+class _SignedInState extends State<_SignedIn> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))..forward();
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(const Duration(milliseconds: 560), () { if (mounted) HapticFeedback.lightImpact(); });
+  }
+  @override
+  void dispose() { _c.dispose(); super.dispose(); }
+
+  Animation<double> _seg(double a, double b, [Curve curve = Curves.easeOutCubic]) =>
+      CurvedAnimation(parent: _c, curve: Interval(a, b, curve: curve));
+
+  @override
+  Widget build(BuildContext context) {
+    final ui = widget.ui;
+    final veil = _seg(0, 0.14), ring = _seg(0.06, 0.42, Curves.easeInOutCubic), check = _seg(0.36, 0.58, Curves.easeOutCubic),
+        pop = _seg(0.06, 0.5, Curves.easeOutBack), text = _seg(0.48, 0.78), bloom = _seg(0.36, 0.9, Curves.easeOut);
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (_, __) => Container(
+        color: ui.bg.withValues(alpha: veil.value),
+        alignment: Alignment.center,
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          SizedBox(
+            width: 148, height: 148,
+            child: Stack(alignment: Alignment.center, children: [
+              Opacity( // a soft bloom that swells and fades behind the ring
+                opacity: (1 - bloom.value) * 0.9,
+                child: Container(
+                  width: 96 + 52 * bloom.value, height: 96 + 52 * bloom.value,
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: ShellUi.teal.withValues(alpha: 0.22)),
+                ),
+              ),
+              Transform.scale(
+                scale: 0.6 + 0.4 * pop.value,
+                child: Container(
+                  width: 96, height: 96,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF45C7A6), Color(0xFF239C7E)]),
+                    boxShadow: [BoxShadow(color: ShellUi.teal.withValues(alpha: 0.35 * pop.value), blurRadius: 28, offset: const Offset(0, 12), spreadRadius: -6)],
+                  ),
+                  child: CustomPaint(painter: _CheckPainter(ring: ring.value, check: check.value)),
+                ),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 22),
+          Opacity(
+            opacity: text.value,
+            child: Transform.translate(
+              offset: Offset(0, 10 * (1 - text.value)),
+              child: Column(children: [
+                Text("You're in", style: TextStyle(color: ui.ink, fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -0.6)),
+                const SizedBox(height: 6),
+                Text('Connected to ${widget.host}', style: TextStyle(color: ui.ink2, fontSize: 14.5)),
+              ]),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+class _CheckPainter extends CustomPainter {
+  final double ring, check;
+  _CheckPainter({required this.ring, required this.check});
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = size.center(Offset.zero), r = size.width / 2 - 7;
+    final p = Paint()..color = Colors.white..style = PaintingStyle.stroke..strokeWidth = 4..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round;
+    canvas.drawArc(Rect.fromCircle(center: c, radius: r), -math.pi / 2, 2 * math.pi * ring, false, p..color = Colors.white.withValues(alpha: 0.55));
+    if (check <= 0) return;
+    final a = Offset(size.width * 0.30, size.height * 0.52), b = Offset(size.width * 0.44, size.height * 0.65), d = Offset(size.width * 0.70, size.height * 0.38);
+    final path = Path()..moveTo(a.dx, a.dy);
+    final first = (a - b).distance, second = (d - b).distance, len = (first + second) * check;
+    if (len <= first) {
+      final t = len / first; path.lineTo(a.dx + (b.dx - a.dx) * t, a.dy + (b.dy - a.dy) * t);
+    } else {
+      final t = (len - first) / second; path..lineTo(b.dx, b.dy)..lineTo(b.dx + (d.dx - b.dx) * t, b.dy + (d.dy - b.dy) * t);
+    }
+    canvas.drawPath(path, p..color = Colors.white..strokeWidth = 5);
+  }
+  @override
+  bool shouldRepaint(_CheckPainter old) => old.ring != ring || old.check != check;
 }

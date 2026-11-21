@@ -52,17 +52,22 @@ class ShellConfig {
     return cfg;
   }
 
+  /// Tests can stand in for the network here.
+  static http.Client? httpClient;
+
   /// Returns null when the server accepted the token, otherwise a readable reason.
   static Future<String?> test(String url, String token) async {
     final base = normalizeUrl(url);
-    if (base.isEmpty) return 'Enter your PC\'s address.';
-    if (token.trim().isEmpty) return 'Enter your ApplyPilot token.';
+    if (base.isEmpty) return 'Enter your server address.';
+    if (token.trim().isEmpty) return 'Enter your access key.';
     try {
-      final res = await http
+      final client = httpClient ?? http.Client();
+      final res = await client
           .get(Uri.parse('$base/api/v1/health/authenticated'), headers: {'Authorization': 'Bearer ${token.trim()}'})
           .timeout(const Duration(seconds: 6));
       if (res.statusCode == 200) return null;
-      if (res.statusCode == 401 || res.statusCode == 403) return 'The server rejected this token.';
+      if (res.statusCode == 401 || res.statusCode == 403) return 'That access key didn\'t work. Check it and try again.';
+      if (res.statusCode == 429) return 'Too many tries. Wait a few minutes, then try again.';
       return 'The server answered with HTTP ${res.statusCode}.';
     } catch (_) {
       return 'Couldn\'t reach $base. Check your internet connection and the server address.';

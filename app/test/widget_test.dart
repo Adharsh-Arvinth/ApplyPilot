@@ -18,10 +18,10 @@ void main() {
     expect(cfg.ready, isFalse);
 
     await tester.pumpWidget(ApplyPilotApp(initialConfig: cfg));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 1)); // the sign-in background drifts forever, so step instead of settling
 
     expect(find.byType(ConnectScreen), findsOneWidget);
-    expect(find.text('Connect'), findsOneWidget);
+    expect(find.text('Get started'), findsOneWidget); // first run opens on the welcome pages
     expect(find.text('Cancel'), findsNothing); // nothing to go back to yet
   });
 
