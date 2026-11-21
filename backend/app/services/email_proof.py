@@ -36,7 +36,8 @@ INTERVIEW = re.compile(
     r"|next step in (the|our) (hiring|interview|recruit\w*) process|book a time|your availability for", re.I)
 CONFIRMATION = re.compile(
     r"thank(s| you) for (applying|your application|submitting|your interest in)|application (has been |was )?(received|submitted)"
-    r"|we('ve| have) received your application|received your application|your application to|application confirmation", re.I)
+    r"|we('ve| have) received your application|received your application|received your [\w .,&'-]{1,40}? application"
+    r"|your application to|application confirmation", re.I)
 ATS_SENDERS = ("greenhouse", "lever.co", "ashbyhq", "workday", "myworkday", "smartrecruiters", "icims", "jobvite",
                "bamboohr", "workable", "recruitee", "teamtailor", "successfactors", "taleo")
 TRACKED_STATUSES = ("applied", "submitted", "unverified", "dry_run", "needs_review", "needs_attention", "interview", "offer", "rejected")
@@ -58,6 +59,19 @@ def save_connection(db: Session, address: str, app_password: str) -> None:
 
 def clear_connection(db: Session) -> None:
     delete_setting(db, "email_proof")
+
+
+def reclassify_codes(db: Session) -> int:
+    """One-off tidy-up: earlier versions filed 'Security code for your application' emails as confirmations."""
+    rows = db.query(EmailProof).filter(EmailProof.kind == "confirmation").all()
+    n = 0
+    for r in rows:
+        if CODE_HINT.search(r.subject or ""):
+            r.kind = "code"
+            n += 1
+    if n:
+        db.commit()
+    return n
 
 
 def status(db: Session) -> Dict[str, Any]:
@@ -181,6 +195,8 @@ def classify(subject: str, body: str) -> Optional[str]:
         return "rejection"
     if INTERVIEW.search(text):
         return "interview"
+    if CODE_HINT.search(subject or ""):
+        return "code"  # a one-time sign-in / verification code, not a confirmation
     if CONFIRMATION.search(text):
         return "confirmation"
     return None

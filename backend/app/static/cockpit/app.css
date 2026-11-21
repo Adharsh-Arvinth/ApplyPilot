@@ -1484,3 +1484,9 @@ html[data-motion="reduce"] .tabbar button .ms, html[data-motion="reduce"] .set-n
   .ai-empty { padding: var(--s5) var(--s3); }
 }
 .act-card .card-h > .btn { margin-left: auto; }
+
+/* Proof: who sent the application */
+.who { display: inline-flex; align-items: center; gap: 3px; margin-right: 6px; padding: 0 7px; height: 18px; border-radius: 9px;
+  font-size: .6875rem; font-weight: 700; color: var(--ink-2); background: var(--surface-2); vertical-align: 1px; }
+.who.ap { color: var(--teal); background: color-mix(in srgb, var(--teal) 14%, transparent); }
+.who .ms { font-size: 12px; }

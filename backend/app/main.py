@@ -48,6 +48,8 @@ async def lifespan(app: FastAPI):
         AnswerService.seed_initial_data(db)
         from backend.app.services.scoring_service import ScoringService
         ScoringService.refresh_stale_summaries(db)  # one-off: replace old template card summaries
+        from backend.app.services.email_proof import reclassify_codes
+        reclassify_codes(db)  # one-off: sign-in codes were filed as confirmations
     finally:
         db.close()
     

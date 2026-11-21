@@ -52,7 +52,7 @@ def test_phase4_dry_run_application():
 
             # Run application engine
             result = await AutoApplyEngine.process_job_application(db, job, profile, force_dry_run=True)
-            assert result["status"] in ["dry_run", "submitted", "needs_input", "blocked", "skipped", "failed"]
+            assert result["status"] in ["dry_run", "submitted", "needs_input", "blocked", "skipped", "failed", "expired"]  # live postings close
             
             # If dry run succeeded, verify screenshot and application record
             if result["status"] == "dry_run":

@@ -13,7 +13,7 @@ from backend.app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-from backend.app.services.eligibility_service import SeniorityGuard, LocationGuard
+from backend.app.services.eligibility_service import SeniorityGuard, LocationGuard, RoleGuard
 
 ALLOWED_LOCATIONS = [
     "india", "bangalore", "bengaluru", "chennai", "hyderabad",
@@ -65,6 +65,9 @@ class JobDiscoveryService:
         ok_exp, _ = SeniorityGuard.check_experience(title_str)
         if not ok_exp:
             return False
+        ok_role, _ = RoleGuard.check_title(title_str)
+        if not ok_role:
+            return False
         t = title_str.lower()
         return any(term in t for term in TARGET_TITLE_KEYWORDS)
 
@@ -82,6 +85,9 @@ class JobDiscoveryService:
                         title = item.get("title", "")
                         loc = item.get("location", {}).get("name", "India")
                         job_url = item.get("absolute_url", "")
+                        if item.get("id") and "greenhouse.io" not in job_url:
+                            # The company shows the form inside its own site; go straight to Greenhouse's form page
+                            job_url = f"https://job-boards.greenhouse.io/embed/job_app?for={board_name}&token={item['id']}"
                         if JobDiscoveryService.is_target_title(title) and JobDiscoveryService.is_eligible_location(loc):
                             jobs.append({
                                 "source": "greenhouse",

@@ -12,6 +12,7 @@ breaker and Live vs Dry-run. Autopilot never turns Live mode on by itself.
 """
 import asyncio
 import datetime
+import re
 import logging
 import zoneinfo
 from typing import Any, Dict, Optional
@@ -107,6 +108,19 @@ class Autopilot:
             "live": bool(profile and profile.go_live),
         }
 
+    # Roles that match what the candidate is actually after go first; with one application per company
+    # every 30 days, the best role at each company must be the one that gets sent.
+    CORE_TITLE = re.compile(r"machine learning|\bml\b|data scien|\bai\b|artificial intelligence|data analyst|"
+                            r"data engineer|analytics|computer vision|\bnlp\b|deep learning|genai|llm|python|"
+                            r"software (engineer|developer)|backend|intern|graduate|new grad|associate (engineer|data)", re.I)
+    INDIA_LOC = re.compile(r"india|bengaluru|bangalore|hyderabad|chennai|pune|mumbai|gurgaon|gurugram|noida|delhi", re.I)
+
+    @staticmethod
+    def apply_priority(job: Job):
+        core = 0 if Autopilot.CORE_TITLE.search(job.title or "") else 1
+        india = 0 if Autopilot.INDIA_LOC.search(job.location or "") else 1
+        return (core, india, -(job.score or 0), job.created_at or datetime.datetime.max)
+
     @staticmethod
     def apply_gap_minutes(profile: Optional[Profile]) -> int:
         hourly = (profile.hourly_cap if profile and profile.hourly_cap else 10)
@@ -197,10 +211,11 @@ class Autopilot:
         hourly_ok = _applied_since(db, now - datetime.timedelta(hours=1)) < (profile.hourly_cap or 10)
         if not profile.is_paused and hourly_ok and (not last_apply or now - last_apply >= gap):
             # Only sites that allow automation; assist-only roles wait for you (shown on Home).
-            job = (db.query(Job)
-                   .filter(Job.status == "queued", Job.is_assist_only == False,  # noqa: E712
-                           ~Job.source.in_(ASSIST_ONLY_SOURCES))
-                   .order_by(Job.score.desc(), Job.created_at.asc()).first())
+            candidates = (db.query(Job)
+                          .filter(Job.status == "queued", Job.is_assist_only == False,  # noqa: E712
+                                  ~Job.source.in_(ASSIST_ONLY_SOURCES))
+                          .order_by(Job.score.desc(), Job.created_at.asc()).limit(300).all())
+            job = min(candidates, key=Autopilot.apply_priority) if candidates else None
             if job:
                 job.status = "applying"
                 db.commit()

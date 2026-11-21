@@ -40,6 +40,39 @@ FOREIGN_TERMS = [
     "chicago", "boston", "singapore", "dubai", "ireland", "dublin"
 ]
 
+# Roles that aren't hands-on technical work (wrong fit for this candidate), unless the title is clearly technical
+NON_TECH_REGEX = re.compile(
+    r"\b(sales|pre-?sales|account (executive|manager)|business development|bdr|sdr|gtm|go[- ]to[- ]market|"
+    r"compliance|investigations?|risk (operations|management)|collections?|billing|deal desk|alliances?|partnerships?|"
+    r"recruit\w*|talent|legal|counsel|payroll|accounting|accountant|procurement|office|executive assistant|"
+    r"customer success|revenue operations|rev ?ops|strategic finance|treasury|tax|audit|merchandis\w*|"
+    r"operations|risk analyst|support associate|social media|cost analyst|marketing|"
+    r"hr|human resources|onboarding|product\s+ops|expenses?|ap|equity reporting|financial reporting|fp&a|"
+    r"general ledger|ledger|commissions?|content|copywrit\w*|editor\w*)\b", re.I)
+STRONG_TECH_REGEX = re.compile(
+    r"machine learning|\bml\b|data scien\w*|\bai\b|\bengineer\b|software engineer|developer|back-?end|front-?end|full[- ]?stack|"
+    r"data engineer|platform engineer|research (engineer|scientist)|computer vision|\bnlp\b|deep learning", re.I)
+ALWAYS_NON_TECH = re.compile(r"\b(sales engineer|solutions? engineer|pre-?sales)\b", re.I)
+
+
+class RoleGuard:
+    @staticmethod
+    def check_title(title: str) -> Tuple[bool, Optional[str]]:
+        """Keep to hands-on technical roles: no sales/pre-sales, compliance, finance-ops or recruiting jobs."""
+        t = title or ""
+        lvl = re.search(r"(?:\b(III|IV|V|VI)\b|\bL[4-9]\b|\bLevel [4-9]\b|\barchitect\b|"
+                        r"\b(?:engineer|developer|sde)\s*[-,]?\s*[3-9]\b|\bSDE[- ]?(?:3|4|III|IV)\b)", t, re.I)
+        if lvl:
+            return False, f"Level '{lvl.group(0)}' is for experienced engineers"
+        m = ALWAYS_NON_TECH.search(t)
+        if m:
+            return False, f"Not a fit: '{m.group(0)}' is a sales-side role"
+        m = NON_TECH_REGEX.search(t)
+        if m and not STRONG_TECH_REGEX.search(t):
+            return False, f"Not a fit: '{m.group(0)}' is not a hands-on technical role"
+        return True, None
+
+
 class EligibilityDecision:
     def __init__(self, is_eligible: bool, reason: str, violations: Optional[List[str]] = None, needs_verification: bool = False):
         self.is_eligible = is_eligible
@@ -91,10 +124,11 @@ class LocationGuard:
             return True, None
 
         if "remote" in loc_lower:
-            # Remote without India or any foreign specification -> check if foreign
-            if has_foreign:
-                return False, f"Remote location outside India: '{location}'"
-            return True, None # Remote acceptable if not foreign
+            # Plain "Remote" / "Remote - Anywhere" is fine; "Remote - Spain", "Ontario - Remote", "Remote - TX" are not
+            rest = re.sub(r"remote|work from home|wfh|anywhere|worldwide|global|distributed|[-–—,;/|()&.\s]+", " ", loc_lower).strip()
+            if has_foreign or rest:
+                return False, f"Remote role tied to another region: '{location}'"
+            return True, None
 
         return False, f"Location '{location}' is not a recognized Indian city or remote-India"
 
@@ -152,6 +186,11 @@ class EligibilityService:
         ok_title, reason_title = SeniorityGuard.check_title(title)
         if not ok_title:
             violations.append(reason_title)
+
+        # 1b. Hands-on technical role
+        ok_role, reason_role = RoleGuard.check_title(title)
+        if not ok_role:
+            violations.append(reason_role)
 
         # 2. Experience threshold
         ok_exp, reason_exp = SeniorityGuard.check_experience(title, description)

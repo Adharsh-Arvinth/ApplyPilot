@@ -54,10 +54,15 @@ def proofs_list(kind: Optional[str] = None, limit: int = 200, db: Session = Depe
     if kind:
         q = q.filter(EmailProof.kind == kind)
     rows = q.order_by(EmailProof.received_at.desc()).limit(max(1, min(limit, 500))).all()
-    titles = {j.id: j.title for j in db.query(Job).filter(Job.id.in_([r.job_id for r in rows if r.job_id])).all()}
+    ids = [r.job_id for r in rows if r.job_id]
+    titles = {j.id: j.title for j in db.query(Job).filter(Job.id.in_(ids)).all()}
+    from backend.app.models import Application
+    by_app = {a.job_id for a in db.query(Application).filter(
+        Application.job_id.in_(ids), Application.resume_file != "manual_tracking_submission",
+        Application.status.in_(("submitted", "unverified", "applied"))).all()}
     return [{
         "id": r.id, "job_id": r.job_id, "role": titles.get(r.job_id, ""), "company": r.company, "sender": r.sender,
-        "subject": r.subject, "snippet": r.snippet, "kind": r.kind,
+        "subject": r.subject, "snippet": r.snippet, "kind": r.kind, "by_applypilot": r.job_id in by_app,
         "received_at": r.received_at.isoformat() if r.received_at else None,
     } for r in rows]
 

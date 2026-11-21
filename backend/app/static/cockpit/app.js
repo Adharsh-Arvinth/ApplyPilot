@@ -1003,9 +1003,9 @@
         <span class="art" style="--h:${hue(m.company)}">${esc(initials(m.company))}${m.match_percent ? `<span class="badge">${m.match_percent}%</span>` : ''}<span class="open">${icon('arrow_outward')}</span></span>
         <span class="tile-t">${esc(m.title)}</span><span class="tile-s"><span class="ellipsis">${esc(m.company)}</span>${scoreTag(m.score)}</span></button>`).join('')}</div></section>`;
   }
-  const PROOF_KIND = { confirmation: ['Confirmed', 'teal'], interview: ['Interview', 'violet'], rejection: ['Declined', 'slate'] };
+  const PROOF_KIND = { confirmation: ['Confirmed', 'teal'], interview: ['Interview', 'violet'], rejection: ['Declined', 'slate'], code: ['Code', 'slate'] };
   const proofRow = (p) => `<button class="row hv" data-proof="${p.id}">
-    ${art(p.company, 'sm')}<span class="grow"><span class="main-t">${esc(p.subject || p.company)}</span><span class="sub-t">${esc(p.company)}${p.role ? ' · ' + esc(p.role) : ''}</span></span>
+    ${art(p.company, 'sm')}<span class="grow min0"><span class="main-t">${esc(p.subject || p.company)}</span><span class="sub-t">${p.by_applypilot ? `<span class="who ap">${icon('auto_awesome', 'fill')}ApplyPilot</span>` : '<span class="who">You</span>'}${esc(p.company)}${p.role ? ' · ' + esc(p.role) : ''}</span></span>
     <span class="end"><span class="chip ${PROOF_KIND[p.kind] ? PROOF_KIND[p.kind][1] : ''}">${PROOF_KIND[p.kind] ? PROOF_KIND[p.kind][0] : esc(p.kind)}</span><span class="faint small tnum">${rel(p.received_at)}</span></span></button>`;
 
   // What the autopilot is doing right now and what happened on its last try, in plain words
