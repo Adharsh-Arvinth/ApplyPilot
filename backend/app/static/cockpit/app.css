@@ -1324,3 +1324,12 @@ html.lite .toolbar > .hint, html.lite .kbd { display: none; }
 
 /* Sideways drags on the settings tabs drive the glide (the row scrolls under the lens), vertical ones scroll the page */
 .set-nav { touch-action: pan-y; }
+
+/* Phone settings tabs behave and look exactly like the bottom tab bar: only the glass moves.
+   No per-tab hover/press highlight or finger spotlight trailing behind it. */
+@media (max-width: 1023px) {
+  .set-nav .set-link::before, .set-nav .set-link::after { content: none; display: none; }
+  .set-nav .glide { border-radius: var(--r-pill); box-shadow: var(--rim), 0 4px 14px -4px rgba(0, 0, 0, .3); }
+  .set-nav .set-link:active .ms { transform: scale(.86); transition-duration: var(--t-press); }
+  .set-nav .glide.held { scale: 1.1 1.14; }
+}
