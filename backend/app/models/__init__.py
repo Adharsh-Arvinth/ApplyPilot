@@ -131,6 +131,7 @@ class Job(Base):
     
     score = Column(Float, default=0.0) # 1.0 to 5.0 (Composite Fit)
     score_reason = Column(Text, default="")
+    description = Column(Text, default="")  # the posting's own text, fetched from the ATS for tailoring
     
     # Explainable Fit Scoring breakdown (0.0 to 100.0 or 1.0 to 5.0)
     skills_score = Column(Float, default=0.0)

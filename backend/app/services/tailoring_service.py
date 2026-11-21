@@ -49,6 +49,59 @@ class ResumeTailoringService:
         }
 
     @staticmethod
+    def _from_master(master: Path, company: str, role: str, job_description: str, html_out: Path, pdf_out: Path,
+                     kw_analysis: Dict[str, Any]) -> Dict[str, Any]:
+        from backend.app.services import resume_builder as rb
+        parsed = rb.parse_master(rb.read_master_text(master))
+        t = rb.tailor(parsed, role, company, job_description or "")
+        p = LOCKED_FACTS["personal"]
+        ed = LOCKED_FACTS["education"]
+        person = {"name": p.get("name", ""), "email": p.get("email", ""), "phone": p.get("phone", ""),
+                  "linkedin": p.get("linkedin", ""), "github": p.get("github", ""),
+                  "location": ", ".join(x.strip() for x in [p.get("location", "").split(",")[0], "India"] if x.strip()) if "india" in p.get("location", "").lower() else p.get("location", "")}
+        education = [{"institution": ed.get("institution_full", ""), "when": f"{ed.get('start_date', '')} – Present".strip(" –"),
+                      "degree": ed.get("degree", ""), "detail": f"CGPA {ed.get('cgpa', '')}" if ed.get("cgpa") else ""}]
+        html_str = rb.render_html(t, person, education)
+        html_out.write_text(html_str, encoding="utf-8")
+        if pdf_out.exists():
+            try:
+                pdf_out.unlink()
+            except Exception:
+                pass
+
+        def render(scale: float):
+            with sync_playwright() as pw:
+                browser = pw.chromium.launch(headless=True)
+                page = browser.new_page()
+                page.set_content(html_str, wait_until="networkidle")
+                page.pdf(path=str(pdf_out), format="A4", print_background=True, prefer_css_page_size=True, scale=scale,
+                         margin={"top": "0", "bottom": "0", "left": "0", "right": "0"})
+                browser.close()
+
+        from concurrent.futures import ThreadPoolExecutor
+        pages, text = 0, ""
+        for scale in (1.0, 0.95, 0.9, 0.86):  # shrink gently until it fits on one page
+            with ThreadPoolExecutor(max_workers=1) as ex:
+                ex.submit(render, scale).result(timeout=60)
+            reader = pypdf.PdfReader(str(pdf_out))
+            pages, text = len(reader.pages), "".join((pg.extract_text() or "") for pg in reader.pages)
+            if pages == 1:
+                break
+        problems = rb.quality_problems(t, text, pages)
+        if problems:
+            raise ValueError("Resume not good enough to send: " + "; ".join(problems))
+        return {
+            "html_path": str(html_out), "pdf_path": str(pdf_out), "filename": pdf_out.name,
+            "target_company": company, "target_role": role,
+            "ats_score": kw_analysis["ats_compatibility_score"], "keyword_coverage_percent": kw_analysis["coverage_percent"],
+            "matched_keywords": t.get("matched", []) or kw_analysis["matched_keywords"],
+            "missing_qualifications": kw_analysis["missing_qualifications"], "source": "master_resume",
+            "changes_applied": [f"Tailored your master resume for {role} at {company}",
+                                f"Skills the posting names listed first: {', '.join(t.get('matched', [])[:6]) or 'none named'}",
+                                "Projects ordered by relevance; every bullet is your own wording"],
+        }
+
+    @staticmethod
     def generate_tailored_resume(
         company: str,
         role: str,
@@ -77,6 +130,11 @@ class ResumeTailoringService:
 
         # Keyword analysis
         kw_analysis = ResumeTailoringService.analyze_keywords(role, job_description)
+
+        # Preferred path: tailor the candidate's own master resume (all real content, role-first ordering)
+        master = next(iter(sorted((settings.OUTPUT_DIR / "resumes").glob("master_resume.*"))), None)
+        if master is not None:
+            return ResumeTailoringService._from_master(master, company, role, job_description, html_out, pdf_out, kw_analysis)
 
         # Personal Contact details from LOCKED_FACTS
         email_val = LOCKED_FACTS["personal"]["email"]

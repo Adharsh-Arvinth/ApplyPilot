@@ -317,6 +317,26 @@ class AutoApplyEngine:
     )
 
     @staticmethod
+    async def _open_browser(p):
+        """A real, full Chromium in modern headless mode that tells the truth about itself.
+        The stripped-down headless shell (and a fake 'Chrome 124' user agent on a newer browser) gets silently
+        rejected by ATS bot checks: the form fills, but the final submit request is never sent."""
+        args = ["--disable-blink-features=AutomationControlled", "--lang=en-IN"]
+        try:
+            browser = await p.chromium.launch(channel="chromium", headless=True, args=args)
+        except Exception:
+            browser = await p.chromium.launch(headless=True, args=args)
+        import platform
+        machine = platform.machine().lower()
+        plat = {"Windows": "Windows NT 10.0; Win64; x64", "Darwin": "Macintosh; Intel Mac OS X 10_15_7"}.get(
+            platform.system(), "X11; Linux aarch64" if machine in ("aarch64", "arm64") else "X11; Linux x86_64")
+        ua = f"Mozilla/5.0 ({plat}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{browser.version} Safari/537.36"
+        context = await browser.new_context(user_agent=ua, viewport={"width": 1280, "height": 900},
+                                            locale="en-IN", timezone_id="Asia/Kolkata", color_scheme="light")
+        await context.add_init_script("Object.defineProperty(navigator, 'webdriver', { get: () => undefined });")
+        return browser, context
+
+    @staticmethod
     async def _click_submit(page: Page) -> bool:
         btn = await page.query_selector(AutoApplyEngine.SUBMIT_SELECTORS)
         if not btn:
@@ -586,7 +606,12 @@ class AutoApplyEngine:
 
         # Generate tailored 1-page resume with strict fact grounding
         try:
-            resume_info = ResumeTailoringService.generate_tailored_resume(job.company, job.title, profile)
+            if not (getattr(job, "description", "") or "").strip():
+                from backend.app.services.job_description import fetch as fetch_description
+                job.description = (await asyncio.to_thread(fetch_description, job.url, job.source or "")) or ""
+                db.commit()
+            resume_info = await asyncio.to_thread(ResumeTailoringService.generate_tailored_resume, job.company, job.title, profile,
+                                                  job.description or "")
             pdf_path = resume_info["pdf_path"]
         except Exception as uf_err:
             logger.warning(f"Fact grounding or resume check failed for {job.company}: {uf_err}")
@@ -616,14 +641,7 @@ class AutoApplyEngine:
         AutoApplyEngine._record_transition(db, job, "applying", f"Browser launched for {mode_label} fill")
 
         async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=True,
-                args=["--disable-blink-features=AutomationControlled"]
-            )
-            context = await browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                viewport={"width": 1280, "height": 900}
-            )
+            browser, context = await AutoApplyEngine._open_browser(p)
             page = await context.new_page()
             page.set_default_timeout(8000)  # a stuck element fails fast instead of waiting 30 s
 
@@ -905,9 +923,33 @@ class AutoApplyEngine:
                 if is_live:
                     submit_clicked_time = datetime.datetime.now(datetime.timezone.utc)
 
+                    # Watch the network: a real submission sends the ATS's own "submit application" request.
+                    # If the click produces none, the site silently refused it (usually a bot check) - never call that "sent".
+                    submit_calls = []
+
+                    def _on_request(rq):
+                        try:
+                            u = rq.url.lower()
+                            if rq.method not in ("POST", "PUT") or any(x in u for x in (
+                                    "google", "recaptcha", "hcaptcha", "analytics", "sentry", "segment", "datadog", "hotjar",
+                                    "apisetformvalue", "upload", "telemetry", "/log", "fullstory", "intercom")):
+                                return
+                            body = (rq.post_data or "")[:600].lower() if rq.post_data else ""
+                            if any(x in u + " " + body for x in ("submit", "apply", "application", "job_app", "candidate")):
+                                submit_calls.append(rq)
+                        except Exception:
+                            pass
+                    page.on("request", _on_request)
+
                     await AutoApplyEngine._click_submit(page)
                     logger.info(f"Clicked submit for {job.company}. Waiting for the result…")
                     await AutoApplyEngine._wait_for_outcome(page)
+                    if not submit_calls:
+                        _, confirmed_early, _ = await AutoApplyEngine._outcome(page)
+                        if not confirmed_early:  # the bot check may still be loading: one patient second try
+                            await asyncio.sleep(4)
+                            await AutoApplyEngine._click_submit(page)
+                            await AutoApplyEngine._wait_for_outcome(page)
                     code_state = await AutoApplyEngine._complete_email_code(page, job.company, submit_clicked_time)
                     if code_state == "entered":
                         await AutoApplyEngine._wait_for_outcome(page)
@@ -946,6 +988,29 @@ class AutoApplyEngine:
 
                     if code_state == "timeout" and not is_confirmed:
                         AutoApplyEngine._ask_user(db, job, [{"label": f"{job.company} emailed a verification code. Connect your inbox in Settings › Email proof, or enter the code yourself.", "kind": "text", "reason": "No code arrived within 3 minutes"}])
+
+                    # Nothing left the browser: the site refused the automated submit. Not an application, no cooldown.
+                    sent_ok = False
+                    for rq in submit_calls:
+                        try:
+                            resp = await rq.response()
+                            if resp is not None and resp.status < 400:
+                                sent_ok = True
+                                break
+                        except Exception:
+                            pass
+                    if not is_confirmed and not sent_ok:
+                        why = ("the site didn't accept the automatic submit (it sent nothing - usually a bot check)" if not submit_calls
+                               else "the site rejected the submission")
+                        AutoApplyEngine._record_transition(db, job, "needs_attention", f"Not sent: {why}", "not_sent")
+                        job.status = "needs_attention"
+                        job.skip_reason = (f"Not sent: {why}. The tailored resume and answers are ready - "
+                                           f"open the posting and press Submit yourself.")[:500]
+                        db.add(RunLog(event_type="automation", level="warn", outcome="not_sent",
+                                      message=f"{job.company}: {why}. Marked for you to submit."))
+                        db.commit()
+                        await browser.close()
+                        return {"status": "not_sent", "reason": why, "screenshot": str(confirm_screenshot), "resume": str(pdf_path)}
 
                     has_proof = is_confirmed and confirm_screenshot.exists() and confirm_screenshot.stat().st_size > 1000
                     final_app_status = "submitted" if has_proof else "unverified"

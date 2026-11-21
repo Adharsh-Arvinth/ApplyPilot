@@ -210,9 +210,11 @@ def test_resume_a4_single_column_headings_and_single_page():
 
     extracted_text = "".join(p.extract_text() for p in reader.pages).upper()
     headings = ["EDUCATION", "SKILLS", "PROJECTS", "PATENTS", "CERTIFICATIONS"]
+    lines = [ln.strip() for ln in extracted_text.splitlines()]
     last_idx = -1
     for h in headings:
-        idx = extracted_text.find(h)
+        # the heading line itself (the word can also appear in the summary, e.g. "two published patents")
+        idx = next((i for i, ln in enumerate(lines) if ln == h or ln.endswith(" " + h) and len(ln) < len(h) + 12), -1)
         assert idx != -1, f"Heading {h} missing from resume PDF"
         assert idx > last_idx, f"Heading {h} out of reading order"
         last_idx = idx

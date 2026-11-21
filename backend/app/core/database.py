@@ -96,6 +96,7 @@ def migrate_db():
         # 3. Migrate jobs
         job_cols = get_existing_cols("jobs")
         job_additions = [
+            ("description", "TEXT DEFAULT ''"),
             ("work_mode", "VARCHAR(32) DEFAULT 'remote'"),
             ("experience_required", "VARCHAR(64) DEFAULT '0-1 years'"),
             ("skills_score", "FLOAT DEFAULT 0.0"),
