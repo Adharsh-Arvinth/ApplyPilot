@@ -1355,3 +1355,11 @@ html.lite .toolbar > .hint, html.lite .kbd { display: none; }
 .tabbar button.hot .ms, .set-nav .set-link.hot .ms { transform: none; }
 @media (prefers-reduced-motion: reduce) { .tabbar button .ms, .set-nav .set-link .ms { scale: 1; } }
 html[data-motion="reduce"] .tabbar button .ms, html[data-motion="reduce"] .set-nav .set-link .ms { scale: 1; }
+
+/* Top settings tabs, phone: the glass rides in a track like the bottom bar, and nothing repaints under it */
+@media (max-width: 1023px) {
+  .set-nav { padding: 4px; margin: 0; gap: 2px; border-radius: var(--r-pill);
+    background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--hair); }
+  .set-nav .set-link { height: 34px; transition: color .3s var(--ease-out); }
+  .set-nav.is-gliding { -webkit-mask-image: none !important; mask-image: none !important; }
+}

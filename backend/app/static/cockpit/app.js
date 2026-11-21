@@ -253,12 +253,12 @@
     const horiz = Math.abs(st.vx) >= Math.abs(st.vy);
     ind.style.setProperty('--sx', (horiz ? 1 + stretch : 1 - stretch * 0.4).toFixed(3));
     ind.style.setProperty('--sy', (horiz ? 1 - stretch * 0.4 : 1 + stretch).toFixed(3));
-    const items = st.items;
-    if (items && items.length) { // magnify what the glass passes over
+    const items = st.items, centers = st.centers;
+    if (items && centers) { // magnify what the glass passes over (positions measured once, not per frame)
       const cx = st.x + st.w / 2, reach = Math.max(st.w, 40) * 1.15, lift = ind.classList.contains('held') ? 0.2 : 0.08;
-      for (const it of items) {
-        const d = Math.abs(it.offsetLeft + it.offsetWidth / 2 - cx), m = Math.max(0, 1 - d / reach);
-        it.style.setProperty('--mag', (1 + lift * m * m).toFixed(3));
+      for (let i = 0; i < items.length; i++) {
+        const m = Math.max(0, 1 - Math.abs(centers[i] - cx) / reach), mag = (1 + lift * m * m).toFixed(3);
+        if (items[i].__mag !== mag) { items[i].__mag = mag; items[i].style.setProperty('--mag', mag); }
       }
     }
   }
@@ -279,7 +279,11 @@
     if (!st) { st = { ...to, vx: 0, vy: 0, vw: 0, vh: 0, raf: 0, t: 0 }; springs.set(ind, st); snap = true; }
     st.to = { ...to };
     const root = ind.parentElement;
-    st.items = root && (root.id === 'tabbar' || root.classList.contains('set-nav')) ? Array.from(root.querySelectorAll(':scope > button, :scope > .set-link')) : null;
+    if (st.root !== root || !st.items) { // measure the items once per render; content positions don't change while scrolling
+      st.root = root;
+      st.items = root && (root.id === 'tabbar' || root.classList.contains('set-nav')) ? Array.from(root.querySelectorAll(':scope > button, :scope > .set-link')) : null;
+      st.centers = st.items ? st.items.map(it => it.offsetLeft + it.offsetWidth / 2) : null;
+    }
     ind.style.transition = 'opacity 200ms, scale 260ms var(--ease-sheet), --lift 260ms var(--ease-sheet)';
     if (snap || reduceMotion()) {
       cancelAnimationFrame(st.raf); st.raf = 0;
@@ -297,6 +301,7 @@
     if (!on || !on.offsetWidth) { ind.style.opacity = '0'; return; }
     const to = { x: on.offsetLeft, y: on.offsetTop, w: on.offsetWidth, h: on.offsetHeight };
     const from = glidePos[key];
+    const known = springs.get(ind); if (known) known.items = null; // layout may have changed: re-measure
     if (fresh) lensTo(ind, from || to, true);
     lensTo(ind, to);
     ind.style.opacity = '1';
@@ -558,12 +563,14 @@
       d.armed = true;
       try { d.nav.setPointerCapture(d.id); } catch (e) {}
       const l = lens(d.nav); if (l) l.classList.add('held', 'gliding');
+      d.nav.classList.add('is-gliding');
       hot(d.nav, d.over); tick(); follow(); d.raf = requestAnimationFrame(loop);
     };
     const stop = () => {
       if (!d) return;
       clearTimeout(d.timer); cancelAnimationFrame(d.raf);
       const l = lens(d.nav); if (l) l.classList.remove('held', 'gliding');
+      d.nav.classList.remove('is-gliding');
       hot(d.nav, null);
     };
     document.addEventListener('pointerdown', (e) => {
